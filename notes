@@ -1,0 +1,106 @@
+* Technical Questions
+- Q: Straight webgl or find a library?
+- A: Neither, layout in clay, just use a canvas renderer
+
+https://github.com/johan0A/clay-zig-bindings
+* Game Ideas
+- Kaiju roguelike
+  - big, multi-tile monsters
+    - direct hit from kaiju, obscene amount of damage, almost always insta-death
+    = kaiju more often do environment damage, and chunks of terrain etc can hit the player
+  - level structure
+    - lots of obstacles, buildings, etc
+    - the remains of tokyo after the kaiju showed up
+    - streets, alleys
+    - you can hide in a building, but kaiju can break down the building
+    - every building has an escape/back door/etc
+    - one giant map
+    - you need several maguffins to put together to destroy the kaiju breeding grounds
+    - the maguffins attract kaiju, so progression
+    - use perlin noise or something to create a kaiju density map
+  - terrain features
+    - buildings
+    - parks
+    - highways that restrict movement with controlled access
+    - vending machines
+      - money operated
+      - usually heal you (random)
+      - some random positive effect sometimes
+      - unknown finite uses
+  - vehicle-based movement
+    - motorcycle:
+      - 2x1
+      - draw as:   %@
+      - wasd to move
+      - you have a speed and a facing
+        - reticle for indicator
+      - moving along with your facing increases your speed
+        - diminishing return on acceleration? (maybe not)
+          - ie accel 1 -> speed 2, accel 3 -> speed 3, accel 6 -> speed 4
+      - a right turn halves your speed
+      - a reverse brakes
+        - braking continues for speed/2
+        - causes the motorcycle to turn right/left
+        - speed goes to 0
+      - use the shift keys to modify movement
+        - shift + brake is a weaker brake
+        - shift + left/right strafes
+        - shift + forward maintains speed
+      - crash:
+        - separated from motorcycle
+        - need to walk back to it (normal 4-dir mvoement)
+        - on the turn you would have crashed, you leap off the motorcycle and let it crash instead
+          - you do not move
+          - the motorcycle does
+          - motorcycle loses some hp
+            - at zero, its broken
+        - same if you send it into a kaiju
+          - damage to enemy proportional to speed
+
+
+- weapons:
+  - gun
+    - basic shot does 1 damage
+    - sometimes it becommes useful somehow
+  - artillery strike
+    - paint target for N turns
+    - then the artillery lands
+  - paint to target a missile?
+  - paint to target a nuclear weapon?
+  - poisonous dart (engineered anti-kaiju virus)
+    - takes time to take effect
+  - death ray (radiation damage)
+    - restrictions: splashback, not affected by multipliers
+  - regeneration inhibitor:
+    - increases damage of subsequent attacks
+    - has a cooldown
+    - the bonuses are color-coded
+  - psi lance
+    - has bonus damage based on overkill delivered to other enemies recently
+
+- game about compounding numbers
+  - damage types:
+     radiation: does a percentage of current enemy health
+     viral: over time, stacks up an increasing multiplier on incoming damage
+     combo: a sequence of moves that increase the damage of immediately (ish) following moves
+     overkill: bonus damage to later attacks from excess damage dealt to other enemies
+     crit clock: 
+       - clock 1: 2x damage every other turn
+       - clock 2: 2x damage every 3rd turn
+       - clock 3: 2x damage every 5rd turn
+       - ...
+
+- progression:
+  - Your level is the size of the biggest kaiju you have taken down
+  - higher level means you can carry more items
+  - items in inventory have an order
+  - stat buffs from earlier items affect the impact of later items
+    - some items have stat buffs that scale with a stat
+
+- stats:
+  - destiny (luck)
+  - accuracy
+  - fitness
+  - acuity
+  - focus
+  - determination
