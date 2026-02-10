@@ -1,6 +1,32 @@
 * Technical Questions
 - Q: Straight webgl or find a library?
-- A: Neither, layout in clay, just use a canvas renderer
+- A: straight up webgl
+
+
+- Q: How do you deal with camera?
+- A: There's a big array of map locations
+     there's a camera vector
+     we use the two of those to figure out what to draw
+
+
+- Q: How are we going to display the giant kaiju?
+- 
+............................................
+............................................
+............................................
+...........................|----|...........
+.................|-|.......|****|...........
+.................|k|.......|*--*|...........
+......@%.........|-|.......|*-K*|...........
+...........................|****|...........
+...........................|----|...........
+............................................
+............................................
+............................................
+............................................
+
+
+
 
 https://github.com/johan0A/clay-zig-bindings
 * Game Ideas
@@ -57,11 +83,133 @@ https://github.com/johan0A/clay-zig-bindings
         - same if you send it into a kaiju
           - damage to enemy proportional to speed
 
+mapgen:
+  - there's a cool thing that happens in cities:
+    when you have two different neighborhoods on grid systems, but the grids are at different angles and they meet
+  - generating by chunks of city blocks
+    - they vary in some way:
+      - all grids are NSEW aligned
+      - street width, in any direction
+      - street spacing (controls block width, height)
+      - building size
+      - what % of a block is building/open
+      - degree of destruction
+      - zoning
+        - residential 
+          - more vending machines, smaller buildings
+        - industrial
+          - larger buildings, more kaiju eggs
+        - commercial
+          - more loot, piles of money
+        - kaiju nest
+          - how do we indicate to the player that it is a kaiju nest?
+  - map features
+    - obstacles?
+    - trail of destruction
+
+kaiju behavior:
+  - when you aren't around:
+    - walk in a straight line
+    - active destruction
+  - Q: how do you aggro a kaiju?
+
+eg blocks are 50x50
+
+terrain types:
+  - " grass
+  - asphalt
+    - painted asphalt (for road stripes)
+  - . interior
+  - ^ tree
+  - O rubble (impassable to player, passable to monster)
+  - ; debris (slows)
+  - 0 eggs (monsters do not destroy, impassable to monsters, player can run them over)
+  - fat + glass door
+    - shoot it to break it
+    - can crash through it
+  - + wooden door
+    - open/closed
+  - # wall
+  - = glass wall / window
+    - shoot it to break it
+    - can crash through it
+
+motorcycles:
+ - lots of spare motorcycles scattered throughout the map
+ - they have varying attributes
+   - model name
+   - hp
+   - damage
+   - top speed
+   - acceleration curve
+     - eg: [1,1,1,1,1,1] accel by 1 at any speed
+     - eg: [3,1,1,1,1,1] accel by 3 from a stop, otherwise by 1
+     - eg: [2,2,2,2,1]
+     - instead of throwing these numbers at the player, display a "horsepower"
+       and make the exact curve discovered
+
+
+2500 x 2500 -> 50 blocks x 50 blocks (2500 blocks)
+
+
+
+- "gun-type"
+   base damage + N scaling damage
+   driven by consecutive attacks on the same enemy
+   - params:
+      - base
+      - scale
+- "explosive-type"
+  some larger flat base damage
+  some area
+  - hits every space of its area
+  - a larger dude can get hit more times
+   - params:
+      - damage
+      - area
+- "poison type"
+  applies a debuff
+  the debuff grows over time (exponential? logistic?)
+  the debuff increases incoming damage
+   - params:
+      - damage
+- "radioactive type"
+  percent current enemy hp
+   - params:
+      - damage
+- "psychic type"
+  doing overkill to enemies gains psychic charge
+  damage dealt is based on psychic charge
+  (maybe its spent, maybe not)
+  charge decays over time
+  - the map has low hp kaiju eggs that count for this
+  - params:
+    - damage
+
+- trinkets:
+  - labubu (..variants)
+  - cell phone
+  - figurine (..variants)
+    - maybe these pop out of vending machines sometimes
+  - pencil case
+  - omamori
+  - talisman
+  - amulet
+  - sakazuki
+  - hachimaki
+  - briefcase
+  - hair clip
+  - juzu beads
+  - credit card
+  - stamp seal
+  - ...
+
+
 
 - weapons:
   - gun
     - basic shot does 1 damage
-    - sometimes it becommes useful somehow
+    - sometimes it becomes useful somehow
   - artillery strike
     - paint target for N turns
     - then the artillery lands
