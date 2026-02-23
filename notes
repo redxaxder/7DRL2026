@@ -72,6 +72,9 @@ https://github.com/johan0A/clay-zig-bindings
         - shift + brake is a weaker brake
         - shift + left/right strafes
         - shift + forward maintains speed
+      - when dismouting at speed:
+        motorcycle travels distance equal to current speed this turn
+        next turn it swerves and tips over. travels half its speed then stops
       - crash:
         - separated from motorcycle
         - need to walk back to it (normal 4-dir mvoement)
@@ -104,16 +107,32 @@ mapgen:
         - kaiju nest
           - how do we indicate to the player that it is a kaiju nest?
   - map features
-    - obstacles?
+    - obstacles
+      - abandoned cars (3x3)
+        - player does not have the right kind of license and won't drive a car
+      - partially destroyed car
+      - fire hydrants
+      - rubble
+      - potholes
+      - trees
+      - downed aircraft
     - trail of destruction
-
-kaiju behavior:
-  - when you aren't around:
-    - walk in a straight line
-    - active destruction
-  - Q: how do you aggro a kaiju?
+    - vending machines
+    - kaiju eggs
+    - piles of money
+    - weapons/trinkets
 
 eg blocks are 50x50
+
+car:
+  O-O
+  | |
+  O-O
+
+motorcycle (unoccupied):
+  O%
+motorcycle (occupied):
+  @%
 
 terrain types:
   - " grass
@@ -121,7 +140,7 @@ terrain types:
     - painted asphalt (for road stripes)
   - . interior
   - ^ tree
-  - O rubble (impassable to player, passable to monster)
+  - & rubble (impassable to player, passable to monster)
   - ; debris (slows)
   - 0 eggs (monsters do not destroy, impassable to monsters, player can run them over)
   - fat + glass door
@@ -133,6 +152,10 @@ terrain types:
   - = glass wall / window
     - shoot it to break it
     - can crash through it
+  - damaging terrain?
+  - * broken glass
+    - damage when walking on it?
+
 
 motorcycles:
  - lots of spare motorcycles scattered throughout the map
@@ -185,6 +208,9 @@ motorcycles:
   - the map has low hp kaiju eggs that count for this
   - params:
     - damage
+- "motorcycle type"
+  - Damage is proportional to square of speed
+  - if the kaiju has low enough remaining health and you drive into it, you just go through
 
 - trinkets:
   - labubu (..variants)
@@ -241,14 +267,64 @@ motorcycles:
 - progression:
   - Your level is the size of the biggest kaiju you have taken down
   - higher level means you can carry more items
-  - items in inventory have an order
-  - stat buffs from earlier items affect the impact of later items
-    - some items have stat buffs that scale with a stat
+  - items in inventory have an order (or not?)
 
-- stats:
-  - destiny (luck)
-  - accuracy
-  - fitness
-  - acuity
-  - focus
-  - determination
+- stats and damage:
+  - kaiju hp
+    - 10^n
+  - player stats:
+      10 - 40 or so?
+
+- types of items:
+  - crit clock (3,4,5)
+  - motorcycle acceleration
+  - motorcycle impact damage (to target)
+  - debris resist (maybe it usually slows you)
+  - [damage modifiers]
+  - vending machine detector
+  - vending luck adjust
+  - egg detector
+  - kaiju detection
+  - money detector
+  - street map
+  - motorcycle armor
+  - consumable heal
+    - auto eat when at critical hp
+  - something that lets you drive through walls
+  - atm card?
+  - dna sequencer
+    - grows in stats when breaking special eggs
+
+- vision
+  - obstacles block vision of everything but kaiju
+
+- ui
+  - wasd + WASD movement
+  - in motion, WASD gives slower adjustments
+  - dedicated dismount button, always on the left
+  - number key matches item index for weapon selection
+  - indicate the mode: aiming weapon vs moving
+    - while aiming: wasd to fire in that direction
+  - inventory
+    - there's a button to pick up an item
+    - if your inventory is full, you pick an item to replace
+    - the replaced item is gone
+  - legend
+  - log
+  - mouseover or something for enemy hp/state?
+    - display info about thing you last hit
+
+- kaiju behaviors
+  - sleep
+  - chase the player
+  - smack player around
+  - break down obstacles that get in the way of chasing the player
+    - fling the debris near the player
+    - warning indicator: can dodge it
+  - break down obstacles just because and fling debris at the player
+  - beam attack?
+    - telegraph charging
+  - fire breath?
+  - leap?
+  - 
+
