@@ -328,3 +328,7 @@ motorcycles:
   - leap?
   - 
 
+- kaiju spawning
+  - kaiju are spawned on demand with frequency depending on proximity to mama kaiju
+  - kaiju start at size 3x3, and n x n kaiju spawn half as frequently as (n - 1) x (n - 1) kaiju
+  - we want roughly one kaiju per city block
