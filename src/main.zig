@@ -142,6 +142,25 @@ pub const globals = struct {
 };
 
 const PLAYER_ID: UnitId = 1;
+pub fn mapgen() void {
+    const block_size: IVec2 = .{ .x = 30, .y = 50 };
+    const street_size: i16 = 3;
+    for (0..MAP_SIZE / block_size.x) |block_x| {
+        for (0..MAP_SIZE / block_size.y) |block_y| {
+            for (0..block_size.x) |x| {
+                for (0..block_size.y) |y| {
+                    // assume street width is 3 tiles
+                    // top
+                    if (y < street_size) {
+                        const pos: IVec2 = .{ .x = @as(i16, @intCast((block_x * block_size.x) + x)), .y = @as(i16, @intCast((block_y * block_size.y) + y)) };
+                        set_terrain_at(pos, .Asphalt);
+                    }
+                }
+            }
+        }
+    }
+    _ = 5;
+}
 
 pub fn init() !void {
     globals.player().* = Unit{
@@ -155,6 +174,7 @@ pub fn init() !void {
         .orientation = .Right,
     };
     globals.player().mounted_on = moto_id;
+    mapgen();
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
