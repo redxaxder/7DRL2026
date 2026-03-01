@@ -95,7 +95,6 @@ const DrawOptions = struct {
     size: u8 = 1,
     color: u8 = WHITE,
 };
-// accepts a position in world coordinates, it converts it to camera coordinates and adds a render buffer item
 pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     const screen_pos = world_pos.minus(camera.pos()).scale(SPRITE_SCALE);
     const dim = SPRITE_DIM.scale(@floatFromInt(options.size));
@@ -115,6 +114,36 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
         .src_idx = src_idx,
     });
 }
+fn render_kaiju(unit: *const main.Unit) void {
+    const render_at = unit.position.float();
+    const screen_space = render_at.minus(camera.pos());
+
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = SPRITE_DIM,
+        .color = BLACK,
+        .src_idx = 0xDB,
+    });
+    // this will create the top boundary of the kaiju,
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = SPRITE_DIM,
+        .color = WHITE,
+        .src_idx = '|',
+    });
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = .{ .x = SPRITE_SCALE + 15, .y = SPRITE_SCALE },
+        .color = WHITE,
+        .src_idx = '-',
+    });
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = .{ .x = SPRITE_SCALE + 30, .y = SPRITE_SCALE },
+        .color = WHITE,
+        .src_idx = '|',
+    });
+}
 
 fn render_unit(unit: *const main.Unit) void {
     switch (unit.tag) {
@@ -132,23 +161,7 @@ fn render_unit(unit: *const main.Unit) void {
 
             draw_world_glyph(p1.float(), '%', .{ .clear_back = true });
         },
-        .Kaiju => {
-            const render_at = unit.position.float();
-            const screen_space = render_at.minus(camera.pos());
-
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = BLACK,
-                .src_idx = 0xDB,
-            });
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = WHITE,
-                .src_idx = 'K',
-            });
-        },
+        .Kaiju => render_kaiju(unit),
         else => {
             return;
         },
