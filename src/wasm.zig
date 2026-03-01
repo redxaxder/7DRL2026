@@ -90,61 +90,89 @@ fn splatString(x: f32, y: f32, text: []const u8, color: u8, size: f32) void {
 const SPRITE_SCALE = 16;
 const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 
-fn render_kaiju(unit: *const main.Unit) void {
-    const render_at = unit.position.float();
-    const screen_space = render_at.minus(camera.pos());
+const DrawOptions = struct {
+    clear_back: bool = false,
+    size: u8 = 1,
+    color: u8 = WHITE,
+};
+// accepts a position in world coordinates, it converts it to camera coordinates and adds a render buffer item
+pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
+    const screen_pos = world_pos.minus(camera.pos()).scale(SPRITE_SCALE);
+    const dim = SPRITE_DIM.scale(@floatFromInt(options.size));
 
+    if (options.clear_back) {
+        render_buffer.push(.{
+            .pos = screen_pos,
+            .size = dim,
+            .color = BLACK,
+            .src_idx = 0xDB,
+        });
+    }
     render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = SPRITE_DIM,
-        .color = BLACK,
-        .src_idx = 0xDB,
+        .pos = screen_pos,
+        .size = dim,
+        .color = options.color,
+        .src_idx = src_idx,
     });
-    // this will create the top boundary of the kaiju,
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = SPRITE_DIM,
-        .color = WHITE,
-        .src_idx = '|',
-    });
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = .{ .x = SPRITE_SCALE + 15, .y = SPRITE_SCALE },
-        .color = WHITE,
-        .src_idx = '-',
-    });
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = .{ .x = SPRITE_SCALE + 30, .y = SPRITE_SCALE },
-        .color = WHITE,
-        .src_idx = '|',
-    });
-    // render_buffer.push(.{
-    //     .pos = screen_space.scale(SPRITE_SCALE),
-    //     .size = SPRITE_DIM,
-    //     .color = WHITE,
-    //     .src_idx = 'K',
-    // });
 }
 
+fn render_kaiju(kaiju: *const main.Unit) void {
+    // Box-drawing layout for a size-N kaiju (dim = 2*N+1):
+    //   ┌─…─┐
+    //   │   │
+    //   │ K │
+    //   │   │
+    //   └─…─┘
+    const s: i16 = @intCast(kaiju.size);
+    const dim: i16 = 2 * s + 1;
+    var dy: i16 = 0;
+    while (dy < dim) : (dy += 1) {
+        var dx: i16 = 0;
+        while (dx < dim) : (dx += 1) {
+            const pos = kaiju.position.plus(.{ .x = dx, .y = dy });
+            const is_top = dy == 0;
+            const is_bottom = dy == dim - 1;
+            const is_left = dx == 0;
+            const is_right = dx == dim - 1;
+            const is_center = dx == s and dy == s;
+
+            const glyph: u8 = if (is_center)
+                'K'
+            else if (is_top and is_left)
+                0xDA // ┌
+            else if (is_top and is_right)
+                0xBF // ┐
+            else if (is_bottom and is_left)
+                0xC0 // └
+            else if (is_bottom and is_right)
+                0xD9 // ┘
+            else if (is_top or is_bottom)
+                0xC4 // ─
+            else if (is_left or is_right)
+                0xB3 // │
+            else
+                ' ';
+
+            const color: u8 = if (is_center) 3 else 1; // red K, green border
+            draw_world_glyph(pos.float(), glyph, .{ .clear_back = true, .color = color, .size = @as(u8, @intCast(s)) - 2 });
+        }
+    }
+}
 fn render_unit(unit: *const main.Unit) void {
     switch (unit.tag) {
         .Player => {
-            const render_at = unit.position.float();
-            const screen_space = render_at.minus(camera.pos());
+            draw_world_glyph(
+                unit.position.float(),
+                '@',
+                .{ .clear_back = true },
+            );
+        },
+        .Motorcycle => {
+            const p0 = unit.position;
+            const p1 = p0.plus(unit.orientation.ivec());
+            draw_world_glyph(p0.float(), 'o', .{ .clear_back = true });
 
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = BLACK,
-                .src_idx = 0xDB,
-            });
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = WHITE,
-                .src_idx = '@',
-            });
+            draw_world_glyph(p1.float(), '%', .{ .clear_back = true });
         },
         .Kaiju => render_kaiju(unit),
         else => {
@@ -205,11 +233,16 @@ pub export fn frame(t: f64) void {
     render_buffer.flush();
 
     // Draw units over the terrain
-    for (main.globals.units[1..]) |u| {
-        if (u.tag == .Nil) {
-            continue;
+    {
+        var i: u16 = @intCast(main.globals.units.len);
+        while (i > 1) {
+            i -= 1;
+            const u = main.globals.unit(i);
+            if (u.tag == .Nil) {
+                continue;
+            }
+            render_unit(u);
         }
-        render_unit(&u);
     }
     render_buffer.flush();
 
