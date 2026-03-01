@@ -87,24 +87,47 @@ fn splatString(x: f32, y: f32, text: []const u8, color: u8, size: f32) void {
 const SPRITE_SCALE = 16;
 const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 
+const DrawOptions = struct {
+    clear_back: bool = false,
+    size: u8 = 1,
+    color: u8 = WHITE,
+};
+// accepts a position in world coordinates, it converts it to camera coordinates and adds a render buffer item
+pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
+    const screen_pos = world_pos.minus(camera.pos()).scale(SPRITE_SCALE);
+    const dim = SPRITE_DIM.scale(@floatFromInt(options.size));
+
+    if (options.clear_back) {
+        render_buffer.push(.{
+            .pos = screen_pos,
+            .size = dim,
+            .color = BLACK,
+            .src_idx = 0xDB,
+        });
+    }
+    render_buffer.push(.{
+        .pos = screen_pos,
+        .size = dim,
+        .color = options.color,
+        .src_idx = src_idx,
+    });
+}
+
 fn render_unit(unit: *const main.Unit) void {
     switch (unit.tag) {
         .Player => {
-            const render_at = unit.position.float();
-            const screen_space = render_at.minus(camera.pos());
+            draw_world_glyph(
+                unit.position.float(),
+                '@',
+                .{ .clear_back = true },
+            );
+        },
+        .Motorcycle => {
+            const p0 = unit.position;
+            const p1 = p0.plus(unit.orientation.ivec());
+            draw_world_glyph(p0.float(), 'o', .{ .clear_back = true });
 
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = BLACK,
-                .src_idx = 0xDB,
-            });
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = WHITE,
-                .src_idx = '@',
-            });
+            draw_world_glyph(p1.float(), '%', .{ .clear_back = true });
         },
         else => {
             return;
@@ -164,11 +187,16 @@ pub export fn frame(t: f64) void {
     render_buffer.flush();
 
     // Draw units over the terrain
-    for (main.globals.units[1..]) |u| {
-        if (u.tag == .Nil) {
-            continue;
+    {
+        var i: u16 = @intCast(main.globals.units.len);
+        while (i > 1) {
+            i -= 1;
+            const u = main.globals.unit(i);
+            if (u.tag == .Nil) {
+                continue;
+            }
+            render_unit(u);
         }
-        render_unit(&u);
     }
     render_buffer.flush();
 
