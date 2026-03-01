@@ -10,9 +10,7 @@ const Sprite = RenderBuffer.Sprite;
 const Vec2 = @import("core.zig").Vec2;
 const Rect = @import("core.zig").Rect;
 
-var prev_time: f64 = 0;
-
-const UnitType = enum {
+pub const UnitType = enum {
     Nil,
     Player,
     Kaiju,
@@ -39,7 +37,7 @@ pub const IVec2 = struct {
     }
 };
 
-const Dir4 = enum {
+pub const Dir4 = enum {
     Right,
     Up,
     Left,
@@ -54,10 +52,11 @@ const Dir4 = enum {
     }
 };
 
-const Unit = struct {
+pub const Unit = struct {
     // Universal
     tag: UnitType = .Nil,
     position: IVec2 = IVec2.default,
+    // TODO: add render_position Vec2
 
     // Healthy
     hp: i64 = 0,
@@ -77,7 +76,7 @@ const Unit = struct {
 const MAP_SIZE = 2500;
 const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
 
-const Terrain = enum(u8) {
+pub const Terrain = enum(u8) {
     Floor,
     Asphalt,
     Wall,
@@ -113,9 +112,9 @@ pub fn get_terrain_at(position: IVec2) ?Terrain {
     return globals.mapdata[ix];
 }
 
-const globals = struct {
-    var units: [2000]Unit = .{Unit.default} ** 2000;
-    var mapdata: [MAPDATA_LEN]Terrain = .{.Floor} ** MAPDATA_LEN;
+pub const globals = struct {
+    pub var units: [2000]Unit = .{Unit.default} ** 2000;
+    pub var mapdata: [MAPDATA_LEN]Terrain = .{.Floor} ** MAPDATA_LEN;
 };
 
 pub fn init() !void {

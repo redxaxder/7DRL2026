@@ -84,7 +84,35 @@ fn splatString(x: f32, y: f32, text: []const u8, color: u8, size: f32) void {
     }
 }
 
+const SPRITE_DIM = Vec2{ .x = 16, .y = 16 };
+
+fn render_unit(unit: *const main.Unit) void {
+    switch (unit.tag) {
+        .Player => {
+            const render_at = unit.position.float();
+            const screen_space = render_at.minus(camera.pos());
+
+            render_buffer.push(.{
+                .pos = screen_space.scale(16),
+                .size = SPRITE_DIM,
+                .color = BLACK,
+                .src_idx = 0xDB,
+            });
+            render_buffer.push(.{
+                .pos = screen_space.scale(16),
+                .size = SPRITE_DIM,
+                .color = WHITE,
+                .src_idx = '@',
+            });
+        },
+        else => {
+            return;
+        },
+    }
+}
+
 const WHITE = 0;
+const BLACK = 13;
 
 pub export fn frame(t: f64) void {
     const rawdt = t - prev_time;
@@ -124,11 +152,19 @@ pub export fn frame(t: f64) void {
             render_buffer.push(draw_sprite);
         }
     }
-
     // The render buffer assumes that all images in the same batch
     // are the same size. So we flush before drawing anything at
     // a different size. (If we don't, that will resize the previous
     // images.)
+    render_buffer.flush();
+
+    // Draw units over the terrain
+    for (main.globals.units) |u| {
+        if (u.tag == .Nil) {
+            continue;
+        }
+        render_unit(&u);
+    }
     render_buffer.flush();
 
     splatString(10, 10, "hello world", 0, 32);
