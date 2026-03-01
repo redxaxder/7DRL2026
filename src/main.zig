@@ -245,13 +245,11 @@ fn is_door(pos: IVec2, street_size: i16, block_size: IVec2, doors: DirFlags) boo
 }
 
 const PLAYER_ID: UnitId = 1;
-pub fn mapgen(rng: std.Random) void {
-    const block_size: IVec2 = .{ .x = rng.intRangeAtMost(i16, 20, 50), .y = rng.intRangeAtMost(i16, 20, 50) };
-    // assume street width is 3 tiles
-    const street_size: i16 = rng.intRangeAtMost(i16, 1, 5);
-    for (0..@as(usize, @intCast(@divFloor(MAP_SIZE, block_size.x)))) |bx| {
-        for (0..@as(usize, @intCast(@divFloor(MAP_SIZE, block_size.y)))) |by| {
-            // bitmask of doors in this block, rtlb
+
+fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: i16, rng: std.Random) void {
+    // iterate over blocks
+    for (0..@as(usize, @intCast(@divFloor(zone_size.x, block_size.x)))) |bx| {
+        for (0..@as(usize, @intCast(@divFloor(zone_size.y, block_size.y)))) |by| {
             const doors: DirFlags = @bitCast(rng.int(u4));
             for (0..@as(usize, @intCast(block_size.x))) |xx| {
                 for (0..@as(usize, @intCast(block_size.y))) |yy| {
@@ -264,7 +262,7 @@ pub fn mapgen(rng: std.Random) void {
                         .x = x,
                         .y = y,
                     };
-                    const world_pos: IVec2 = .{ .x = (block_x * block_size.x) + x, .y = (block_y * block_size.y) + y };
+                    const world_pos: IVec2 = .{ .x = (zone.x * zone_size.x) + (block_x * block_size.x) + x, .y = (zone.y * zone_size.y) + (block_y * block_size.y) + y };
                     if (is_street(local_pos, street_size, block_size)) {
                         set_terrain_at(world_pos, .Asphalt);
                     }
@@ -280,7 +278,20 @@ pub fn mapgen(rng: std.Random) void {
             }
         }
     }
-    _ = 5;
+}
+
+pub fn mapgen(rng: std.Random) void {
+    const num_zones_x: i16 = rng.intRangeAtMost(i16, 3, 8);
+    const num_zones_y: i16 = rng.intRangeAtMost(i16, 3, 8);
+    const zone_size: IVec2 = .{ .x = @divFloor(MAP_SIZE, num_zones_x), .y = @divFloor(MAP_SIZE, num_zones_y) };
+    for (0..@as(usize, @intCast(num_zones_x))) |zx| {
+        for (0..@as(usize, @intCast(num_zones_y))) |zy| {
+            const block_size: IVec2 = .{ .x = rng.intRangeAtMost(i16, 20, 50), .y = rng.intRangeAtMost(i16, 20, 50) };
+            const street_size: i16 = rng.intRangeAtMost(i16, 1, 5);
+            const zone: IVec2 = .{ .x = @as(i16, @intCast(zx)), .y = @as(i16, @intCast(zy)) };
+            mapgen_blocks(zone, zone_size, block_size, street_size, rng);
+        }
+    }
 }
 
 pub fn init(rng: std.Random) !void {

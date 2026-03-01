@@ -65,6 +65,7 @@ v0.2 core features
   - varying street sizes
     - alleys
   - zones
+    - multiple zones of the same type can abut in a not grid-aligned way
     - commercial
     - nest
   - mechanical map features
