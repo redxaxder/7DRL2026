@@ -11,6 +11,9 @@ const Vec2 = @import("core.zig").Vec2;
 const IVec2 = main.IVec2;
 const Rect = @import("core.zig").Rect;
 
+const CameraWidth = 65;
+const CameraHeight = 65;
+
 pub const std_options: std.Options = .{
     .logFn = log,
 };
@@ -158,8 +161,8 @@ pub export fn frame(t: f64) void {
         .x = @intFromFloat(@floor(camera.x)),
         .y = @intFromFloat(@floor(camera.y)),
     };
-    for (0..65) |dx| {
-        for (0..65) |dy| {
+    for (0..CameraWidth) |dx| {
+        for (0..CameraHeight) |dy| {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
             const draw_pos = IVec2{
