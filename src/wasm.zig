@@ -135,7 +135,9 @@ fn render_unit(unit: *const main.Unit) void {
     }
 }
 
+// TODO: fill out this list. convert into enum.
 const WHITE = 0;
+const YELLOW = 2;
 const BLACK = 13;
 
 pub export fn frame(t: f64) void {
@@ -198,6 +200,29 @@ pub export fn frame(t: f64) void {
             render_unit(u);
         }
     }
+
+    // Draw movement preview reticles
+    blk: {
+        const mount = main.globals.player().mount();
+        if (mount.tag == .Nil) {
+            break :blk;
+        }
+        for (main.get_reticle_positions(mount)) |pos| {
+            const p0 = mount.position;
+            const p1 = mount.position.plus(mount.orientation.ivec());
+            if (pos == p0) {
+                continue;
+            }
+            if (pos == p1) {
+                continue;
+            }
+            draw_world_glyph(pos.float(), '%', .{
+                .clear_back = true,
+                .color = YELLOW,
+            });
+        }
+    }
+
     render_buffer.flush();
 
     splatString(10, 10, "hello world", 0, 32);

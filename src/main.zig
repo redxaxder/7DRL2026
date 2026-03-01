@@ -43,6 +43,13 @@ pub const IVec2 = struct {
         };
     }
 
+    pub fn minus(self: IVec2, rhs: IVec2) IVec2 {
+        return .{
+            .x = self.x - rhs.x,
+            .y = self.y - rhs.y,
+        };
+    }
+
     pub fn scaled(self: IVec2, c: i16) IVec2 {
         return .{
             .x = self.x * c,
@@ -307,15 +314,8 @@ pub fn resolve_motorcycle_movement(
         it.position = it.position.plus(drift);
         return it;
     };
-    if (speed == 0) {
-        const dv = change.ivec();
-        it.position = position.plus(dv);
-        it.orientation = change;
-        it.speed = 1;
-        return it;
-    }
-    const slide_dist = speed / 2;
-    const turned_speed = speed - slide_dist;
+
+    const slide_dist = @max(speed / 2, 1);
 
     switch (RelativeDir.from(change, orientation)) {
         .Forward => { // accelerate!
@@ -324,6 +324,13 @@ pub fn resolve_motorcycle_movement(
             it.position = it.position.plus(drift);
         },
         .Left, .Right => { // turn!
+            const turned_speed = blk: {
+                if (speed > slide_dist) {
+                    break :blk speed - slide_dist;
+                } else {
+                    break :blk 1;
+                }
+            };
             const pre_drift = orientation.ivec().scaled(@intCast(slide_dist));
             it.midpoint = it.position.plus(pre_drift);
             const post_drift = change.ivec().scaled(@intCast(turned_speed));
@@ -332,11 +339,45 @@ pub fn resolve_motorcycle_movement(
             it.orientation = change;
         },
         .Reverse => { // brake!
+
             const drift = orientation.ivec().scaled(@intCast(slide_dist));
             it.position = it.position.plus(drift);
-            it.orientation = orientation.turn(RelativeDir.Right);
+            if (speed == 0) {
+                it.orientation = change;
+            }
             it.speed = 0;
+            // if speed is high enough, brake via akira slide
+            if (slide_dist >= 2) {
+                it.orientation = orientation.turn(RelativeDir.Right);
+                it.position = it.position.minus(it.orientation.ivec());
+            }
         },
     }
     return it;
+}
+
+pub fn get_reticle_positions(unit: *const Unit) [5]IVec2 {
+    var result: [5]IVec2 = undefined;
+    for (std.enums.values(Dir4), 0..) |d, i| {
+        const projection = resolve_motorcycle_movement(
+            unit.position,
+            unit.orientation,
+            unit.speed,
+            d,
+        );
+        const ppos = projection.position;
+        const handlepos = ppos.plus(projection.orientation.ivec());
+        result[i] = handlepos;
+    }
+
+    const projection = resolve_motorcycle_movement(
+        unit.position,
+        unit.orientation,
+        unit.speed,
+        null,
+    );
+    const ppos = projection.position;
+    const handlepos = ppos.plus(projection.orientation.ivec());
+    result[4] = handlepos;
+    return result;
 }
