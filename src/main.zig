@@ -316,7 +316,7 @@ pub fn init(rng: std.Random) !void {
     const big_kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
     globals.unit(big_kaiju_id).* = Unit{
         .tag = .Kaiju,
-        .position = IVec2{ .x = 12, .y = 18 },
+        .position = IVec2{ .x = 9, .y = 18 },
         .size = 2,
     };
     mapgen(rng);
