@@ -13,6 +13,12 @@ pub const Vec2 = extern struct {
             .y = self.y + rhs.y,
         };
     }
+    pub fn minus(self: Vec2, rhs: Vec2) Vec2 {
+        return .{
+            .x = self.x - rhs.x,
+            .y = self.y - rhs.y,
+        };
+    }
 
     pub fn scale(self: Vec2, c: f32) Vec2 {
         return .{
@@ -56,10 +62,14 @@ pub const Rect = struct {
     w: f32,
     h: f32,
 
-    fn xmax(self: Rect) f32 {
+    pub fn pos(self: Rect) Vec2 {
+        return Vec2{ .x = self.x, .y = self.y };
+    }
+
+    pub fn xmax(self: Rect) f32 {
         return self.x + self.w;
     }
-    fn ymax(self: Rect) f32 {
+    pub fn ymax(self: Rect) f32 {
         return self.y + self.h;
     }
 };
