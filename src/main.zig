@@ -246,7 +246,7 @@ fn is_door(pos: IVec2, street_size: i16, block_size: IVec2, doors: DirFlags) boo
 
 const PLAYER_ID: UnitId = 1;
 
-fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: i16, rng: std.Random) void {
+fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: i16, rng: std.Random, block_offset: IVec2) void {
     // iterate over blocks
     for (0..@as(usize, @intCast(@divFloor(zone_size.x, block_size.x)))) |bx| {
         for (0..@as(usize, @intCast(@divFloor(zone_size.y, block_size.y)))) |by| {
@@ -262,7 +262,9 @@ fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: 
                         .x = x,
                         .y = y,
                     };
-                    const world_pos: IVec2 = .{ .x = (zone.x * zone_size.x) + (block_x * block_size.x) + x, .y = (zone.y * zone_size.y) + (block_y * block_size.y) + y };
+                    const world_x: i16 = (zone.x * zone_size.x) + (block_x * block_size.x) - block_offset.x + x;
+                    const world_y: i16 = (zone.y * zone_size.y) + (block_y * block_size.y) - block_offset.y + y;
+                    const world_pos: IVec2 = .{ .x = world_x, .y = world_y };
                     if (is_street(local_pos, street_size, block_size)) {
                         set_terrain_at(world_pos, .Asphalt);
                     }
@@ -281,16 +283,28 @@ fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: 
 }
 
 pub fn mapgen(rng: std.Random) void {
+    // basic mapgen strategy:
+    // the map is chunked into zones, each zone is chunked into blocks, each block is made up of tiles
     const num_zones_x: i16 = rng.intRangeAtMost(i16, 3, 8);
     const num_zones_y: i16 = rng.intRangeAtMost(i16, 3, 8);
     const zone_size: IVec2 = .{ .x = @divFloor(MAP_SIZE, num_zones_x), .y = @divFloor(MAP_SIZE, num_zones_y) };
+
+    // for each zone, we track block offsets, because a zone with width z and block width b will have z % b leftover space
+    // we use these block offsets so that the zones mesh with no gap
+    // TODO probably a big gap on the far edges of the map
+    var block_offset_x: i16 = 0;
     for (0..@as(usize, @intCast(num_zones_x))) |zx| {
+        const block_size_x = rng.intRangeAtMost(i16, 20, 50);
+        var block_offset_y: i16 = 0;
         for (0..@as(usize, @intCast(num_zones_y))) |zy| {
-            const block_size: IVec2 = .{ .x = rng.intRangeAtMost(i16, 20, 50), .y = rng.intRangeAtMost(i16, 20, 50) };
+            const block_size: IVec2 = .{ .x = block_size_x, .y = rng.intRangeAtMost(i16, 20, 50) };
             const street_size: i16 = rng.intRangeAtMost(i16, 1, 5);
             const zone: IVec2 = .{ .x = @as(i16, @intCast(zx)), .y = @as(i16, @intCast(zy)) };
-            mapgen_blocks(zone, zone_size, block_size, street_size, rng);
+            const block_offset: IVec2 = .{ .x = block_offset_x, .y = block_offset_y };
+            mapgen_blocks(zone, zone_size, block_size, street_size, rng, block_offset);
+            block_offset_y += @rem(zone_size.y, block_size.y);
         }
+        block_offset_x += @rem(zone_size.x, block_size_x);
     }
 }
 
