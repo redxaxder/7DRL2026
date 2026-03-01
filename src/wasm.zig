@@ -132,6 +132,23 @@ fn render_unit(unit: *const main.Unit) void {
 
             draw_world_glyph(p1.float(), '%', .{ .clear_back = true });
         },
+        .Kaiju => {
+            const render_at = unit.position.float();
+            const screen_space = render_at.minus(camera.pos());
+
+            render_buffer.push(.{
+                .pos = screen_space.scale(SPRITE_SCALE),
+                .size = SPRITE_DIM,
+                .color = BLACK,
+                .src_idx = 0xDB,
+            });
+            render_buffer.push(.{
+                .pos = screen_space.scale(SPRITE_SCALE),
+                .size = SPRITE_DIM,
+                .color = WHITE,
+                .src_idx = 'K',
+            });
+        },
         else => {
             return;
         },
