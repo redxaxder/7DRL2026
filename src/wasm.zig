@@ -72,6 +72,7 @@ pub export fn frame(t: f64) void {
         main.logic_tick(key, prng.random());
     }
 
+    // Draw the terrain
     const imin = IVec2{
         .x = @intFromFloat(@floor(camera.x)),
         .y = @intFromFloat(@floor(camera.y)),
@@ -81,19 +82,25 @@ pub export fn frame(t: f64) void {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
             const pos = IVec2{
-                .x = x,
-                .y = y,
+                .x = x * 16,
+                .y = y * 16,
             };
             const terrain = main.get_terrain_at(pos) orelse continue;
             const draw_sprite = Sprite{
                 .pos = pos.float().minus(camera.pos()),
                 .color = WHITE,
-                .size = Vec2{ .x = 8, .y = 8 },
+                .size = Vec2{ .x = 16, .y = 16 },
                 .src_idx = terrain.glyph(),
             };
             render_buffer.push(draw_sprite);
         }
     }
+
+    // The render buffer assumes that all images in the same batch
+    // are the same size. So we flush before drawing anything at
+    // a different size. (If we don't, that will resize the previous
+    // images.)
+    render_buffer.flush();
 
     splatString(10, 10, "hello world", 0, 32);
 
