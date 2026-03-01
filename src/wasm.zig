@@ -20,6 +20,7 @@ pub const std_options: std.Options = .{
 
 pub const js = struct {
     pub extern "util" fn log(strPtr: i32, strLen: i32) void;
+    pub extern "util" fn time() u64;
 };
 
 var printBuffer: [8192]u8 = .{0} ** 8192;
@@ -57,11 +58,11 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     resize(screenW, screenH);
 
     // TODO: init rng with current time
-    prng = std.Random.DefaultPrng.init(12345);
+    prng = std.Random.DefaultPrng.init(@bitCast(js.time()));
 
     render_buffer = RenderBuffer.init(allocator, @intCast(buffer_size)) catch return -1;
 
-    main.init() catch return -1;
+    main.init(prng.random()) catch return -1;
 
     std.log.info("hello", .{});
 

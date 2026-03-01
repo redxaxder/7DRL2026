@@ -16,11 +16,11 @@ v0.1 technically a game
   - features:
     - rubble
     - debris
-  - terrain:
-    - asphalt
-    - wall
-    - interior
-    - door
+  + terrain:
+    + asphalt
+    + wall
+    + interior
+    + door
 - 1 weapon (gun)
 - can attack
 - can be attacked

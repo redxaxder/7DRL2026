@@ -26,8 +26,12 @@ export async function initWasm(path, renderer, audio) {
 
   }
 
+  function time() {
+    return BigInt(Date.now());
+  }
+
   const imports = {
-    util: { log },
+    util: { log, time },
     render: { clear, draw },
     audio: { playSound }
   }

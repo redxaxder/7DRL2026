@@ -141,6 +141,7 @@ pub const Terrain = enum(u8) {
     Floor,
     Asphalt,
     Wall,
+    Door,
     _,
 
     pub fn glyph(self: @This()) u8 {
@@ -148,6 +149,7 @@ pub const Terrain = enum(u8) {
             .Asphalt => return 0xB0,
             .Floor => return '.',
             .Wall => return '#',
+            .Door => return '+',
             else => return '?',
         }
     }
@@ -195,22 +197,84 @@ pub const globals = struct {
     }
 };
 
+fn is_street(pos: IVec2, street_size: i16, block_size: IVec2) bool {
+    return pos.y < street_size or pos.x < street_size or pos.x >= block_size.x - street_size or pos.y >= block_size.y - street_size;
+}
+
+fn is_wall_y(pos: IVec2, street_size: i16, block_size: IVec2) bool {
+    return (pos.y == street_size or pos.y == block_size.y - street_size - 1) and !is_street(pos, street_size, block_size);
+}
+
+fn is_wall_x(pos: IVec2, street_size: i16, block_size: IVec2) bool {
+    return (pos.x == street_size or pos.x == block_size.x - street_size - 1) and !is_street(pos, street_size, block_size);
+}
+
+const DirFlags = packed struct(u4) {
+    north: bool = false,
+    south: bool = false,
+    east: bool = false,
+    west: bool = false,
+};
+
+fn is_door(pos: IVec2, street_size: i16, block_size: IVec2, doors: DirFlags) bool {
+    if (doors.east) {
+        //right
+        if (is_wall_x(pos, street_size, block_size) and @abs(pos.y - @divFloor(block_size.y, 2)) < 2 and pos.x == block_size.x - street_size - 1) {
+            return true;
+        }
+    }
+    if (doors.north) {
+        //top
+        if (is_wall_y(pos, street_size, block_size) and @abs(pos.x - @divFloor(block_size.x, 2)) < 2 and pos.y == street_size) {
+            return true;
+        }
+    }
+    if (doors.west) {
+        //left
+        if (is_wall_x(pos, street_size, block_size) and @abs(pos.y - @divFloor(block_size.y, 2)) < 2 and pos.x == street_size) {
+            return true;
+        }
+    }
+    if (doors.south) {
+        //bottom
+        if (is_wall_y(pos, street_size, block_size) and @abs(pos.x - @divFloor(block_size.x, 2)) < 2 and pos.y == block_size.y - street_size - 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const PLAYER_ID: UnitId = 1;
-pub fn mapgen() void {
-    const block_size: IVec2 = .{ .x = 30, .y = 50 };
-    const street_size: i16 = 3;
-    for (0..(MAP_SIZE / block_size.x)) |block_x| {
-        for (0..(MAP_SIZE / block_size.y)) |block_y| {
-            for (0..block_size.x) |x| {
-                for (0..block_size.y) |y| {
-                    // assume street width is 3 tiles
+pub fn mapgen(rng: std.Random) void {
+    const block_size: IVec2 = .{ .x = rng.intRangeAtMost(i16, 20, 50), .y = rng.intRangeAtMost(i16, 20, 50) };
+    // assume street width is 3 tiles
+    const street_size: i16 = rng.intRangeAtMost(i16, 1, 5);
+    for (0..@as(usize, @intCast(@divFloor(MAP_SIZE, block_size.x)))) |bx| {
+        for (0..@as(usize, @intCast(@divFloor(MAP_SIZE, block_size.y)))) |by| {
+            // bitmask of doors in this block, rtlb
+            const doors: DirFlags = @bitCast(rng.int(u4));
+            for (0..@as(usize, @intCast(block_size.x))) |xx| {
+                for (0..@as(usize, @intCast(block_size.y))) |yy| {
+                    const block_x: i16 = @as(i16, @intCast(bx));
+                    const block_y: i16 = @as(i16, @intCast(by));
+                    const x: i16 = @as(i16, @intCast(xx));
+                    const y: i16 = @as(i16, @intCast(yy));
                     // streets
-                    const pos: IVec2 = .{ .x = @as(i16, @intCast((block_x * block_size.x) + x)), .y = @as(i16, @intCast((block_y * block_size.y) + y)) };
-                    if (y < street_size or x < street_size or x >= block_size.x - street_size or y >= block_size.y - street_size) {
-                        if (pos.x < 20 and pos.y < 20) {
-                            std.log.info("x {} y {}", .{ pos.x, pos.y });
-                        }
-                        set_terrain_at(pos, .Asphalt);
+                    const local_pos: IVec2 = .{
+                        .x = x,
+                        .y = y,
+                    };
+                    const world_pos: IVec2 = .{ .x = (block_x * block_size.x) + x, .y = (block_y * block_size.y) + y };
+                    if (is_street(local_pos, street_size, block_size)) {
+                        set_terrain_at(world_pos, .Asphalt);
+                    }
+                    // buildings
+                    if (is_wall_x(local_pos, street_size, block_size) or is_wall_y(local_pos, street_size, block_size)) {
+                        set_terrain_at(world_pos, .Wall);
+                    }
+                    // doors
+                    if (is_door(local_pos, street_size, block_size, doors)) {
+                        set_terrain_at(world_pos, .Door);
                     }
                 }
             }
@@ -219,7 +283,7 @@ pub fn mapgen() void {
     _ = 5;
 }
 
-pub fn init() !void {
+pub fn init(rng: std.Random) !void {
     globals.player().* = Unit{
         .tag = .Player,
         .position = IVec2{ .x = 5, .y = 5 },
@@ -244,7 +308,7 @@ pub fn init() !void {
         .position = IVec2{ .x = 12, .y = 18 },
         .size = 2,
     };
-    mapgen();
+    mapgen(rng);
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
