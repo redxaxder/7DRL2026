@@ -25,6 +25,10 @@ pub fn isDown(key: Code) bool {
     return globals.keys.isSet(@intFromEnum(key));
 }
 
+pub fn isShiftDown() bool {
+    return isDown(.ShiftLeft) or isDown(.ShiftRight);
+}
+
 pub fn firstJustPressed() ?Code {
     if (globals.pressed.findFirstSet()) |ix| {
         return @enumFromInt(ix);

@@ -346,7 +346,13 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         const pmount = player.mount();
         if (pmount.tag == .Motorcycle) {
             // mounted movement
-            const target = resolve_motorcycle_movement(pmount, .{ .dir = d });
+            const target = resolve_motorcycle_movement(
+                pmount,
+                .{
+                    .dir = d,
+                    .shift = keyboard.isShiftDown(),
+                },
+            );
             pmount.*.position = target.position;
             pmount.*.orientation = target.orientation;
             pmount.*.speed = target.speed;
@@ -393,42 +399,67 @@ pub fn resolve_motorcycle_movement(
         it.position = it.position.plus(drift);
         return it;
     };
-
     const slide_dist = @max(moto.speed / 2, 1);
 
     switch (RelativeDir.from(change, moto.orientation)) {
-        .Forward => { // accelerate!
+        .Forward => {
+            // accelerate!
             it.speed = @min(it.speed + 1, MAX_SPEED);
             const drift = moto.orientation.ivec().scaled(@intCast(it.speed));
             it.position = it.position.plus(drift);
+
+            // in shift mode, we move at speed+1, but keep our previous speed
+            if (move.shift) {
+                it.speed = moto.speed;
+            }
         },
-        .Left, .Right => { // turn!
-            const turned_speed = blk: {
-                if (moto.speed > slide_dist) {
-                    break :blk moto.speed - slide_dist;
-                } else {
-                    break :blk 0;
-                }
-            };
-            const pre_drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
-            it.midpoint = it.position.plus(pre_drift);
-            const post_drift = change.ivec().scaled(@intCast(turned_speed));
-            it.position = it.midpoint.plus(post_drift);
-            it.speed = @max(1, turned_speed);
-            it.orientation = change;
+        .Left, .Right => {
+            // in shift mode, we strafe instead of turning
+            if (move.shift) {
+                // TODO: at speed 0, this dismounts
+                const drift = moto.orientation.ivec()
+                    .scaled(@intCast(it.speed))
+                    .plus(change.ivec());
+                // TODO: pick a good midpoint for interacting with collisions
+                it.position = it.position.plus(drift);
+            } else { // turn!
+                const turned_speed = blk: {
+                    if (moto.speed > slide_dist) {
+                        break :blk moto.speed - slide_dist;
+                    } else {
+                        break :blk 0;
+                    }
+                };
+                const pre_drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
+                it.midpoint = it.position.plus(pre_drift);
+                const post_drift = change.ivec().scaled(@intCast(turned_speed));
+                it.position = it.midpoint.plus(post_drift);
+                it.speed = @max(1, turned_speed);
+                it.orientation = change;
+            }
         },
         .Reverse => { // brake!
 
-            const drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
-            it.position = it.position.plus(drift);
-            if (moto.speed == 0) {
-                it.orientation = change;
-            }
-            it.speed = 0;
-            // if speed is high enough, brake via akira slide
-            if (slide_dist >= 2) {
-                it.orientation = moto.orientation.turn(RelativeDir.Right);
-                it.position = it.position.minus(it.orientation.ivec());
+            if (move.shift) { // slight brake
+                const drift = moto.orientation.ivec()
+                    .scaled(@intCast(it.speed))
+                    .plus(change.ivec());
+                it.position = it.position.plus(drift);
+                if (it.speed > 0) {
+                    it.speed -= 1;
+                }
+            } else { // full brake
+                const drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
+                it.position = it.position.plus(drift);
+                if (moto.speed == 0) {
+                    it.orientation = change;
+                }
+                it.speed = 0;
+                // if speed is high enough, brake via akira slide
+                if (slide_dist >= 2) {
+                    it.orientation = moto.orientation.turn(RelativeDir.Right);
+                    it.position = it.position.minus(it.orientation.ivec());
+                }
             }
         },
     }
