@@ -316,28 +316,16 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
     var move_dir: ?Dir4 = null;
     switch (key) {
-        .KeyW => {
+        .KeyW, .ArrowUp => {
             move_dir = .Up;
         },
-        .ArrowUp => {
-            move_dir = .Up;
-        },
-        .KeyA => {
+        .KeyA, .ArrowLeft => {
             move_dir = .Left;
         },
-        .ArrowLeft => {
-            move_dir = .Left;
-        },
-        .KeyS => {
+        .KeyS, .ArrowDown => {
             move_dir = .Down;
         },
-        .ArrowDown => {
-            move_dir = .Down;
-        },
-        .KeyD => {
-            move_dir = .Right;
-        },
-        .ArrowRight => {
+        .KeyD, .ArrowRight => {
             move_dir = .Right;
         },
         else => {},
@@ -347,12 +335,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         const pmount = player.mount();
         if (pmount.tag == .Motorcycle) {
             // mounted movement
-            const target = resolve_motorcycle_movement(
-                pmount.position,
-                pmount.orientation,
-                pmount.speed,
-                d,
-            );
+            const target = resolve_motorcycle_movement(pmount, .{ .dir = d });
             pmount.*.position = target.position;
             pmount.*.orientation = target.orientation;
             pmount.*.speed = target.speed;
@@ -371,49 +354,52 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 }
 
 pub const MAX_SPEED = 20;
+
+pub const MotoMove = struct {
+    dir: ?Dir4 = null,
+    shift: bool = false,
+};
 pub const MotoResult = struct {
     midpoint: IVec2,
     position: IVec2,
     orientation: Dir4,
     speed: u8,
 };
+
 pub fn resolve_motorcycle_movement(
-    position: IVec2,
-    orientation: Dir4,
-    speed: u8,
-    // TODO: slight movement
-    input: ?Dir4,
+    moto: *const Unit,
+    move: MotoMove,
 ) MotoResult {
     var it = MotoResult{
-        .position = position,
-        .midpoint = position,
-        .speed = speed,
-        .orientation = orientation,
+        .position = moto.position,
+        .midpoint = moto.position,
+        .speed = moto.speed,
+        .orientation = moto.orientation,
     };
 
-    const change = input orelse {
-        const drift = orientation.ivec().scaled(@intCast(speed));
+    const change = move.dir orelse {
+        const drift = moto.orientation.ivec().scaled(@intCast(moto.speed));
         it.position = it.position.plus(drift);
         return it;
     };
 
-    const slide_dist = @max(speed / 2, 1);
+    const slide_dist = @max(moto.speed / 2, 1);
 
-    switch (RelativeDir.from(change, orientation)) {
+    switch (RelativeDir.from(change, moto.orientation)) {
         .Forward => { // accelerate!
             it.speed = @min(it.speed + 1, MAX_SPEED);
-            const drift = orientation.ivec().scaled(@intCast(it.speed));
+            const drift = moto.orientation.ivec().scaled(@intCast(it.speed));
             it.position = it.position.plus(drift);
         },
         .Left, .Right => { // turn!
             const turned_speed = blk: {
-                if (speed > slide_dist) {
-                    break :blk speed - slide_dist;
+                if (moto.speed > slide_dist) {
+                    break :blk moto.speed - slide_dist;
                 } else {
                     break :blk 0;
                 }
             };
-            const pre_drift = orientation.ivec().scaled(@intCast(slide_dist));
+            const pre_drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
             it.midpoint = it.position.plus(pre_drift);
             const post_drift = change.ivec().scaled(@intCast(turned_speed));
             it.position = it.midpoint.plus(post_drift);
@@ -422,15 +408,15 @@ pub fn resolve_motorcycle_movement(
         },
         .Reverse => { // brake!
 
-            const drift = orientation.ivec().scaled(@intCast(slide_dist));
+            const drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
             it.position = it.position.plus(drift);
-            if (speed == 0) {
+            if (moto.speed == 0) {
                 it.orientation = change;
             }
             it.speed = 0;
             // if speed is high enough, brake via akira slide
             if (slide_dist >= 2) {
-                it.orientation = orientation.turn(RelativeDir.Right);
+                it.orientation = moto.orientation.turn(RelativeDir.Right);
                 it.position = it.position.minus(it.orientation.ivec());
             }
         },
@@ -441,23 +427,12 @@ pub fn resolve_motorcycle_movement(
 pub fn get_reticle_positions(unit: *const Unit) [5]IVec2 {
     var result: [5]IVec2 = undefined;
     for (std.enums.values(Dir4), 0..) |d, i| {
-        const projection = resolve_motorcycle_movement(
-            unit.position,
-            unit.orientation,
-            unit.speed,
-            d,
-        );
+        const projection = resolve_motorcycle_movement(unit, .{ .dir = d });
         const ppos = projection.position;
         const handlepos = ppos.plus(projection.orientation.ivec());
         result[i] = handlepos;
     }
-
-    const projection = resolve_motorcycle_movement(
-        unit.position,
-        unit.orientation,
-        unit.speed,
-        null,
-    );
+    const projection = resolve_motorcycle_movement(unit, .{});
     const ppos = projection.position;
     const handlepos = ppos.plus(projection.orientation.ivec());
     result[4] = handlepos;
