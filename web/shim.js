@@ -16,7 +16,18 @@ export async function initWasm(path, renderer, audio) {
     return audio.play(soundId, pan, pitchShift, gainScale) ? 1 : 0;
   }
 
+  let textd = new TextDecoder('utf-8');
+
+  function log(strPtr, strLen) {
+    const mem = instance.exports.memory.buffer;
+    const stringBytes = new Uint8Array(mem, strPtr, strLen);
+    const string = textd.decode(stringBytes)
+    console.log(string);
+
+  }
+
   const imports = {
+    util: { log },
     render: { clear, draw },
     audio: { playSound }
   }

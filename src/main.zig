@@ -22,14 +22,14 @@ const UnitType = enum {
 };
 
 pub const IVec2 = struct {
-    x: i16,
-    y: i16,
+    x: i16 = 0,
+    y: i16 = 0,
 
-    pub const zero = .{
+    pub const zero: IVec2 = .{
         .x = 0,
         .y = 0,
     };
-    pub const default = .{
+    pub const default: IVec2 = .{
         .x = -3200,
         .y = -3200,
     };
@@ -39,12 +39,25 @@ pub const IVec2 = struct {
     }
 };
 
-const Dir4 = enum { Right, Up, Left, Down };
+const Dir4 = enum {
+    Right,
+    Up,
+    Left,
+    Down,
+    pub fn ivec(self: Dir4) IVec2 {
+        return switch (self) {
+            .Right => IVec2{ .x = 1 },
+            .Left => IVec2{ .x = -1 },
+            .Down => IVec2{ .y = 1 },
+            .Up => IVec2{ .y = -1 },
+        };
+    }
+};
 
 const Unit = struct {
     // Universal
     tag: UnitType = .Nil,
-    position: IVec2 = .default,
+    position: IVec2 = IVec2.default,
 
     // Healthy
     hp: i64 = 0,
@@ -58,6 +71,7 @@ const Unit = struct {
     speed: u8 = 0,
     //TODO: model
 
+    pub const default: Unit = .{};
 };
 
 const MAP_SIZE = 2500;
@@ -100,16 +114,44 @@ pub fn get_terrain_at(position: IVec2) ?Terrain {
 }
 
 const globals = struct {
-    var units: [2000]Unit = .{.Nil} ** 2000;
+    var units: [2000]Unit = .{Unit.default} ** 2000;
     var mapdata: [MAPDATA_LEN]Terrain = .{.Floor} ** MAPDATA_LEN;
 };
 
 pub fn init() !void {
+    globals.units[0] = Unit{
+        .tag = .Player,
+        .position = IVec2{ .x = 5, .y = 5 },
+    };
     // TODO
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
-    _ = key;
     _ = rng;
+
+    var move_dir: ?Dir4 = null;
+    switch (key) {
+        .KeyW => {
+            move_dir = .Up;
+        },
+        .KeyA => {
+            move_dir = .Left;
+        },
+        .KeyS => {
+            move_dir = .Down;
+        },
+        .KeyD => {
+            move_dir = .Right;
+        },
+        else => {},
+    }
+    if (move_dir) |d| {
+        const dv = d.ivec();
+        globals.units[0].position.x += dv.x;
+        globals.units[0].position.y += dv.y;
+    }
+
+    std.log.info("player at {}", .{globals.units[0].position});
+
     //TODO
 }

@@ -11,6 +11,33 @@ const Vec2 = @import("core.zig").Vec2;
 const IVec2 = main.IVec2;
 const Rect = @import("core.zig").Rect;
 
+pub const std_options: std.Options = .{
+    .logFn = log,
+};
+
+pub const js = struct {
+    pub extern "util" fn log(strPtr: i32, strLen: i32) void;
+};
+
+var printBuffer: [255]u8 = .{0} ** 255;
+
+pub fn log(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = level;
+    _ = scope;
+    const slice = std.fmt.bufPrint(printBuffer[0..], format, args) catch {
+        std.log.err("log failed: message too long", .{});
+        return;
+    };
+    const len: usize = slice.len;
+    const ptr = slice.ptr;
+    js.log(@intCast(@intFromPtr(ptr)), @intCast(len));
+}
+
 var prev_time: f64 = 0;
 
 var render_buffer: RenderBuffer = undefined;
@@ -32,6 +59,8 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     render_buffer = RenderBuffer.init(allocator, @intCast(buffer_size)) catch return -1;
 
     main.init() catch return -1;
+
+    std.log.info("hello", .{});
 
     return 0;
 }
