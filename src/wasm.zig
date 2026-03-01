@@ -84,7 +84,8 @@ fn splatString(x: f32, y: f32, text: []const u8, color: u8, size: f32) void {
     }
 }
 
-const SPRITE_DIM = Vec2{ .x = 16, .y = 16 };
+const SPRITE_SCALE = 16;
+const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 
 fn render_unit(unit: *const main.Unit) void {
     switch (unit.tag) {
@@ -93,13 +94,13 @@ fn render_unit(unit: *const main.Unit) void {
             const screen_space = render_at.minus(camera.pos());
 
             render_buffer.push(.{
-                .pos = screen_space.scale(16),
+                .pos = screen_space.scale(SPRITE_SCALE),
                 .size = SPRITE_DIM,
                 .color = BLACK,
                 .src_idx = 0xDB,
             });
             render_buffer.push(.{
-                .pos = screen_space.scale(16),
+                .pos = screen_space.scale(SPRITE_SCALE),
                 .size = SPRITE_DIM,
                 .color = WHITE,
                 .src_idx = '@',
@@ -139,8 +140,8 @@ pub export fn frame(t: f64) void {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
             const draw_pos = IVec2{
-                .x = x * 16,
-                .y = y * 16,
+                .x = x * SPRITE_SCALE,
+                .y = y * SPRITE_SCALE,
             };
             const world_pos = IVec2{
                 .x = x,
@@ -150,7 +151,7 @@ pub export fn frame(t: f64) void {
             const draw_sprite = Sprite{
                 .pos = draw_pos.float().minus(camera.pos()),
                 .color = WHITE,
-                .size = Vec2{ .x = 16, .y = 16 },
+                .size = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE },
                 .src_idx = terrain.glyph(),
             };
             render_buffer.push(draw_sprite);

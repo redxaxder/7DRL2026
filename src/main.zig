@@ -35,6 +35,20 @@ pub const IVec2 = struct {
     pub fn float(self: IVec2) Vec2 {
         return .{ .x = @floatFromInt(self.x), .y = @floatFromInt(self.y) };
     }
+
+    pub fn plus(self: IVec2, rhs: IVec2) IVec2 {
+        return .{
+            .x = self.x + rhs.x,
+            .y = self.y + rhs.y,
+        };
+    }
+
+    pub fn scaled(self: IVec2, c: i16) IVec2 {
+        return .{
+            .x = self.x * c,
+            .y = self.y * c,
+        };
+    }
 };
 
 pub const Dir4 = enum {
@@ -48,6 +62,35 @@ pub const Dir4 = enum {
             .Left => IVec2{ .x = -1 },
             .Down => IVec2{ .y = 1 },
             .Up => IVec2{ .y = -1 },
+        };
+    }
+
+    pub fn turn(self: Dir4, rd: RelativeDir) Dir4 {
+        const uself: u8 = @intFromEnum(self);
+        const urd: u8 = @intFromEnum(rd);
+        const combined: u2 = @truncate(uself + urd);
+        return @enumFromInt(combined);
+    }
+};
+pub const RelativeDir = enum {
+    Forward,
+    Left,
+    Reverse,
+    Right,
+
+    // This new direction is ____ compared to the starting dir
+    pub fn from(new: Dir4, root: Dir4) RelativeDir {
+        const inew: i8 = @intCast(@intFromEnum(new));
+        const iroot: i8 = @intCast(@intFromEnum(root));
+        return switch (inew - iroot) {
+            -3 => .Left,
+            -2 => .Reverse,
+            -1 => .Right,
+            0 => .Forward,
+            1 => .Left,
+            2 => .Reverse,
+            3 => .Right,
+            else => unreachable,
         };
     }
 };
@@ -212,17 +255,88 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         else => {},
     }
     if (move_dir) |d| {
-        const dv = d.ivec();
         const player = globals.player();
-        player.*.position.x += dv.x;
-        player.*.position.y += dv.y;
-        const mount = globals.player().mount();
-        if (mount.tag != .Nil) {
-            mount.*.position = player.position;
+        const pmount = player.mount();
+        if (pmount.tag == .Motorcycle) {
+            // mounted movement
+            const target = resolve_motorcycle_movement(
+                pmount.position,
+                pmount.orientation,
+                pmount.speed,
+                d,
+            );
+            pmount.*.position = target.position;
+            pmount.*.orientation = target.orientation;
+            pmount.*.speed = target.speed;
+            player.*.position = pmount.position;
+        } else {
+            // unmounted movement
+            const dv = d.ivec();
+            player.*.position.x += dv.x;
+            player.*.position.y += dv.y;
         }
     }
 
     std.log.info("player at {}", .{globals.units[PLAYER_ID].position});
 
     //TODO
+}
+
+pub const MotoResult = struct {
+    midpoint: IVec2,
+    position: IVec2,
+    orientation: Dir4,
+    speed: u8,
+};
+pub fn resolve_motorcycle_movement(
+    position: IVec2,
+    orientation: Dir4,
+    speed: u8,
+    // TODO: slight movement
+    input: ?Dir4,
+) MotoResult {
+    var it = MotoResult{
+        .position = position,
+        .midpoint = position,
+        .speed = speed,
+        .orientation = orientation,
+    };
+
+    const change = input orelse {
+        const drift = orientation.ivec().scaled(@intCast(speed));
+        it.position = it.position.plus(drift);
+        return it;
+    };
+    if (speed == 0) {
+        const dv = change.ivec();
+        it.position = position.plus(dv);
+        it.orientation = change;
+        it.speed = 1;
+        return it;
+    }
+    const slide_dist = speed / 2;
+    const turned_speed = speed - slide_dist;
+
+    switch (RelativeDir.from(change, orientation)) {
+        .Forward => { // accelerate!
+            it.speed += 1;
+            const drift = orientation.ivec().scaled(@intCast(it.speed));
+            it.position = it.position.plus(drift);
+        },
+        .Left, .Right => { // turn!
+            const pre_drift = orientation.ivec().scaled(@intCast(slide_dist));
+            it.midpoint = it.position.plus(pre_drift);
+            const post_drift = change.ivec().scaled(@intCast(turned_speed));
+            it.position = it.midpoint.plus(post_drift);
+            it.speed = turned_speed;
+            it.orientation = change;
+        },
+        .Reverse => { // brake!
+            const drift = orientation.ivec().scaled(@intCast(slide_dist));
+            it.position = it.position.plus(drift);
+            it.orientation = orientation.turn(RelativeDir.Right);
+            it.speed = 0;
+        },
+    }
+    return it;
 }
