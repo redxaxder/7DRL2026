@@ -138,13 +138,17 @@ pub export fn frame(t: f64) void {
         for (0..65) |dy| {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
-            const pos = IVec2{
+            const draw_pos = IVec2{
                 .x = x * 16,
                 .y = y * 16,
             };
-            const terrain = main.get_terrain_at(pos) orelse continue;
+            const world_pos = IVec2{
+                .x = x,
+                .y = y,
+            };
+            const terrain = main.get_terrain_at(world_pos) orelse continue;
             const draw_sprite = Sprite{
-                .pos = pos.float().minus(camera.pos()),
+                .pos = draw_pos.float().minus(camera.pos()),
                 .color = WHITE,
                 .size = Vec2{ .x = 16, .y = 16 },
                 .src_idx = terrain.glyph(),

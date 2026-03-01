@@ -145,14 +145,17 @@ const PLAYER_ID: UnitId = 1;
 pub fn mapgen() void {
     const block_size: IVec2 = .{ .x = 30, .y = 50 };
     const street_size: i16 = 3;
-    for (0..MAP_SIZE / block_size.x) |block_x| {
-        for (0..MAP_SIZE / block_size.y) |block_y| {
+    for (0..(MAP_SIZE / block_size.x)) |block_x| {
+        for (0..(MAP_SIZE / block_size.y)) |block_y| {
             for (0..block_size.x) |x| {
                 for (0..block_size.y) |y| {
                     // assume street width is 3 tiles
-                    // top
-                    if (y < street_size) {
-                        const pos: IVec2 = .{ .x = @as(i16, @intCast((block_x * block_size.x) + x)), .y = @as(i16, @intCast((block_y * block_size.y) + y)) };
+                    // streets
+                    const pos: IVec2 = .{ .x = @as(i16, @intCast((block_x * block_size.x) + x)), .y = @as(i16, @intCast((block_y * block_size.y) + y)) };
+                    if (y < street_size or x < street_size or x >= block_size.x - street_size or y >= block_size.y - street_size) {
+                        if (pos.x < 20 and pos.y < 20) {
+                            std.log.info("x {} y {}", .{ pos.x, pos.y });
+                        }
                         set_terrain_at(pos, .Asphalt);
                     }
                 }
@@ -185,13 +188,25 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         .KeyW => {
             move_dir = .Up;
         },
+        .ArrowUp => {
+            move_dir = .Up;
+        },
         .KeyA => {
+            move_dir = .Left;
+        },
+        .ArrowLeft => {
             move_dir = .Left;
         },
         .KeyS => {
             move_dir = .Down;
         },
+        .ArrowDown => {
+            move_dir = .Down;
+        },
         .KeyD => {
+            move_dir = .Right;
+        },
+        .ArrowRight => {
             move_dir = .Right;
         },
         else => {},
@@ -207,7 +222,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         }
     }
 
-    std.log.info("player at {}", .{globals.units[0].position});
+    std.log.info("player at {}", .{globals.units[PLAYER_ID].position});
 
     //TODO
 }
