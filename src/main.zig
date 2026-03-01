@@ -227,6 +227,12 @@ pub fn init() !void {
         .orientation = .Right,
     };
     globals.player().mounted_on = moto_id;
+    const kaiu_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
+    globals.unit(kaiu_id).* = Unit{
+        .tag = .Kaiju,
+        .position = IVec2{ .x = 6, .y = 6 },
+        .size = 1,
+    };
     mapgen();
 }
 
