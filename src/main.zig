@@ -56,6 +56,10 @@ pub const IVec2 = struct {
             .y = self.y * c,
         };
     }
+
+    pub fn eq(self: IVec2, rhs: IVec2) bool {
+        return self.x == rhs.x and self.y == rhs.y;
+    }
 };
 
 pub const Dir4 = enum {
@@ -302,6 +306,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     //TODO
 }
 
+pub const MAX_SPEED = 20;
 pub const MotoResult = struct {
     midpoint: IVec2,
     position: IVec2,
@@ -332,7 +337,7 @@ pub fn resolve_motorcycle_movement(
 
     switch (RelativeDir.from(change, orientation)) {
         .Forward => { // accelerate!
-            it.speed += 1;
+            it.speed = @min(it.speed + 1, MAX_SPEED);
             const drift = orientation.ivec().scaled(@intCast(it.speed));
             it.position = it.position.plus(drift);
         },

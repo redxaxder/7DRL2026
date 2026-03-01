@@ -48,8 +48,8 @@ var prng: std.Random.DefaultPrng = undefined;
 var camera: Rect = Rect{
     .x = 0,
     .y = 0,
-    .w = 8 * 64,
-    .h = 8 * 64,
+    .w = 64,
+    .h = 64,
 };
 
 pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
@@ -173,6 +173,25 @@ const WHITE = 0;
 const YELLOW = 2;
 const BLACK = 13;
 
+pub fn bounding_box(positions: []const Vec2) Rect {
+    var min_x = positions[0].x;
+    var min_y = positions[0].y;
+    var max_x = positions[0].x;
+    var max_y = positions[0].y;
+    for (positions[1..]) |p| {
+        min_x = @min(min_x, p.x);
+        min_y = @min(min_y, p.y);
+        max_x = @max(max_x, p.x);
+        max_y = @max(max_y, p.y);
+    }
+    return .{
+        .x = min_x,
+        .y = min_y,
+        .w = max_x - min_x,
+        .h = max_y - min_y,
+    };
+}
+
 pub export fn frame(t: f64) void {
     const rawdt = t - prev_time;
     const dt: f32 = @floatCast(@min(20, rawdt));
@@ -186,6 +205,38 @@ pub export fn frame(t: f64) void {
 
     if (keyboard.firstJustPressed()) |key| {
         main.logic_tick(key, prng.random());
+
+        // Update camera: minimally shift to enclose player + reticles with buffer
+        {
+            const CAMERA_BUFFER: f32 = 3;
+            const player = main.globals.player();
+            const mount = player.mount();
+
+            var points: [7]Vec2 = undefined;
+            points[0] = player.position.float();
+            var count: usize = 1;
+
+            if (mount.tag != .Nil) {
+                for (main.get_reticle_positions(mount)) |pos| {
+                    points[count] = pos.float();
+                    count += 1;
+                }
+            }
+
+            const bbox = bounding_box(points[0..count]);
+
+            const left = bbox.x - CAMERA_BUFFER;
+            const top = bbox.y - CAMERA_BUFFER;
+            const right = bbox.x + bbox.w + 1 + CAMERA_BUFFER;
+            const bottom = bbox.y + bbox.h + 1 + CAMERA_BUFFER;
+
+            if (left < camera.x) camera.x = left;
+            if (top < camera.y) camera.y = top;
+            if (right > camera.xmax()) camera.x = right - camera.w;
+            if (bottom > camera.ymax()) camera.y = bottom - camera.h;
+
+            std.log.info("camera {}", .{camera});
+        }
     }
 
     // Draw the terrain
@@ -197,17 +248,14 @@ pub export fn frame(t: f64) void {
         for (0..CameraHeight) |dy| {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
-            const draw_pos = IVec2{
-                .x = x * SPRITE_SCALE,
-                .y = y * SPRITE_SCALE,
-            };
             const world_pos = IVec2{
                 .x = x,
                 .y = y,
             };
             const terrain = main.get_terrain_at(world_pos) orelse continue;
+            const screen_pos = world_pos.float().minus(camera.pos()).scale(SPRITE_SCALE);
             const draw_sprite = Sprite{
-                .pos = draw_pos.float().minus(camera.pos()),
+                .pos = screen_pos,
                 .color = WHITE,
                 .size = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE },
                 .src_idx = terrain.glyph(),
@@ -243,10 +291,10 @@ pub export fn frame(t: f64) void {
         for (main.get_reticle_positions(mount)) |pos| {
             const p0 = mount.position;
             const p1 = mount.position.plus(mount.orientation.ivec());
-            if (pos == p0) {
+            if (pos.eq(p0)) {
                 continue;
             }
-            if (pos == p1) {
+            if (pos.eq(p1)) {
                 continue;
             }
             draw_world_glyph(pos.float(), '%', .{
