@@ -1,14 +1,15 @@
 v0.1 technically a game
-- motorcycle-only movement
-  - akira slide bake
-  - turning
-  - accelerating
-  - continue moving while shooting
-- ui
-  - 5 movement reticles
-    - shows where you'd end up after:
-      - firing (center)
-      - wasd
++ motorcycle-only movement
+  + akira slide bake
+  + turning
+  + accelerating
+  + continue moving while shooting
+  - shift movement
++ ui
+  + 5 movement reticles
+    + shows where you'd end up after:
+      + firing (center)
+      + wasd
 - 1 enemy (3x3)
 - really dumb mapgen
   - 1 zone (not fully fleshed out)
