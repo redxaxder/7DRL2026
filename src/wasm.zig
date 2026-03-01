@@ -19,7 +19,7 @@ pub const js = struct {
     pub extern "util" fn log(strPtr: i32, strLen: i32) void;
 };
 
-var printBuffer: [255]u8 = .{0} ** 255;
+var printBuffer: [8192]u8 = .{0} ** 8192;
 
 pub fn log(
     comptime level: std.log.Level,
@@ -27,9 +27,9 @@ pub fn log(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    _ = level;
     _ = scope;
-    const slice = std.fmt.bufPrint(printBuffer[0..], format, args) catch {
+    const prefix = comptime level.asText();
+    const slice = std.fmt.bufPrint(printBuffer[0..], prefix ++ ": " ++ format, args) catch {
         std.log.err("log failed: message too long", .{});
         return;
     };
