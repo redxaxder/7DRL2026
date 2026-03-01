@@ -115,35 +115,50 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
         .src_idx = src_idx,
     });
 }
-fn render_kaiju(unit: *const main.Unit) void {
-    const render_at = unit.position.float();
-    const screen_space = render_at.minus(camera.pos());
 
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = SPRITE_DIM,
-        .color = BLACK,
-        .src_idx = 0xDB,
-    });
-    // this will create the top boundary of the kaiju,
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = SPRITE_DIM,
-        .color = WHITE,
-        .src_idx = '|',
-    });
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = .{ .x = SPRITE_SCALE + 15, .y = SPRITE_SCALE },
-        .color = WHITE,
-        .src_idx = '-',
-    });
-    render_buffer.push(.{
-        .pos = screen_space.scale(SPRITE_SCALE),
-        .size = .{ .x = SPRITE_SCALE + 30, .y = SPRITE_SCALE },
-        .color = WHITE,
-        .src_idx = '|',
-    });
+fn render_kaiju(kaiju: *const main.Unit) void {
+    // Box-drawing layout for a size-N kaiju (dim = 2*N+1):
+    //   ┌─…─┐
+    //   │   │
+    //   │ K │
+    //   │   │
+    //   └─…─┘
+    const s: i16 = @intCast(kaiju.size);
+    const dim: i16 = 2 * s + 1;
+
+    // Draw border and interior spaces at size=1
+    var dy: i16 = 0;
+    while (dy < dim) : (dy += 1) {
+        var dx: i16 = 0;
+        while (dx < dim) : (dx += 1) {
+            const pos = kaiju.position.plus(.{ .x = dx, .y = dy });
+            const is_top = dy == 0;
+            const is_bottom = dy == dim - 1;
+            const is_left = dx == 0;
+            const is_right = dx == dim - 1;
+
+            const glyph: u8 =
+                if (is_top and is_left) 0xDA // ┌
+                else if (is_top and is_right) 0xBF // ┐
+                else if (is_bottom and is_left) 0xC0 // └
+                else if (is_bottom and is_right) 0xD9 // ┘
+                else if (is_top or is_bottom) 0xC4 // ─
+                else if (is_left or is_right) 0xB3 // │
+                else ' ';
+
+            draw_world_glyph(pos.float(), glyph, .{ .clear_back = true, .color = 1 });
+        }
+    }
+
+    // Flush before K so it doesn't resize the border batch
+    render_buffer.flush();
+
+    // Draw K centered in the interior at kaiju.size scale.
+    // Interior spans cells 1..(dim-2), width = 2s-1.
+    const k_offset: f32 = 1.0 + @as(f32, @floatFromInt(dim - 2)) / 16.0;
+    const k_pos = kaiju.position.float().plus(.{ .x = k_offset, .y = k_offset });
+    draw_world_glyph(k_pos, 'K', .{ .clear_back = true, .color = 3, .size = @intCast(dim - 2) });
+    render_buffer.flush();
 }
 
 fn render_unit(unit: *const main.Unit) void {
