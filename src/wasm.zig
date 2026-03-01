@@ -209,7 +209,7 @@ pub export fn frame(t: f64) void {
 
         // Update camera: minimally shift to enclose player + reticles with buffer
         {
-            const CAMERA_BUFFER: f32 = 3;
+            const CAMERA_BUFFER: f32 = 10;
             const player = main.globals.player();
             const mount = player.mount();
 

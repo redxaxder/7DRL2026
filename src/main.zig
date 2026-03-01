@@ -410,14 +410,14 @@ pub fn resolve_motorcycle_movement(
                 if (speed > slide_dist) {
                     break :blk speed - slide_dist;
                 } else {
-                    break :blk 1;
+                    break :blk 0;
                 }
             };
             const pre_drift = orientation.ivec().scaled(@intCast(slide_dist));
             it.midpoint = it.position.plus(pre_drift);
             const post_drift = change.ivec().scaled(@intCast(turned_speed));
             it.position = it.midpoint.plus(post_drift);
-            it.speed = turned_speed;
+            it.speed = @max(1, turned_speed);
             it.orientation = change;
         },
         .Reverse => { // brake!
