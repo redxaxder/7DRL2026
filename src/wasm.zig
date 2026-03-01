@@ -90,6 +90,43 @@ fn splatString(x: f32, y: f32, text: []const u8, color: u8, size: f32) void {
 const SPRITE_SCALE = 16;
 const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 
+fn render_kaiju(unit: *const main.Unit) void {
+    const render_at = unit.position.float();
+    const screen_space = render_at.minus(camera.pos());
+
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = SPRITE_DIM,
+        .color = BLACK,
+        .src_idx = 0xDB,
+    });
+    // this will create the top boundary of the kaiju,
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = SPRITE_DIM,
+        .color = WHITE,
+        .src_idx = '|',
+    });
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = .{ .x = SPRITE_SCALE + 15, .y = SPRITE_SCALE },
+        .color = WHITE,
+        .src_idx = '-',
+    });
+    render_buffer.push(.{
+        .pos = screen_space.scale(SPRITE_SCALE),
+        .size = .{ .x = SPRITE_SCALE + 30, .y = SPRITE_SCALE },
+        .color = WHITE,
+        .src_idx = '|',
+    });
+    // render_buffer.push(.{
+    //     .pos = screen_space.scale(SPRITE_SCALE),
+    //     .size = SPRITE_DIM,
+    //     .color = WHITE,
+    //     .src_idx = 'K',
+    // });
+}
+
 fn render_unit(unit: *const main.Unit) void {
     switch (unit.tag) {
         .Player => {
@@ -109,23 +146,7 @@ fn render_unit(unit: *const main.Unit) void {
                 .src_idx = '@',
             });
         },
-        .Kaiju => {
-            const render_at = unit.position.float();
-            const screen_space = render_at.minus(camera.pos());
-
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = BLACK,
-                .src_idx = 0xDB,
-            });
-            render_buffer.push(.{
-                .pos = screen_space.scale(SPRITE_SCALE),
-                .size = SPRITE_DIM,
-                .color = WHITE,
-                .src_idx = 'K',
-            });
-        },
+        .Kaiju => render_kaiju(unit),
         else => {
             return;
         },
