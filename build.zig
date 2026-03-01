@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const number_of_pages = 17;
+const number_of_pages = 200;
 pub fn build(b: *std.Build) void {
     const wasm_module = b.createModule(.{
         .root_source_file = b.path("src/wasm.zig"),
@@ -16,7 +16,6 @@ pub fn build(b: *std.Build) void {
     wasm.entry = .disabled;
     wasm.rdynamic = true;
     wasm.initial_memory = std.wasm.page_size * number_of_pages;
-    wasm.max_memory = std.wasm.page_size * number_of_pages * 10;
 
     const wasm_install = b.addInstallArtifact(wasm, .{});
     const wasm_step = b.step("wasm", "Build WASM module");

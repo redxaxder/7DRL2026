@@ -52,6 +52,7 @@ pub const Dir4 = enum {
     }
 };
 
+pub const UnitId = u16;
 pub const Unit = struct {
     // Universal
     tag: UnitType = .Nil,
@@ -70,7 +71,13 @@ pub const Unit = struct {
     speed: u8 = 0,
     //TODO: model
 
+    mounted_on: UnitId = 0,
+
     pub const default: Unit = .{};
+
+    pub fn mount(self: *const @This()) *Unit {
+        return globals.unit(self.mounted_on);
+    }
 };
 
 const MAP_SIZE = 2500;
@@ -115,14 +122,39 @@ pub fn get_terrain_at(position: IVec2) ?Terrain {
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.default} ** 2000;
     pub var mapdata: [MAPDATA_LEN]Terrain = .{.Floor} ** MAPDATA_LEN;
+
+    pub fn unit(u: UnitId) *Unit {
+        return &units[@intCast(u)];
+    }
+
+    pub fn player() *Unit {
+        return globals.unit(PLAYER_ID);
+    }
+
+    pub fn free_unit_id() ?UnitId {
+        for (units[1..], 1..) |u, i| {
+            if (u.tag == .Nil) {
+                return @intCast(i);
+            }
+        }
+        return null;
+    }
 };
 
+const PLAYER_ID: UnitId = 1;
+
 pub fn init() !void {
-    globals.units[0] = Unit{
+    globals.player().* = Unit{
         .tag = .Player,
         .position = IVec2{ .x = 5, .y = 5 },
     };
-    // TODO
+    const moto_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
+    globals.unit(moto_id).* = Unit{
+        .tag = .Motorcycle,
+        .position = globals.player().position,
+        .orientation = .Right,
+    };
+    globals.player().mounted_on = moto_id;
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
@@ -146,8 +178,13 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     }
     if (move_dir) |d| {
         const dv = d.ivec();
-        globals.units[0].position.x += dv.x;
-        globals.units[0].position.y += dv.y;
+        const player = globals.player();
+        player.*.position.x += dv.x;
+        player.*.position.y += dv.y;
+        const mount = globals.player().mount();
+        if (mount.tag != .Nil) {
+            mount.*.position = player.position;
+        }
     }
 
     std.log.info("player at {}", .{globals.units[0].position});

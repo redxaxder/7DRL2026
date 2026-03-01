@@ -159,7 +159,7 @@ pub export fn frame(t: f64) void {
     render_buffer.flush();
 
     // Draw units over the terrain
-    for (main.globals.units) |u| {
+    for (main.globals.units[1..]) |u| {
         if (u.tag == .Nil) {
             continue;
         }
