@@ -26,15 +26,16 @@ v0.1 technically a game
 - can be attacked
 - enemy behavior:
   + chase player
-    - kaiju can take partial steps
+    + kaiju can take partial steps
     + pathfinding
       + we don't need to be clever if they can smash through walls
       + they get stuck behind eggs (if we even add them)
   - smack player
   - break obstacles
-    - kaiju must spend a turn getting to the wall before tearing it down
+    + kaiju must spend a turn getting to the wall before tearing it down
   - spawning
-- no vision restrictions
+  - kaiju obstruct each other's movement
++ no vision restrictions
 v0.2 core features
 - vision (fov, reveal terrain)
 - progression

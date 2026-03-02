@@ -244,6 +244,51 @@ pub const IRect = struct {
     pub fn intersects(self: IRect, other: IRect) bool {
         return self.x < other.x + other.w and other.x < self.x + self.w and
             self.y < other.y + other.h and other.y < self.y + self.h;
+
+    pub fn displace(self: IRect, displacement: IVec2) IRect {
+        return .{ .x = self.x + displacement.x, .y = self.y + displacement.y, .w = self.w, .h = self.h };
+    }
+
+    pub fn distance(self: IRect, other: IRect) IVec2 {
+        const most_left: IRect = if (self.x < other.x) self else other;
+        const most_right: IRect = if (self.x < other.x) other else self;
+        const xDiff1: i16 = if (most_left.x == most_right.x) 0 else most_right.x - (most_left.x + most_left.w);
+        const xDiff: i16 = if (xDiff1 > 0) xDiff1 else 0;
+
+        const most_up: IRect = if (self.y < other.y) self else other;
+        const most_down: IRect = if (self.y < other.y) other else self;
+        const yDiff1: i16 = if (most_up.y == most_down.y) 0 else most_down.y - (most_up.y + most_up.h);
+        const yDiff: i16 = if (yDiff1 > 0) yDiff1 else 0;
+
+        return .{ .x = xDiff, .y = yDiff };
+    }
+
+    pub fn point_distance(self: IRect, point: IVec2) IVec2 {
+        const l: i16 = self.x;
+        const t: i16 = self.y;
+        const r: i16 = self.x + self.w;
+        const b: i16 = self.x + self.h;
+
+        var xDist: i16 = undefined;
+        var yDist: i16 = undefined;
+
+        if (point.x > r) {
+            xDist = point.x - r;
+        } else if (point.x < l) {
+            xDist = l - point.x;
+        } else {
+            xDist = 0;
+        }
+
+        if (point.y > b) {
+            yDist = point.y - b;
+        } else if (point.y < t) {
+            yDist = t - point.y;
+        } else {
+            yDist = 0;
+        }
+
+        return .{ .x = xDist, .y = yDist };
     }
 
     pub const LocationIterator = struct {

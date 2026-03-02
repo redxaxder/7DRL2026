@@ -493,35 +493,40 @@ fn smack_player(smacker: *const Unit, dir: Dir4) void {
     std.log.info("SMACK player smacked", .{});
 }
 
-// raycasts in an orthogonal direction to see if there is a wall between units
-// return is either null for no wall or distance to wall
-// from is typically a kaiju
-// to is typically the player
-fn raycast_with_obstacle(from: *const Unit, to: *const Unit, terrain: Terrain) ?i16 {
-    const give_up: usize = 65;
-    var iter_coord: IVec2 = from.position;
-    const to_coord: IVec2 = to.position;
-    const dir: Dir4 = from.position.facing(to.position);
-    const increment: IVec2 = dir.ivec();
-    for (0..give_up) |distance| {
-        if (get_terrain_at(iter_coord) == terrain) {
-            if (from.tag == .Kaiju and (dir == .Right or dir == .Down)) {
-                // account for kaiju size
-                return @as(i16, @intCast(distance)) - from.size + 1;
+fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
+    const rect: IRect = from.get_rect().displace(dir.ivec().scaled(from.size + 1));
+    var iter = rect.iter();
+    var step_dist: ?i16 = null;
+    while (iter.next()) |pos| {
+        if (map.get_terrain_at(pos, &globals.mapdata) == .Wall) {
+            const dist: IVec2 = from.get_rect().point_distance(pos);
+            switch (dir) {
+                .Left, .Right => {
+                    if (step_dist) |s| {
+                        step_dist = if (s < dist.x) s else dist.x;
+                    } else {
+                        step_dist = dist.x;
+                    }
+                },
+                .Up, .Down => {
+                    if (step_dist) |s| {
+                        step_dist = if (s < dist.y) s else dist.y;
+                    } else {
+                        step_dist = dist.y;
+                    }
+                },
             }
-            return @intCast(distance);
         }
-        if (iter_coord.eq(to_coord)) {
-            return null;
-        }
-        iter_coord = iter_coord.plus(increment);
     }
-    return null;
+    if (step_dist) |s| {
+        std.log.info("distance to wall {}", .{s});
+    }
+    return step_dist;
 }
 
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
-    if (raycast_with_obstacle(k, globals.player(), .Wall)) |distance| {
+    if (step_distance_to_obstacle(k, dir)) |distance| {
         std.log.info("distance to wall {}", .{distance});
         //   if there is a wall in the way, and wall > size distance, take full step
         if (distance > k.size) {
