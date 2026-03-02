@@ -11,9 +11,6 @@ const Vec2 = @import("core.zig").Vec2;
 const IVec2 = @import("core.zig").IVec2;
 const Rect = @import("core.zig").Rect;
 
-const CameraWidth = 65;
-const CameraHeight = 65;
-
 pub const std_options: std.Options = .{
     .logFn = log,
 };
@@ -111,7 +108,7 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
     }
 
     const offset: f32 = if (options.pixel_shift)
-        16.0 * @as(f32, @floatFromInt(options.size))
+        (SPRITE_SCALE / 16.0) * @as(f32, @floatFromInt(options.size))
     else
         0;
 
@@ -159,7 +156,7 @@ fn render_kaiju(kaiju: *const main.Unit) void {
 
     // Flush before K so it doesn't resize the border batch
     render_buffer.flush();
-    draw_world_glyph(kaiju.render_position, 'K', .{
+    draw_world_glyph(kaiju.render_position.plus(Vec2.ONE), 'K', .{
         .bgcolor = .black,
         .color = .red,
         .size = kaiju.size - 2,
@@ -280,8 +277,8 @@ pub export fn frame(t: f64) void {
         .x = @intFromFloat(@floor(camera.x)),
         .y = @intFromFloat(@floor(camera.y)),
     };
-    for (0..CameraWidth) |dx| {
-        for (0..CameraHeight) |dy| {
+    for (0..@intFromFloat(camera.w + 1)) |dx| {
+        for (0..@intFromFloat(camera.h + 1)) |dy| {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
             const world_pos = IVec2{

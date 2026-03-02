@@ -123,6 +123,49 @@ pub fn get_terrain_at(position: IVec2) ?Terrain {
     return globals.mapdata[ix];
 }
 
+pub const ux = struct {
+    pub const InputMode = enum { Movement, Attack };
+    pub const Action = union(enum) {
+        move: struct { Dir4, bool },
+        attack: Dir4,
+    };
+    pub var input_mode: InputMode = .Movement;
+
+    pub fn resolve_input(key: keyboard.Code) ?Action {
+        const dir: ?Dir4 = blk: switch (key) {
+            .KeyW, .ArrowUp => {
+                break :blk .Up;
+            },
+            .KeyA, .ArrowLeft => {
+                break :blk .Left;
+            },
+            .KeyS, .ArrowDown => {
+                break :blk .Down;
+            },
+            .KeyD, .ArrowRight => {
+                break :blk .Right;
+            },
+            else => {
+                break :blk null;
+            },
+        };
+
+        if (dir) |d| {
+            switch (input_mode) {
+                .Movement => {
+                    const shift = keyboard.isShiftDown();
+                    return .{ .move = .{ d, shift } };
+                },
+                .Attack => {
+                    return .{ .attack = d };
+                },
+            }
+        }
+
+        return null;
+    }
+};
+
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
     pub var mapdata: [map.MAPDATA_LEN]Terrain = .{.Floor} ** map.MAPDATA_LEN;
@@ -166,76 +209,102 @@ pub fn init(rng: std.Random) !void {
     map.mapgen(rng, &globals.mapdata);
 }
 
-pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
-    var player_acted = false;
-    var move_dir: ?Dir4 = null;
-    switch (key) {
-        .KeyW, .ArrowUp => {
-            move_dir = .Up;
-        },
-        .KeyA, .ArrowLeft => {
-            move_dir = .Left;
-        },
-        .KeyS, .ArrowDown => {
-            move_dir = .Down;
-        },
-        .KeyD, .ArrowRight => {
-            move_dir = .Right;
-        },
-        else => {},
+pub fn scan_until_obstacle(from: IVec2, dir: Dir4, max: i16) IVec2 {
+    if (max <= 0) {
+        return from;
     }
-    if (move_dir) |d| {
-        const player = globals.player();
-        const pmount = player.mount();
-        if (pmount.tag == .Motorcycle) {
-            // mounted movement
-            const motomove = resolve_motorcycle_movement(
-                pmount,
-                .{
-                    .dir = d,
-                    .shift = keyboard.isShiftDown(),
-                },
-            );
-            if (motomove.dismount) {
-                player.move_to(motomove.position);
-                player.*.mounted_on = 0;
-            } else if (crash_check(pmount, motomove)) |crashed| {
-                pmount.move_to(crashed.position);
-                pmount.*.orientation = crashed.orientation;
-                pmount.*.speed = 0;
-                if (motomove.brake) {
-                    player.*.move_to(pmount.position);
-                } else {
-                    player.*.mounted_on = 0;
-                }
-                if (crashed.fling) {
-                    const delta = motomove.midpoint.minus(player.position);
-                    // TODO: slide player toward this position instead  (ie interrupted by obstacles) instead of assigning it
-                    player.move_to(motomove.midpoint.plus(delta));
-                }
+    const vec = dir.ivec();
+    var cursor = from;
+    for (0..@intCast(max)) |_| {
+        const next = cursor.plus(vec);
+        if (!player_passable(next)) {
+            return cursor;
+        }
+        cursor = next;
+    }
+    return cursor;
+}
+
+pub fn handle_player_move(d: Dir4, shift: bool) bool {
+    const player = globals.player();
+    const pmount = player.mount();
+    if (pmount.tag == .Motorcycle) {
+        // mounted movement
+        const motomove = resolve_motorcycle_movement(
+            pmount,
+            .{
+                .dir = d,
+                .shift = shift,
+            },
+        );
+        if (motomove.dismount) {
+            player.move_to(motomove.position);
+            player.*.mounted_on = 0;
+        } else if (crash_check(pmount, motomove)) |crashed| {
+            if (crashed.fling) {
+                const delta = motomove.midpoint.minus(player.position);
+                const landed_at = scan_until_obstacle(motomove.midpoint, pmount.orientation, delta.max_norm());
+                player.move_to(landed_at);
+            }
+            pmount.move_to(crashed.position);
+            pmount.*.orientation = crashed.orientation;
+            pmount.*.speed = 0;
+            if (motomove.brake) {
+                player.*.move_to(pmount.position);
             } else {
-                pmount.*.orientation = motomove.orientation;
-                pmount.*.speed = motomove.speed;
-                pmount.move_to(motomove.position);
-                player.move_to(motomove.position);
+                player.*.mounted_on = 0;
             }
         } else {
-            // unmounted movement
-            const dv = d.ivec();
-            const target = player.position.plus(dv);
-
-            if (get_occupant(target)) |occupant_id| {
-                const occupant = globals.unit(occupant_id);
-                if (occupant.tag == .Motorcycle) { // Mount it
-                    player.move_to(occupant.position);
-                    player.*.mounted_on = occupant_id;
-                } else {
-                    // TODO: do something other than move here
-                }
-            } else {
-                player.move_to(target);
-            }
+            pmount.*.orientation = motomove.orientation;
+            pmount.*.speed = motomove.speed;
+            pmount.move_to(motomove.position);
+            player.move_to(motomove.position);
         }
+    } else {
+        // unmounted movement
+        const dv = d.ivec();
+        const target = player.position.plus(dv);
+
+        if (get_occupant(target)) |occupant_id| {
+            const occupant = globals.unit(occupant_id);
+            if (occupant.tag == .Motorcycle) { // Mount it
+                player.move_to(occupant.position);
+                player.*.mounted_on = occupant_id;
+            } else {
+                // TODO: do something other than move here
+            }
+        } else {
+            player.move_to(target);
+        }
+    }
+    return true;
+}
+
+const SHOT_RANGE: usize = 64;
+pub fn handle_player_attack(dir: Dir4) bool {
+    // TODO
+    _ = dir;
+    // const v = dir.ivec();
+    // var cursor = globals.player().position;
+    // for (0..SHOT_RANGE) {
+    // }
+    return false;
+}
+
+pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
+    var player_acted = false;
+
+    if (ux.resolve_input(key)) |action| {
+        switch (action) {
+            .move => |movedata| {
+                const d, const shift = movedata;
+                player_acted = handle_player_move(d, shift);
+            },
+            .attack => |d| {
+                player_acted = handle_player_attack(d);
+            },
+        }
+
         player_acted = true;
     }
 
@@ -325,6 +394,7 @@ pub const MotoResult = struct {
 };
 
 pub fn get_occupant(pos: IVec2) ?UnitId {
+    // TODO: be smart here. lru?
     for (globals.units[1..], 1..) |u, id| {
         if (u.occupies(pos)) {
             return @intCast(id);

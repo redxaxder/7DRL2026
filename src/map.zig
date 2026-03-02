@@ -172,6 +172,13 @@ pub const Terrain = enum(u8) {
             else => true,
         };
     }
+
+    pub fn blocks_shot(self: @This()) bool {
+        return switch (self) {
+            .Wall, .Door => true,
+            else => false,
+        };
+    }
 };
 
 pub fn map_index(position: IVec2) ?usize {
