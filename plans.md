@@ -10,11 +10,11 @@ v0.1 technically a game
     + shows where you'd end up after:
       + firing (center)
       + wasd
-- 1 enemy (3x3)
-- really dumb mapgen
-  - 1 zone (not fully fleshed out)
-  - features:
-    - rubble
++ 1 enemy (3x3)
++ really dumb mapgen
+  + 1 zone (not fully fleshed out)
+  + features:
+    + rubble
     - debris
   + terrain:
     + asphalt

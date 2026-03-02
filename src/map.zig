@@ -116,7 +116,30 @@ pub fn mapgen(rng: std.Random, map: []Terrain) void {
         }
         block_offset_x += @rem(zone_size.x, block_size_x);
     }
-    rubble(map, .{ .x = 7, .y = 4 }, .{ .x = 15, .y = 15 });
+    // rubble
+    const destruction_factor: f32 = 0.001; // how likely an individual tile is to be the epicenter of some destruction
+    for (0..MAP_SIZE - 1) |x| {
+        for (0..MAP_SIZE - 1) |y| {
+            if (rng.float(f32) < destruction_factor) {
+                const terrain: Terrain = if (rng.float(f32) < 0.5) .Rubble else .Debris;
+                switch (terrain) {
+                    .Rubble => {
+                        const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
+                        const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
+                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng);
+                    },
+                    .Debris => {
+                        const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
+                        const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
+                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng);
+                    },
+                    else => {
+                        unreachable;
+                    },
+                }
+            }
+        }
+    }
 }
 
 pub const MAP_SIZE = 2500;
@@ -128,6 +151,7 @@ pub const Terrain = enum(u8) {
     Wall,
     Door,
     Rubble,
+    Debris,
     _,
 
     pub fn glyph(self: @This()) u8 {
@@ -137,6 +161,7 @@ pub const Terrain = enum(u8) {
             .Wall => return '#',
             .Door => return '+',
             .Rubble => return '&',
+            .Debris => return ';',
             else => return '?',
         }
     }
@@ -169,7 +194,7 @@ fn get_terrain_at(position: IVec2, map: []Terrain) ?Terrain {
     return map[ix];
 }
 
-fn rubble(map: []Terrain, radius: IVec2, at: IVec2) void {
+fn rubblum(map: []Terrain, radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) void {
     var buffer: [2 << 16]u8 = undefined;
     var fba: std.heap.FixedBufferAllocator = .init(&buffer);
     const allocator = fba.allocator();
@@ -182,8 +207,8 @@ fn rubble(map: []Terrain, radius: IVec2, at: IVec2) void {
         const ix: i16 = @as(i16, @intCast(ixu));
         const x: i16 = @divTrunc(ix, bound) + at.x - max_radius * 2;
         const y: i16 = @mod(ix, bound) + at.y - max_radius * 2;
-        if (crater_template[ixu]) {
-            set_terrain_at(.{ .x = x, .y = y }, .Rubble, map);
+        if (crater_template[ixu] and rng.float(f32) < density) {
+            set_terrain_at(.{ .x = x, .y = y }, terrain, map);
         }
     }
 }
