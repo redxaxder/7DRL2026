@@ -13,6 +13,9 @@ const IVec2 = core.IVec2;
 const Dir4 = core.Dir4;
 const Vec2 = core.Vec2;
 const Rect = core.Rect;
+const sector = @import("sector.zig");
+
+const get_occupant = sector.get_occupant;
 
 pub const UnitType = enum {
     Nil,
@@ -32,7 +35,6 @@ pub const Unit = struct {
 
     // Healthy
     hp: i64 = 0,
-    max_hp: i64 = 0,
 
     // Kaiju
     size: u8 = 1,
@@ -58,15 +60,18 @@ pub const Unit = struct {
         return .{
             .tag = .Player,
             .position = pos,
+            .hp = 50,
             .render_position = pos.float(),
         };
     }
+
     pub fn init_motorcycle(pos: IVec2, orientation: Dir4) Unit {
         return Unit{
             .tag = .Motorcycle,
             .position = pos,
             .render_position = pos.float(),
             .orientation = orientation,
+            .hp = 80,
         };
     }
 
@@ -75,11 +80,12 @@ pub const Unit = struct {
             .tag = .Kaiju,
             .position = pos,
             .render_position = pos.float(),
+            .hp = std.math.pow(i64, 10, @intCast(size - 1)),
             .size = size,
         };
     }
 
-    pub inline fn occupies(self: *const @This(), pos: IVec2) bool {
+    pub inline fn occupies(self: *const Unit, pos: IVec2) bool {
         const u: UnitType = self.tag;
 
         switch (u) {
@@ -99,27 +105,75 @@ pub const Unit = struct {
         }
     }
 
-    pub fn move_to(self: *@This(), pos: IVec2) void {
+    pub fn unit_id(self: *const Unit) UnitId {
+        return @intCast((@intFromPtr(self) - @intFromPtr(&globals.units)) / @sizeOf(Unit));
+    }
+
+    pub fn move_to(self: *Unit, pos: IVec2) void {
+        const id = self.unit_id();
+        sector.remove(id, self);
         self.position = pos;
+        sector.add(id, self);
         self.render_position = pos.float();
     }
 
-    pub fn mount(self: *const @This()) *Unit {
+    pub fn damage(self: *Unit, amount: i64) void {
+        // TODO: consequences
+        self.hp -= amount;
+    }
+
+    pub fn mount(self: *const Unit) *Unit {
         return globals.unit(self.mounted_on);
     }
 
-    pub fn handlepos(self: *const @This()) IVec2 {
+    pub fn get_rect(self: *const Unit) core.IRect {
+        switch (self.tag) {
+            .Nil => {
+                return .{};
+            },
+            .Player, .PendingRubble => {
+                return core.IRect{
+                    .x = self.position.x,
+                    .y = self.position.y,
+                    .w = 1,
+                    .h = 1,
+                };
+            },
+            .Kaiju, .PendingExplosion => {
+                return core.IRect{
+                    .x = self.position.x,
+                    .y = self.position.y,
+                    .w = @intCast(self.size),
+                    .h = @intCast(self.size),
+                };
+            },
+            .Motorcycle => {
+                const p1 = self.position;
+                const p2 = self.handlepos();
+                const w: i16 = @intCast(@abs(p1.x - p2.x) + 1);
+                const h: i16 = @intCast(@abs(p1.y - p2.y) + 1);
+                return core.IRect{
+                    .x = @min(p1.x, p2.x),
+                    .y = @min(p1.y, p2.y),
+                    .w = w,
+                    .h = h,
+                };
+            },
+        }
+    }
+
+    pub fn handlepos(self: *const Unit) IVec2 {
         return self.position.plus(self.orientation.ivec());
     }
 
-    pub fn move(self: *@This(), dir: Dir4, distance: i16) void {
+    pub fn move(self: *Unit, dir: Dir4, distance: i16) void {
         const target = self.position.plus(dir.ivec().scaled(distance));
         self.move_to(target);
     }
 };
 
-pub fn get_terrain_at(position: IVec2) ?Terrain {
-    const ix = map.map_index(position) orelse return null;
+pub fn get_terrain_at(position: IVec2) Terrain {
+    const ix = map.map_index(position) orelse return .Void;
     return globals.mapdata[ix];
 }
 
@@ -131,23 +185,23 @@ pub const ux = struct {
     };
     pub var input_mode: InputMode = .Movement;
 
+    fn toggle_weapon(id: usize) void {
+        // TODO: handle inventory interaction
+        _ = id;
+        if (input_mode == .Movement) {
+            input_mode = .Attack;
+        } else {
+            input_mode = .Movement;
+        }
+    }
+
     pub fn resolve_input(key: keyboard.Code) ?Action {
-        const dir: ?Dir4 = blk: switch (key) {
-            .KeyW, .ArrowUp => {
-                break :blk .Up;
-            },
-            .KeyA, .ArrowLeft => {
-                break :blk .Left;
-            },
-            .KeyS, .ArrowDown => {
-                break :blk .Down;
-            },
-            .KeyD, .ArrowRight => {
-                break :blk .Right;
-            },
-            else => {
-                break :blk null;
-            },
+        const dir: ?Dir4 = switch (key) {
+            .KeyW, .ArrowUp => .Up,
+            .KeyA, .ArrowLeft => .Left,
+            .KeyS, .ArrowDown => .Down,
+            .KeyD, .ArrowRight => .Right,
+            else => null,
         };
 
         if (dir) |d| {
@@ -160,6 +214,22 @@ pub const ux = struct {
                     return .{ .attack = d };
                 },
             }
+        } else {
+            const weapon_id: ?usize = switch (key) {
+                .Digit1, .Numpad1 => 1,
+                .Digit2, .Numpad2 => 2,
+                .Digit3, .Numpad3 => 3,
+                .Digit4, .Numpad4 => 4,
+                .Digit6, .Numpad6 => 6,
+                .Digit7, .Numpad7 => 7,
+                .Digit8, .Numpad8 => 8,
+                .Digit9, .Numpad9 => 9,
+                .Digit0, .Numpad0 => 0,
+                else => null,
+            };
+            if (weapon_id) |weap| {
+                toggle_weapon(weap);
+            }
         }
 
         return null;
@@ -169,6 +239,9 @@ pub const ux = struct {
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
     pub var mapdata: [map.MAPDATA_LEN]Terrain = .{.Floor} ** map.MAPDATA_LEN;
+
+    pub var attack_chain_target: ?UnitId = 0;
+    pub var attack_chain_count: i64 = 0;
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];
@@ -190,42 +263,35 @@ pub const globals = struct {
 
 const PLAYER_ID: UnitId = 1;
 
+pub fn spawn(u: Unit) UnitId {
+    const id = globals.free_unit_id() orelse @panic("how did we run out so fast");
+    globals.unit(id).* = u;
+    sector.add(id, globals.unit(id));
+    return id;
+}
+
 pub fn init(rng: std.Random) !void {
-    globals.player().* = .init_player(IVec2.ZERO);
-    const moto_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(moto_id).* = .init_motorcycle(IVec2.ZERO, .Right);
+    sector.init();
+
+    globals.units[PLAYER_ID] = .init_player(IVec2.ZERO);
+    sector.add(PLAYER_ID, globals.player());
+
+    const moto_id = spawn(.init_motorcycle(IVec2.ZERO, .Right));
     globals.player().mounted_on = moto_id;
-    const kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(kaiju_id).* = .init_kaiju(
+
+    _ = spawn(.init_kaiju(
         IVec2{ .x = 6, .y = 6 },
         3,
-    );
+    ));
 
-    const big_kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(big_kaiju_id).* = .init_kaiju(
+    _ = spawn(.init_kaiju(
         IVec2{ .x = 9, .y = 18 },
         5,
-    );
+    ));
     map.mapgen(rng, &globals.mapdata);
 }
 
-pub fn scan_until_obstacle(from: IVec2, dir: Dir4, max: i16) IVec2 {
-    if (max <= 0) {
-        return from;
-    }
-    const vec = dir.ivec();
-    var cursor = from;
-    for (0..@intCast(max)) |_| {
-        const next = cursor.plus(vec);
-        if (!player_passable(next)) {
-            return cursor;
-        }
-        cursor = next;
-    }
-    return cursor;
-}
-
-pub fn handle_player_move(d: Dir4, shift: bool) bool {
+pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
     const player = globals.player();
     const pmount = player.mount();
     if (pmount.tag == .Motorcycle) {
@@ -233,7 +299,7 @@ pub fn handle_player_move(d: Dir4, shift: bool) bool {
         const motomove = resolve_motorcycle_movement(
             pmount,
             .{
-                .dir = d,
+                .dir = dir,
                 .shift = shift,
             },
         );
@@ -243,7 +309,15 @@ pub fn handle_player_move(d: Dir4, shift: bool) bool {
         } else if (crash_check(pmount, motomove)) |crashed| {
             if (crashed.fling) {
                 const delta = motomove.midpoint.minus(player.position);
-                const landed_at = scan_until_obstacle(motomove.midpoint, pmount.orientation, delta.max_norm());
+                var landed_at = motomove.midpoint;
+                var scan = landed_at.scan(pmount.orientation, delta.max_norm());
+                while (scan.next()) |path| {
+                    if (player_passable(path)) {
+                        landed_at = path;
+                    } else {
+                        break;
+                    }
+                }
                 player.move_to(landed_at);
             }
             pmount.move_to(crashed.position);
@@ -261,33 +335,60 @@ pub fn handle_player_move(d: Dir4, shift: bool) bool {
             player.move_to(motomove.position);
         }
     } else {
-        // unmounted movement
-        const dv = d.ivec();
-        const target = player.position.plus(dv);
+        if (dir) |d| { // unmounted movement
+            const dv = d.ivec();
+            const target = player.position.plus(dv);
 
-        if (get_occupant(target)) |occupant_id| {
-            const occupant = globals.unit(occupant_id);
-            if (occupant.tag == .Motorcycle) { // Mount it
-                player.move_to(occupant.position);
-                player.*.mounted_on = occupant_id;
+            if (get_occupant(target)) |occupant_id| {
+                const occupant = globals.unit(occupant_id);
+                switch (occupant.tag) {
+                    .Motorcycle => { // Mount it
+                        player.move_to(occupant.position);
+                        player.*.mounted_on = occupant_id;
+                    },
+                    .Kaiju => {
+                        // move into kaiju?
+                        return false;
+                    },
+                }
             } else {
-                // TODO: do something other than move here
+                player.move_to(target);
             }
-        } else {
-            player.move_to(target);
         }
     }
     return true;
 }
 
 const SHOT_RANGE: usize = 64;
+
 pub fn handle_player_attack(dir: Dir4) bool {
-    // TODO
-    _ = dir;
-    // const v = dir.ivec();
-    // var cursor = globals.player().position;
-    // for (0..SHOT_RANGE) {
-    // }
+    var scan = globals.player().position.scan(dir, SHOT_RANGE);
+    while (scan.next()) |aim| {
+        const terrain = get_terrain_at(aim);
+        if (terrain.blocks_shot()) {
+            // you shoot at the terrain
+            // consequences TBD
+            std.log.info("plink!", .{});
+            return true;
+        }
+        if (get_occupant(aim)) |occupant_id| {
+            const unit = globals.unit(occupant_id);
+            if (unit.tag == .Kaiju) {
+                // you shoot at the kaiju
+                if (globals.attack_chain_target != occupant_id) {
+                    globals.attack_chain_target = occupant_id;
+                    globals.attack_chain_count = 0;
+                } else {
+                    globals.attack_chain_count += 1;
+                }
+                // TBD
+                const damage = 1 + (2 * globals.attack_chain_count);
+                unit.damage(damage);
+                std.log.info("bang!", .{});
+                return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -302,6 +403,10 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
             },
             .attack => |d| {
                 player_acted = handle_player_attack(d);
+                if (player_acted) {
+                    // TODO: motorcycle with speed moves
+
+                }
             },
         }
 
@@ -409,18 +514,8 @@ pub const MotoResult = struct {
     dismount: bool,
 };
 
-pub fn get_occupant(pos: IVec2) ?UnitId {
-    // TODO: be smart here. lru?
-    for (globals.units[1..], 1..) |u, id| {
-        if (u.occupies(pos)) {
-            return @intCast(id);
-        }
-    }
-    return null;
-}
-
 pub fn player_passable(pos: IVec2) bool {
-    const t = get_terrain_at(pos) orelse return false;
+    const t = get_terrain_at(pos);
     if (!t.passable()) {
         return false;
     }
@@ -429,9 +524,9 @@ pub fn player_passable(pos: IVec2) bool {
 }
 
 pub fn moto_passable(pos: IVec2, orientation: Dir4) bool {
-    const t = get_terrain_at(pos) orelse return false;
+    const t = get_terrain_at(pos);
     const p2 = pos.plus(orientation.ivec());
-    const t2 = get_terrain_at(p2) orelse return false;
+    const t2 = get_terrain_at(p2);
     return t.passable() and t2.passable();
 }
 

@@ -80,9 +80,13 @@ pub const IVec2 = struct {
         return self.times(dir.ivec());
     }
 
+    pub fn scan(self: IVec2, dir: Dir4, distance: i16) ScanIterator {
+        return .{ .pos = self, .step = dir.ivec(), .remaining = distance };
+    }
+
     pub fn facing(self: IVec2, other: IVec2) Dir4 {
         const diff: IVec2 = other.minus(self);
-        std.log.info("diff x {} y {}", .{ diff.x, diff.y });
+        // std.log.info("diff x {} y {}", .{ diff.x, diff.y });
         if (diff.x > 0 and @abs(diff.x) >= @abs(diff.y)) {
             return .Right;
         } else if (diff.y < 0 and @abs(diff.y) >= @abs(diff.x)) {
@@ -92,6 +96,19 @@ pub const IVec2 = struct {
         } else {
             return .Down;
         }
+    }
+};
+
+pub const ScanIterator = struct {
+    pos: IVec2,
+    step: IVec2,
+    remaining: i16,
+
+    pub fn next(self: *ScanIterator) ?IVec2 {
+        if (self.remaining <= 0) return null;
+        self.pos = self.pos.plus(self.step);
+        self.remaining -= 1;
+        return self.pos;
     }
 };
 
@@ -202,14 +219,10 @@ pub const Vec2 = extern struct {
 };
 
 pub const IRect = struct {
-    x: i16,
-    y: i16,
-    w: i16,
-    h: i16,
-
-    pub fn from(pos: IVec2, size: IVec2) IRect {
-        return .{ .x = pos.x, .y = pos.y, .w = size.x, .h = size.y };
-    }
+    x: i16 = -3200,
+    y: i16 = -3200,
+    w: i16 = 0,
+    h: i16 = 0,
 
     pub fn contains(self: IRect, p: IVec2) bool {
         return p.x >= self.x and p.x < self.x + self.w and

@@ -219,7 +219,7 @@ pub fn render_debug(val: anytype) void {
     inline for (fields) |field| {
         const field_val = @field(val, field.name);
         const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
-        splatString(x, y, text, .yellow, size);
+        splatString(x, y, text, .magenta, size);
         render_buffer.flush();
         y += size;
     }
@@ -285,7 +285,7 @@ pub export fn frame(t: f64) void {
                 .x = x,
                 .y = y,
             };
-            const terrain = main.get_terrain_at(world_pos) orelse continue;
+            const terrain = main.get_terrain_at(world_pos);
             const screen_pos = world_pos.float().minus(camera.pos()).scaled(SPRITE_SCALE);
             const draw_sprite = Sprite{
                 .pos = screen_pos,
@@ -339,11 +339,8 @@ pub export fn frame(t: f64) void {
 
     render_buffer.flush();
 
-    const pl = main.globals.player();
     render_debug(.{
-        .ppos = pl.position,
-        .mount = pl.mounted_on,
-        .motopos = main.globals.unit(2).position,
+        .mode = main.ux.input_mode,
     });
 
     render_buffer.flush();

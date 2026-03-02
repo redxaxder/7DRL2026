@@ -152,6 +152,7 @@ pub const Terrain = enum(u8) {
     Door,
     Rubble,
     Debris,
+    Void,
     _,
 
     pub fn glyph(self: @This()) u8 {
@@ -168,14 +169,14 @@ pub const Terrain = enum(u8) {
 
     pub fn passable(self: @This()) bool {
         return switch (self) {
-            .Wall, .Door, .Rubble => false,
+            .Wall, .Door, .Rubble, .Void => false,
             else => true,
         };
     }
 
     pub fn blocks_shot(self: @This()) bool {
         return switch (self) {
-            .Wall, .Door => true,
+            .Wall, .Door, .Void => true,
             else => false,
         };
     }
