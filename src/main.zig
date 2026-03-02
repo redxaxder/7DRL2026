@@ -27,8 +27,8 @@ pub const UnitId = u16;
 pub const Unit = struct {
     // Universal
     tag: UnitType = .Nil,
-    position: IVec2 = IVec2.default,
-    render_position: Vec2 = Vec2.default,
+    position: IVec2 = IVec2.DEFAULT,
+    render_position: Vec2 = Vec2.DEFAULT,
 
     // Healthy
     hp: i64 = 0,
@@ -44,7 +44,7 @@ pub const Unit = struct {
 
     mounted_on: UnitId = 0,
 
-    pub const default: Unit = .{};
+    pub const DEFAULT: Unit = .{};
 
     // a unit occupies a position if it potentially obscructs travel into it
     // the only things that can do this are:
@@ -126,7 +126,7 @@ pub fn get_terrain_at(position: IVec2) ?Terrain {
 }
 
 pub const globals = struct {
-    pub var units: [2000]Unit = .{Unit.default} ** 2000;
+    pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
     pub var mapdata: [map.MAPDATA_LEN]Terrain = .{.Floor} ** map.MAPDATA_LEN;
 
     pub fn unit(u: UnitId) *Unit {
@@ -150,9 +150,9 @@ pub const globals = struct {
 const PLAYER_ID: UnitId = 1;
 
 pub fn init(rng: std.Random) !void {
-    globals.player().* = .init_player(IVec2.zero);
+    globals.player().* = .init_player(IVec2.ZERO);
     const moto_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(moto_id).* = .init_motorcycle(IVec2.zero, .Right);
+    globals.unit(moto_id).* = .init_motorcycle(IVec2.ZERO, .Right);
     globals.player().mounted_on = moto_id;
     const kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
     globals.unit(kaiju_id).* = .init_kaiju(

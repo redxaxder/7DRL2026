@@ -23,11 +23,11 @@ pub const IVec2 = struct {
     x: i16 = 0,
     y: i16 = 0,
 
-    pub const zero: IVec2 = .{
+    pub const ZERO: IVec2 = .{
         .x = 0,
         .y = 0,
     };
-    pub const default: IVec2 = .{
+    pub const DEFAULT: IVec2 = .{
         .x = -3200,
         .y = -3200,
     };
@@ -145,8 +145,9 @@ pub const Vec2 = extern struct {
     y: f32,
 
     pub const ZERO: Vec2 = .{ .x = 0, .y = 0 };
+    pub const ONE: Vec2 = .{ .x = 1, .y = 1 };
 
-    pub const default: Vec2 = .{
+    pub const DEFAULT: Vec2 = .{
         .x = -3200,
         .y = -3200,
     };
@@ -164,7 +165,7 @@ pub const Vec2 = extern struct {
         };
     }
 
-    pub fn scale(self: Vec2, c: f32) Vec2 {
+    pub fn scaled(self: Vec2, c: f32) Vec2 {
         return .{
             .x = self.x * c,
             .y = self.y * c,
@@ -173,7 +174,7 @@ pub const Vec2 = extern struct {
 
     pub fn linear(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
         const t = time.progress();
-        target.* = x0.scale(1 - t).plus(x1.scale(t));
+        target.* = x0.scaled(1 - t).plus(x1.scaled(t));
     }
 
     pub fn cubic(x0: Vec2, dx0: Vec2, x1: Vec2, dx1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {

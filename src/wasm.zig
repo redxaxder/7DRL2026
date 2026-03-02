@@ -92,24 +92,31 @@ const SPRITE_SCALE = 16;
 const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 
 const DrawOptions = struct {
-    clear_back: bool = false,
     size: u8 = 1,
     color: Color = .white,
+    bgcolor: ?Color = null,
+    pixel_shift: bool = false,
 };
 pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
-    const screen_pos = world_pos.minus(camera.pos()).scale(SPRITE_SCALE);
-    const dim = SPRITE_DIM.scale(@floatFromInt(options.size));
+    const screen_pos = world_pos.minus(camera.pos()).scaled(SPRITE_SCALE);
+    const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
 
-    if (options.clear_back) {
+    if (options.bgcolor) |bgcolor| {
         render_buffer.push(.{
             .pos = screen_pos,
             .size = dim,
-            .color = .black,
+            .color = bgcolor,
             .src_idx = 0xDB,
         });
     }
+
+    const offset: f32 = if (options.pixel_shift)
+        16.0 * @as(f32, @floatFromInt(options.size))
+    else
+        0;
+
     render_buffer.push(.{
-        .pos = screen_pos,
+        .pos = screen_pos.plus(Vec2.ONE.scaled(offset)),
         .size = dim,
         .color = options.color,
         .src_idx = src_idx,
@@ -143,15 +150,21 @@ fn render_kaiju(kaiju: *const main.Unit) void {
                 else if (is_left or is_right) 0xB3 // │
                 else ' ';
 
-            draw_world_glyph(pos.float(), glyph, .{ .clear_back = true, .color = .green });
+            draw_world_glyph(pos.float(), glyph, .{
+                .bgcolor = .black,
+                .color = .green,
+            });
         }
     }
 
     // Flush before K so it doesn't resize the border batch
     render_buffer.flush();
-    const k_offset: f32 = 1.0 + @as(f32, @floatFromInt(kaiju.size - 2)) / 16.0;
-    const k_pos = kaiju.render_position.plus(.{ .x = k_offset, .y = k_offset });
-    draw_world_glyph(k_pos, 'K', .{ .clear_back = true, .color = .red, .size = @intCast(kaiju.size - 2) });
+    draw_world_glyph(kaiju.render_position, 'K', .{
+        .bgcolor = .black,
+        .color = .red,
+        .size = kaiju.size - 2,
+        .pixel_shift = true,
+    });
     render_buffer.flush();
 }
 
@@ -161,15 +174,15 @@ fn render_unit(unit: *const main.Unit) void {
             draw_world_glyph(
                 unit.render_position,
                 '@',
-                .{ .clear_back = true },
+                .{ .bgcolor = .black },
             );
         },
         .Motorcycle => {
             const p0 = unit.position;
             const p1 = p0.plus(unit.orientation.ivec());
-            draw_world_glyph(p0.float(), 'o', .{ .clear_back = true });
+            draw_world_glyph(p0.float(), 'o', .{ .bgcolor = .black });
 
-            draw_world_glyph(p1.float(), '%', .{ .clear_back = true });
+            draw_world_glyph(p1.float(), '%', .{ .bgcolor = .black });
         },
         .Kaiju => render_kaiju(unit),
         else => {
@@ -276,7 +289,7 @@ pub export fn frame(t: f64) void {
                 .y = y,
             };
             const terrain = main.get_terrain_at(world_pos) orelse continue;
-            const screen_pos = world_pos.float().minus(camera.pos()).scale(SPRITE_SCALE);
+            const screen_pos = world_pos.float().minus(camera.pos()).scaled(SPRITE_SCALE);
             const draw_sprite = Sprite{
                 .pos = screen_pos,
                 .color = .white,
@@ -321,7 +334,7 @@ pub export fn frame(t: f64) void {
                 continue;
             }
             draw_world_glyph(pos.float(), '%', .{
-                .clear_back = true,
+                .bgcolor = .black,
                 .color = .yellow,
             });
         }
