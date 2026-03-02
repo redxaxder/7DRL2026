@@ -168,7 +168,7 @@ pub const Terrain = enum(u8) {
 
     pub fn passable(self: @This()) bool {
         return switch (self) {
-            .Wall, .Door => false,
+            .Wall, .Door, .Rubble => false,
             else => true,
         };
     }

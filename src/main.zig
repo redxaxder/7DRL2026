@@ -53,6 +53,32 @@ pub const Unit = struct {
     //   - kaiju
     // these are considered to have mutually exclusive ownership over locations,
     // except when the player is riding a motorcycle
+
+    pub fn init_player(pos: IVec2) Unit {
+        return .{
+            .tag = .Player,
+            .position = pos,
+            .render_position = pos.float(),
+        };
+    }
+    pub fn init_motorcycle(pos: IVec2, orientation: Dir4) Unit {
+        return Unit{
+            .tag = .Motorcycle,
+            .position = pos,
+            .render_position = pos.float(),
+            .orientation = orientation,
+        };
+    }
+
+    pub fn init_kaiju(pos: IVec2, size: u8) Unit {
+        return .{
+            .tag = .Kaiju,
+            .position = pos,
+            .render_position = pos.float(),
+            .size = size,
+        };
+    }
+
     pub inline fn occupies(self: *const @This(), pos: IVec2) bool {
         const u: UnitType = self.tag;
 
@@ -72,6 +98,7 @@ pub const Unit = struct {
             },
         }
     }
+
     pub fn move_to(self: *@This(), pos: IVec2) void {
         self.position = pos;
         self.render_position = pos.float();
@@ -121,30 +148,21 @@ pub const globals = struct {
 const PLAYER_ID: UnitId = 1;
 
 pub fn init(rng: std.Random) !void {
-    globals.player().* = Unit{
-        .tag = .Player,
-        .position = IVec2{ .x = 0, .y = 0 },
-    };
+    globals.player().* = .init_player(IVec2.zero);
     const moto_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(moto_id).* = Unit{
-        .tag = .Motorcycle,
-        .position = globals.player().position,
-        .orientation = .Right,
-    };
+    globals.unit(moto_id).* = .init_motorcycle(IVec2.zero, .Right);
     globals.player().mounted_on = moto_id;
-    // const kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    // globals.unit(kaiju_id).* = Unit{
-    //     .tag = .Kaiju,
-    //     .position = IVec2{ .x = 6, .y = 6 },
-    //     .size = 1,
-    // };
+    const kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
+    globals.unit(kaiju_id).* = .init_kaiju(
+        IVec2{ .x = 6, .y = 6 },
+        3,
+    );
 
     const big_kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(big_kaiju_id).* = Unit{
-        .tag = .Kaiju,
-        .position = IVec2{ .x = 9, .y = 18 },
-        .size = 2,
-    };
+    globals.unit(big_kaiju_id).* = .init_kaiju(
+        IVec2{ .x = 9, .y = 18 },
+        5,
+    );
     map.mapgen(rng, &globals.mapdata);
 }
 

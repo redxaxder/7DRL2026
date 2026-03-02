@@ -117,25 +117,22 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
 }
 
 fn render_kaiju(kaiju: *const main.Unit) void {
-    // Box-drawing layout for a size-N kaiju (dim = 2*N+1):
+    // Box-drawing layout for a size-N kaiju
     //   ┌─…─┐
     //   │   │
     //   │ K │
     //   │   │
     //   └─…─┘
-    const s: i16 = @intCast(kaiju.size);
-    const dim: i16 = 2 * s + 1;
-
     // Draw border and interior spaces at size=1
     var dy: i16 = 0;
-    while (dy < dim) : (dy += 1) {
+    while (dy < kaiju.size) : (dy += 1) {
         var dx: i16 = 0;
-        while (dx < dim) : (dx += 1) {
+        while (dx < kaiju.size) : (dx += 1) {
             const pos = kaiju.position.plus(.{ .x = dx, .y = dy });
             const is_top = dy == 0;
-            const is_bottom = dy == dim - 1;
+            const is_bottom = dy == kaiju.size - 1;
             const is_left = dx == 0;
-            const is_right = dx == dim - 1;
+            const is_right = dx == kaiju.size - 1;
 
             const glyph: u8 =
                 if (is_top and is_left) 0xDA // ┌
@@ -152,12 +149,9 @@ fn render_kaiju(kaiju: *const main.Unit) void {
 
     // Flush before K so it doesn't resize the border batch
     render_buffer.flush();
-
-    // Draw K centered in the interior at kaiju.size scale.
-    // Interior spans cells 1..(dim-2), width = 2s-1.
-    const k_offset: f32 = 1.0 + @as(f32, @floatFromInt(dim - 2)) / 16.0;
-    const k_pos = kaiju.position.float().plus(.{ .x = k_offset, .y = k_offset });
-    draw_world_glyph(k_pos, 'K', .{ .clear_back = true, .color = 3, .size = @intCast(dim - 2) });
+    const k_offset: f32 = 1.0 + @as(f32, @floatFromInt(kaiju.size - 2)) / 16.0;
+    const k_pos = kaiju.render_position.plus(.{ .x = k_offset, .y = k_offset });
+    draw_world_glyph(k_pos, 'K', .{ .clear_back = true, .color = 3, .size = @intCast(kaiju.size - 2) });
     render_buffer.flush();
 }
 
@@ -165,7 +159,7 @@ fn render_unit(unit: *const main.Unit) void {
     switch (unit.tag) {
         .Player => {
             draw_world_glyph(
-                unit.position.float(),
+                unit.render_position,
                 '@',
                 .{ .clear_back = true },
             );
@@ -245,7 +239,7 @@ pub export fn frame(t: f64) void {
             const mount = player.mount();
 
             var points: [7]Vec2 = undefined;
-            points[0] = player.position.float();
+            points[0] = player.render_position;
             var count: usize = 1;
 
             if (mount.tag != .Nil) {
