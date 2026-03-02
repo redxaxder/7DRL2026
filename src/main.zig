@@ -169,7 +169,10 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                     .shift = keyboard.isShiftDown(),
                 },
             );
-            if (crash_check(pmount, motomove)) |crashed| {
+            if (motomove.dismount) {
+                player.*.position = motomove.position;
+                player.*.mounted_on = 0;
+            } else if (crash_check(pmount, motomove)) |crashed| {
                 pmount.*.position = crashed.position;
                 pmount.*.orientation = crashed.orientation;
                 pmount.*.speed = 0;
@@ -422,13 +425,18 @@ pub fn resolve_motorcycle_movement(
         },
         .Reverse => { // brake!
             it.brake = true;
-            if (move.shift) { // slight brake
-                const drift = moto.orientation.ivec()
-                    .scaled(@intCast(it.speed))
-                    .plus(change.ivec());
-                it.position = it.position.plus(drift);
+            if (move.shift) {
                 if (it.speed > 0) {
+                    // slight brake
                     it.speed -= 1;
+                    const drift = moto.orientation.ivec()
+                        .scaled(@intCast(it.speed))
+                        .plus(change.ivec());
+                    it.position = it.position.plus(drift);
+                } else {
+                    // //dismount
+                    it.dismount = true;
+                    it.position = it.position.plus(change.ivec());
                 }
             } else { // full brake
                 const drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
