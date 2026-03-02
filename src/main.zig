@@ -15,7 +15,7 @@ const Vec2 = core.Vec2;
 const Rect = core.Rect;
 const sector = @import("sector.zig");
 
-const get_occupant = sector.get_occupant;
+const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
 
 pub const UnitType = enum {
@@ -340,22 +340,25 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
             const dv = d.ivec();
             const target = player.position.plus(dv);
 
-            if (get_occupant(target)) |occupant_id| {
+            var occupants = get_occupants(target);
+            while (occupants.next()) |occupant_id| {
                 const occupant = globals.unit(occupant_id);
                 switch (occupant.tag) {
                     .Motorcycle => { // Mount it
                         player.move_to(occupant.position);
                         player.*.mounted_on = occupant_id;
+                        return true;
                     },
                     .Kaiju => {
                         // move into kaiju?
                         return false;
                     },
-                    else => unreachable,
+                    else => {
+                        continue;
+                    },
                 }
-            } else {
-                player.move_to(target);
             }
+            player.move_to(target);
         }
     }
     return true;
@@ -373,7 +376,8 @@ pub fn handle_player_attack(dir: Dir4) bool {
             std.log.info("plink!", .{});
             return true;
         }
-        if (get_occupant(aim)) |occupant_id| {
+        var aim_occupants = get_occupants(aim);
+        while (aim_occupants.next()) |occupant_id| {
             const unit = globals.unit(occupant_id);
             if (unit.tag == .Kaiju) {
                 // you shoot at the kaiju

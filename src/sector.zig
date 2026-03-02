@@ -122,15 +122,25 @@ pub fn remove(id: UnitId, u: *const Unit) void {
     }
 }
 
-pub fn get_occupant(pos: IVec2) ?UnitId {
-    const si = sector_index(pos) orelse return null;
-    var cur: NodeIndex = sector_heads[si];
-    while (cur != SENTINEL) {
-        const node = &nodes[cur];
-        if (main.globals.unit(node.unit_id).occupies(pos)) {
-            return node.unit_id;
+pub const OccupantIterator = struct {
+    pos: IVec2,
+    cur: NodeIndex,
+
+    pub fn next(self: *OccupantIterator) ?UnitId {
+        while (self.cur != SENTINEL) {
+            const node = &nodes[self.cur];
+            self.cur = node.next;
+            if (main.globals.unit(node.unit_id).occupies(self.pos)) {
+                return node.unit_id;
+            }
         }
-        cur = node.next;
+        return null;
     }
-    return null;
+};
+
+pub fn get_occupants(pos: IVec2) OccupantIterator {
+    return .{
+        .pos = pos,
+        .cur = if (sector_index(pos)) |si| sector_heads[si] else SENTINEL,
+    };
 }
