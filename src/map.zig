@@ -126,12 +126,12 @@ pub fn mapgen(rng: std.Random, map: []Terrain) void {
                     .Rubble => {
                         const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
                         const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng);
+                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng) catch continue;
                     },
                     .Debris => {
                         const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
                         const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng);
+                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng) catch continue;
                     },
                     else => {
                         unreachable;
@@ -192,24 +192,26 @@ pub fn map_index(position: IVec2) ?usize {
     return (@as(usize, @intCast(position.y)) * MAP_SIZE) + @as(usize, @intCast(position.x));
 }
 
-fn set_terrain_at(position: IVec2, terrain: Terrain, map: []Terrain) void {
+pub fn set_terrain_at(position: IVec2, terrain: Terrain, map: []Terrain) void {
     const ix = map_index(position) orelse return;
     map[ix] = terrain;
 }
 
-fn get_terrain_at(position: IVec2, map: []Terrain) ?Terrain {
+pub fn get_terrain_at(position: IVec2, map: []Terrain) ?Terrain {
     const ix = map_index(position) orelse return null;
     return map[ix];
 }
 
-fn rubblum(map: []Terrain, radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) void {
+fn rubblum(map: []Terrain, radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) !void {
     var buffer: [2 << 16]u8 = undefined;
     var fba: std.heap.FixedBufferAllocator = .init(&buffer);
     const allocator = fba.allocator();
     const max_radius: i16 = if (radius.x >= radius.y) radius.x else radius.y;
-    const bound: i16 = max_radius * 4;
-    const crater_template = allocator.alloc(bool, @as(usize, @intCast(max_radius * max_radius * 16))) catch unreachable;
+    const crater_template = try allocator.alloc(bool, @as(usize, @intCast(max_radius * max_radius * 16)));
     defer allocator.free(crater_template);
+    errdefer @compileError("No errors after this");
+
+    const bound: i16 = max_radius * 4;
     core.splat(@floatFromInt(radius.x), @floatFromInt(radius.y), bound, crater_template);
     for (0..crater_template.len) |ixu| {
         const ix: i16 = @as(i16, @intCast(ixu));

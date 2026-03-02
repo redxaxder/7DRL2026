@@ -16,6 +16,7 @@ const Rect = core.Rect;
 const sector = @import("sector.zig");
 
 const get_occupant = sector.get_occupant;
+const IRect = core.IRect;
 
 pub const UnitType = enum {
     Nil,
@@ -419,16 +420,13 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 }
 
 fn tick_kaiju(rng: std.Random) void {
-    _ = rng;
     // kaiju behavior is based on proximity
     for (globals.units[1..]) |*u| {
         if (u.tag == .Kaiju) {
             // kaiju sleep if outside of 1 camera radius
             // TODO make more complex?
             if (u.position.max_norm_distance(globals.player().position) < 64) {
-                // relentless chase the player
-                kaiju_logic(u);
-                // u.move(u.position.facing(globals.player().position));
+                kaiju_logic(u, rng);
             }
         }
     }
@@ -436,10 +434,18 @@ fn tick_kaiju(rng: std.Random) void {
 
 // destroys wall
 // TODO, fling rubble
-fn destroy_wall(demolitionist: *const Unit, dir: Dir4) void {
-    _ = demolitionist;
+fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     _ = dir;
-    std.log.info("BOOM wall destroyed", .{});
+    const from: IVec2 = demolitionist.position.minus(.{ .x = 1, .y = 1 });
+    const size: IVec2 = .{ .x = demolitionist.size + 1, .y = demolitionist.size + 1 };
+    var destructable: IRect.LocationIterator = IRect.from(from, size).iter();
+    while (destructable.next()) |boom_coord| {
+        std.log.info("attempting demolition at {} {}", .{ boom_coord.x, boom_coord.y });
+        if (map.get_terrain_at(boom_coord, &globals.mapdata) == .Wall) {
+            const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
+            map.set_terrain_at(boom_coord, terrain, &globals.mapdata);
+        }
+    }
 }
 
 fn smack_player(smacker: *const Unit, dir: Dir4) void {
@@ -456,9 +462,14 @@ fn raycast_with_obstacle(from: *const Unit, to: *const Unit, terrain: Terrain) ?
     const give_up: usize = 65;
     var iter_coord: IVec2 = from.position;
     const to_coord: IVec2 = to.position;
-    const increment: IVec2 = from.position.facing(to.position).ivec();
+    const dir: Dir4 = from.position.facing(to.position);
+    const increment: IVec2 = dir.ivec();
     for (0..give_up) |distance| {
         if (get_terrain_at(iter_coord) == terrain) {
+            if (from.tag == .Kaiju and (dir == .Right or dir == .Down)) {
+                // account for kaiju size
+                return @as(i16, @intCast(distance)) - from.size + 1;
+            }
             return @intCast(distance);
         }
         if (iter_coord.eq(to_coord)) {
@@ -469,9 +480,10 @@ fn raycast_with_obstacle(from: *const Unit, to: *const Unit, terrain: Terrain) ?
     return null;
 }
 
-fn kaiju_logic(k: *Unit) void {
+fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
     if (raycast_with_obstacle(k, globals.player(), .Wall)) |distance| {
+        std.log.info("distance to wall {}", .{distance});
         //   if there is a wall in the way, and wall > size distance, take full step
         if (distance > k.size) {
             k.move(dir, k.size);
@@ -479,18 +491,19 @@ fn kaiju_logic(k: *Unit) void {
             //   if there is a wall in the way, and wall < size distance, take partial step to wall
             k.move(dir, distance - 1);
         } else if (distance == 1) {
+            std.log.info("the BOOM", .{});
             //   if there is a wall in the way, and adjacent to wall, DESTROY
-            destroy_wall(k, dir);
+            destroy_wall(k, dir, rng);
         }
     } else {
-        const distance: i16 = k.position.max_norm_distance(globals.player().position);
+        const fudge: i16 = if (dir == .Right or dir == .Down) k.size - 1 else 0;
+        const distance: i16 = k.position.max_norm_distance(globals.player().position) - fudge;
         // if there is line of sight to the player and player > size distance, take full step
         if (distance > k.size) {
             k.move(dir, k.size);
         } else if (distance > 1) {
             k.move(dir, distance - 1);
         } else if (distance == 1) {
-            // TODO
             smack_player(k, dir);
         }
         // if there is line of sight to player and player < size distance, take partial step
