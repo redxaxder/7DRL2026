@@ -351,6 +351,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                         // move into kaiju?
                         return false;
                     },
+                    else => unreachable,
                 }
             } else {
                 player.move_to(target);
@@ -437,7 +438,7 @@ fn tick_kaiju(rng: std.Random) void {
 fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     _ = dir;
     const from: IVec2 = demolitionist.position.minus(.{ .x = 1, .y = 1 });
-    const size: IVec2 = .{ .x = demolitionist.size + 1, .y = demolitionist.size + 1 };
+    const size: IVec2 = .{ .x = demolitionist.size + 2, .y = demolitionist.size + 2 };
     var destructable: IRect.LocationIterator = IRect.from(from, size).iter();
     while (destructable.next()) |boom_coord| {
         std.log.info("attempting demolition at {} {}", .{ boom_coord.x, boom_coord.y });

@@ -233,6 +233,10 @@ pub const IRect = struct {
         return .{ .rect = self };
     }
 
+    pub fn from(loc: IVec2, size: IVec2) IRect {
+        return .{ .x = loc.x, .y = loc.y, .w = size.x, .h = size.y };
+    }
+
     pub const LocationIterator = struct {
         rect: IRect,
         ix: i16 = 0,
