@@ -390,12 +390,13 @@ pub fn handle_player_attack(dir: Dir4) bool {
                 // TBD
                 const damage = 1 + (2 * globals.attack_chain_count);
                 unit.damage(damage);
-                std.log.info("bang!", .{});
+                std.log.info("bang! {}", .{unit.hp});
                 return true;
             }
         }
     }
-    return false;
+    std.log.info("whiff!");
+    return true;
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
@@ -406,12 +407,15 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
             .move => |movedata| {
                 const d, const shift = movedata;
                 player_acted = handle_player_move(d, shift);
+                if (player_acted) {
+                    globals.attack_chain_target = 0;
+                }
             },
             .attack => |d| {
                 player_acted = handle_player_attack(d);
                 if (player_acted) {
+                    _ = handle_player_move(null, false);
                     // TODO: motorcycle with speed moves
-
                 }
             },
         }
