@@ -137,6 +137,13 @@ pub const Terrain = enum(u8) {
             else => return '?',
         }
     }
+
+    pub fn passable(self: @This()) bool {
+        return switch (self) {
+            .Wall, .Door => false,
+            else => true,
+        };
+    }
 };
 
 pub fn map_index(position: IVec2) ?usize {

@@ -4,7 +4,7 @@ v0.1 technically a game
   + turning
   + accelerating
   + continue moving while shooting
-  - shift movement
+  + shift movement
 + ui
   + 5 movement reticles
     + shows where you'd end up after:

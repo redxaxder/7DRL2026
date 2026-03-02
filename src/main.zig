@@ -8,10 +8,11 @@ const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
 const map = @import("map.zig");
 const Terrain = map.Terrain;
-const IVec2 = @import("core.zig").IVec2;
-
-const Vec2 = @import("core.zig").Vec2;
-const Rect = @import("core.zig").Rect;
+const core = @import("core.zig");
+const IVec2 = core.IVec2;
+const Dir4 = core.Dir4;
+const Vec2 = core.Vec2;
+const Rect = core.Rect;
 
 pub const UnitType = enum {
     Nil,
@@ -20,50 +21,6 @@ pub const UnitType = enum {
     Motorcycle,
     PendingExplosion,
     PendingRubble,
-};
-
-pub const Dir4 = enum {
-    Right,
-    Up,
-    Left,
-    Down,
-    pub fn ivec(self: Dir4) IVec2 {
-        return switch (self) {
-            .Right => IVec2{ .x = 1 },
-            .Left => IVec2{ .x = -1 },
-            .Down => IVec2{ .y = 1 },
-            .Up => IVec2{ .y = -1 },
-        };
-    }
-
-    pub fn turn(self: Dir4, rd: RelativeDir) Dir4 {
-        const uself: u8 = @intFromEnum(self);
-        const urd: u8 = @intFromEnum(rd);
-        const combined: u2 = @truncate(uself + urd);
-        return @enumFromInt(combined);
-    }
-};
-pub const RelativeDir = enum {
-    Forward,
-    Left,
-    Reverse,
-    Right,
-
-    // This new direction is ____ compared to the starting dir
-    pub fn from(new: Dir4, root: Dir4) RelativeDir {
-        const inew: i8 = @intCast(@intFromEnum(new));
-        const iroot: i8 = @intCast(@intFromEnum(root));
-        return switch (inew - iroot) {
-            -3 => .Left,
-            -2 => .Reverse,
-            -1 => .Right,
-            0 => .Forward,
-            1 => .Left,
-            2 => .Reverse,
-            3 => .Right,
-            else => unreachable,
-        };
-    }
 };
 
 pub const UnitId = u16;
@@ -93,11 +50,6 @@ pub const Unit = struct {
         return globals.unit(self.mounted_on);
     }
 };
-
-pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
-    const ix = map.map_index(position) orelse return;
-    globals.mapdata[ix] = terrain;
-}
 
 pub fn get_terrain_at(position: IVec2) ?Terrain {
     const ix = map.map_index(position) orelse return null;
@@ -131,7 +83,7 @@ const PLAYER_ID: UnitId = 1;
 pub fn init(rng: std.Random) !void {
     globals.player().* = Unit{
         .tag = .Player,
-        .position = IVec2{ .x = 5, .y = 5 },
+        .position = IVec2{ .x = 0, .y = 0 },
     };
     const moto_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
     globals.unit(moto_id).* = Unit{
@@ -180,17 +132,25 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         const pmount = player.mount();
         if (pmount.tag == .Motorcycle) {
             // mounted movement
-            const target = resolve_motorcycle_movement(
+            const motomove = resolve_motorcycle_movement(
                 pmount,
                 .{
                     .dir = d,
                     .shift = keyboard.isShiftDown(),
                 },
             );
-            pmount.*.position = target.position;
-            pmount.*.orientation = target.orientation;
-            pmount.*.speed = target.speed;
-            player.*.position = pmount.position;
+            if (full_crash_check(pmount, motomove)) |crashed| {
+                pmount.*.position = crashed.position;
+                pmount.*.orientation = crashed.orientation;
+                pmount.*.speed = 0;
+                // TODO: handle post-midpoint crash
+                player.*.mounted_on = 0;
+            } else {
+                pmount.*.position = motomove.position;
+                pmount.*.orientation = motomove.orientation;
+                pmount.*.speed = motomove.speed;
+                player.*.position = pmount.position;
+            }
         } else {
             // unmounted movement
             const dv = d.ivec();
@@ -215,7 +175,101 @@ pub const MotoResult = struct {
     position: IVec2,
     orientation: Dir4,
     speed: u8,
+    dismount: bool,
 };
+
+pub fn signum(x: anytype) @TypeOf(x) {
+    if (x > 0) {
+        return 1;
+    } else if (x < 0) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+pub fn moto_passable(pos: IVec2, orientation: Dir4) bool {
+    const t = get_terrain_at(pos) orelse return false;
+    const p2 = pos.plus(orientation.ivec());
+    const t2 = get_terrain_at(p2) orelse return false;
+    return t.passable() and t2.passable();
+}
+
+pub const CrashInfo = struct {
+    position: IVec2,
+    orientation: Dir4,
+    midpoint: bool = false,
+};
+
+pub fn linear_crash_check(from: IVec2, dir: Dir4, steps: i16) ?CrashInfo {
+    var cursor = CrashInfo{
+        .position = from,
+        .orientation = dir,
+    };
+    const vec = dir.ivec();
+    for (0..@intCast(steps)) |_| {
+        const next = cursor.position.plus(vec);
+        if (!moto_passable(next, dir)) {
+            return cursor;
+        }
+        cursor.position = next;
+    }
+    return null;
+}
+
+pub fn full_crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
+    const delta = move.position.minus(moto.position);
+    const n = delta.max_norm();
+
+    // we're strafing if we haven't changed direction, but we're moving on both x and y
+    const strafe_mode = (move.orientation == moto.orientation) and delta.x != 0 and delta.y != 0;
+
+    if (strafe_mode) {
+        // strafe crash resolution is generous:
+        // the shift to the target row/column happens at the last possible legal moment
+        const principal_vector = moto.orientation.ivec();
+        const secondary_vector = delta.minus(principal_vector.scaled(n));
+        var shifted: bool = false;
+
+        var cursor = CrashInfo{
+            .position = moto.position,
+            .orientation = moto.orientation,
+        };
+
+        for (0..@intCast(n)) |_| {
+            var next = cursor.position.plus(principal_vector);
+            if (!shifted and !moto_passable(next, moto.orientation)) {
+                next = next.plus(secondary_vector);
+                shifted = true;
+            }
+            if (!moto_passable(next, moto.orientation)) {
+                return cursor;
+            }
+            cursor.position = next;
+        }
+        return null;
+    }
+
+    if (linear_crash_check(
+        moto.position,
+        moto.orientation,
+        delta.projection(moto.orientation).max_norm(),
+    )) |crash| {
+        return crash;
+    }
+    if (!moto_passable(move.midpoint, move.orientation)) {}
+
+    if (linear_crash_check(
+        move.midpoint,
+        move.orientation,
+        delta.projection(move.orientation).max_norm(),
+    )) |crash| {
+        var got = crash;
+        got.midpoint = true;
+        return got;
+    }
+    return null;
+}
 
 pub fn resolve_motorcycle_movement(
     moto: *const Unit,
@@ -226,6 +280,7 @@ pub fn resolve_motorcycle_movement(
         .midpoint = moto.position,
         .speed = moto.speed,
         .orientation = moto.orientation,
+        .dismount = false,
     };
 
     const change = move.dir orelse {
@@ -235,7 +290,7 @@ pub fn resolve_motorcycle_movement(
     };
     const slide_dist = @max(moto.speed / 2, 1);
 
-    switch (RelativeDir.from(change, moto.orientation)) {
+    switch (core.RelativeDir.from(change, moto.orientation)) {
         .Forward => {
             // accelerate!
             it.speed = @min(it.speed + 1, MAX_SPEED);
@@ -250,12 +305,13 @@ pub fn resolve_motorcycle_movement(
         .Left, .Right => {
             // in shift mode, we strafe instead of turning
             if (move.shift) {
-                // TODO: at speed 0, this dismounts
                 const drift = moto.orientation.ivec()
                     .scaled(@intCast(it.speed))
                     .plus(change.ivec());
-                // TODO: pick a good midpoint for interacting with collisions
                 it.position = it.position.plus(drift);
+                if (moto.speed == 0) {
+                    it.dismount = true;
+                }
             } else { // turn!
                 const turned_speed = blk: {
                     if (moto.speed > slide_dist) {
@@ -291,7 +347,7 @@ pub fn resolve_motorcycle_movement(
                 it.speed = 0;
                 // if speed is high enough, brake via akira slide
                 if (slide_dist >= 2) {
-                    it.orientation = moto.orientation.turn(RelativeDir.Right);
+                    it.orientation = moto.orientation.turn(.Right);
                     it.position = it.position.minus(it.orientation.ivec());
                 }
             }
@@ -313,4 +369,8 @@ pub fn get_reticle_positions(unit: *const Unit) [5]IVec2 {
     const handlepos = ppos.plus(projection.orientation.ivec());
     result[4] = handlepos;
     return result;
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }

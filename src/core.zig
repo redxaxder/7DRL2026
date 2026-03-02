@@ -42,6 +42,66 @@ pub const IVec2 = struct {
     pub fn eq(self: IVec2, rhs: IVec2) bool {
         return self.x == rhs.x and self.y == rhs.y;
     }
+
+    pub fn times(self: IVec2, rhs: IVec2) IVec2 {
+        return .{
+            .x = self.x * rhs.x,
+            .y = self.y * rhs.y,
+        };
+    }
+
+    pub fn max_norm(self: IVec2) i16 {
+        return @intCast(@max(@abs(self.x), @abs(self.y)));
+    }
+
+    pub fn projection(self: IVec2, dir: Dir4) IVec2 {
+        return self.times(dir.ivec());
+    }
+};
+
+pub const Dir4 = enum {
+    Right,
+    Up,
+    Left,
+    Down,
+    pub fn ivec(self: Dir4) IVec2 {
+        return switch (self) {
+            .Right => IVec2{ .x = 1 },
+            .Left => IVec2{ .x = -1 },
+            .Down => IVec2{ .y = 1 },
+            .Up => IVec2{ .y = -1 },
+        };
+    }
+
+    pub fn turn(self: Dir4, rd: RelativeDir) Dir4 {
+        const uself: u8 = @intFromEnum(self);
+        const urd: u8 = @intFromEnum(rd);
+        const combined: u2 = @truncate(uself + urd);
+        return @enumFromInt(combined);
+    }
+};
+
+pub const RelativeDir = enum {
+    Forward,
+    Left,
+    Reverse,
+    Right,
+
+    // This new direction is ____ compared to the starting dir
+    pub fn from(new: Dir4, root: Dir4) RelativeDir {
+        const inew: i8 = @intCast(@intFromEnum(new));
+        const iroot: i8 = @intCast(@intFromEnum(root));
+        return switch (inew - iroot) {
+            -3 => .Left,
+            -2 => .Reverse,
+            -1 => .Right,
+            0 => .Forward,
+            1 => .Left,
+            2 => .Reverse,
+            3 => .Right,
+            else => unreachable,
+        };
+    }
 };
 
 pub const Vec2 = extern struct {
