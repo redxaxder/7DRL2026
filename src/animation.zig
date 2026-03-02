@@ -108,6 +108,14 @@ pub const Queue = struct {
             }
         }
     }
+
+    pub fn hurry(self: *Queue, mul: f32) void {
+        for (0..self.buffer.len()) |ix| {
+            if (self.buffer.index(@intCast(ix))) |animation| {
+                animation.speed *= mul;
+            }
+        }
+    }
 };
 
 pub const Time = struct {

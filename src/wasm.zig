@@ -43,12 +43,10 @@ var prev_time: f64 = 0;
 
 var render_buffer: RenderBuffer = undefined;
 var prng: std.Random.DefaultPrng = undefined;
-var camera: Rect = Rect{
-    .x = 0,
-    .y = 0,
-    .w = 64,
-    .h = 64,
-};
+var camera: Vec2 = .ZERO;
+var camera_target: Vec2 = .ZERO;
+const camera_w: f32 = 64;
+const camera_h: f32 = 64;
 
 pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     const allocator = std.heap.wasm_allocator;
@@ -95,7 +93,11 @@ const DrawOptions = struct {
     pixel_shift: bool = false,
 };
 pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
-    const screen_pos = world_pos.minus(camera.pos()).scaled(SPRITE_SCALE);
+    const rcamera = Vec2{
+        .x = std.math.round(camera.x * 8) / 8,
+        .y = std.math.round(camera.y * 8) / 8,
+    };
+    const screen_pos = world_pos.minus(rcamera).scaled(SPRITE_SCALE);
     const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
 
     if (options.bgcolor) |bgcolor| {
@@ -166,6 +168,54 @@ fn render_kaiju(kaiju: *const main.Unit) void {
         .pixel_shift = true,
     });
     render_buffer.flush();
+}
+
+fn update_camera() void {
+    const CAMERA_BUFFER: f32 = 10;
+    const player = main.globals.player();
+    const mount = player.mount();
+
+    var points: [7]Vec2 = undefined;
+    points[0] = player.render_position;
+    var count: usize = 1;
+
+    if (mount.tag != .Nil) {
+        for (main.get_reticle_positions(mount)) |pos| {
+            points[count] = pos.float();
+            count += 1;
+        }
+    }
+
+    const bbox = bounding_box(points[0..count]);
+
+    const left = bbox.x - CAMERA_BUFFER;
+    const top = bbox.y - CAMERA_BUFFER;
+    const right = bbox.x + bbox.w + 1 + CAMERA_BUFFER;
+    const bottom = bbox.y + bbox.h + 1 + CAMERA_BUFFER;
+
+    var target: Vec2 = camera_target;
+    if (left < target.x) target.x = left;
+    if (top < target.y) target.y = top;
+    if (right > target.x + camera_w) target.x = right - camera_w;
+    if (bottom > target.y + camera_h) target.y = bottom - camera_h;
+
+    animate_camera_to(target) catch {
+        // camera = target;
+    };
+}
+fn animate_camera_to(target: Vec2) !void {
+    const dist = camera.distance(target);
+    _ = (try main.globals.animation_queue.add(
+        .{ .duration = dist * 20 },
+        main.animlib.linear_slide,
+        .{ camera_target, target, &camera },
+    )).lock_exclusive(main.animlib.lock_camera);
+
+    // _ = (try main.globals.animation_queue.push(.EMPTY))
+    //     .chain()
+    // .lock_exclusive(main.animlib.lock_unit_id(main.PLAYER_ID))
+    // .lock_exclusive(main.animlib.lock_unit_id(main.globals.player().mounted_on));
+    camera_target = target;
 }
 
 fn render_unit(unit: *const main.Unit) void {
@@ -242,38 +292,7 @@ pub export fn frame(t: f64) void {
 
     if (keyboard.firstJustPressed()) |key| {
         main.logic_tick(key, prng.random());
-
-        // Update camera: minimally shift to enclose player + reticles with buffer
-        {
-            const CAMERA_BUFFER: f32 = 10;
-            const player = main.globals.player();
-            const mount = player.mount();
-
-            var points: [7]Vec2 = undefined;
-            points[0] = player.render_position;
-            var count: usize = 1;
-
-            if (mount.tag != .Nil) {
-                for (main.get_reticle_positions(mount)) |pos| {
-                    points[count] = pos.float();
-                    count += 1;
-                }
-            }
-
-            const bbox = bounding_box(points[0..count]);
-
-            const left = bbox.x - CAMERA_BUFFER;
-            const top = bbox.y - CAMERA_BUFFER;
-            const right = bbox.x + bbox.w + 1 + CAMERA_BUFFER;
-            const bottom = bbox.y + bbox.h + 1 + CAMERA_BUFFER;
-
-            if (left < camera.x) camera.x = left;
-            if (top < camera.y) camera.y = top;
-            if (right > camera.xmax()) camera.x = right - camera.w;
-            if (bottom > camera.ymax()) camera.y = bottom - camera.h;
-
-            // std.log.info("camera {}", .{camera});
-        }
+        update_camera();
     }
 
     // Draw the terrain
@@ -281,8 +300,8 @@ pub export fn frame(t: f64) void {
         .x = @intFromFloat(@floor(camera.x)),
         .y = @intFromFloat(@floor(camera.y)),
     };
-    for (0..@intFromFloat(camera.w + 1)) |dx| {
-        for (0..@intFromFloat(camera.h + 1)) |dy| {
+    for (0..@intFromFloat(camera_w + 1)) |dx| {
+        for (0..@intFromFloat(camera_h + 1)) |dy| {
             const x = imin.x + @as(i16, @intCast(dx));
             const y = imin.y + @as(i16, @intCast(dy));
             const world_pos = IVec2{
@@ -290,14 +309,7 @@ pub export fn frame(t: f64) void {
                 .y = y,
             };
             const terrain = main.get_terrain_at(world_pos);
-            const screen_pos = world_pos.float().minus(camera.pos()).scaled(SPRITE_SCALE);
-            const draw_sprite = Sprite{
-                .pos = screen_pos,
-                .color = .white,
-                .size = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE },
-                .src_idx = terrain.glyph(),
-            };
-            render_buffer.push(draw_sprite);
+            draw_world_glyph(world_pos.float(), terrain.glyph(), .{});
         }
     }
     // The render buffer assumes that all images in the same batch

@@ -21,20 +21,22 @@ const IRect = core.IRect;
 
 const ANIMATION_QUEUE_LEN = 128;
 
-const animlib = struct {
+pub const animlib = struct {
     pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
         const t = time.progress();
         target.* = x0.scaled(1 - t).plus(x1.scaled(t));
     }
 
+    pub const lock_camera = animation.singleton(255);
+    pub const lock_player = animation.singleton(254);
     pub fn lock_unit_id(uid: UnitId) animation.LockData {
         if (uid == 0) {
             return .initEmpty();
         }
         if (uid == 1) {
-            return animation.singleton(255);
+            return lock_player;
         }
-        const i = uid % 255;
+        const i = uid % 254;
         return animation.singleton(@intCast(i));
     }
 };
@@ -139,8 +141,9 @@ pub const Unit = struct {
         sector.remove(id, self);
         self.position = pos;
         sector.add(id, self);
+        const dist = to.distance(from);
         const anim: *animation.Animation = globals.animation_queue.add(
-            .{ .duration = 500 },
+            .{ .duration = 50 * dist },
             animlib.linear_slide,
             .{ from, to, &self.render_position },
         ) catch {
@@ -291,7 +294,7 @@ pub const globals = struct {
     }
 };
 
-const PLAYER_ID: UnitId = 1;
+pub const PLAYER_ID: UnitId = 1;
 
 pub fn spawn(u: Unit) UnitId {
     const id = globals.free_unit_id() orelse @panic("how did we run out so fast");
@@ -351,6 +354,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 }
                 player.move_to(landed_at);
             }
+            pmount.move_to(motomove.midpoint);
             pmount.move_to(crashed.position);
             pmount.*.orientation = crashed.orientation;
             pmount.*.speed = 0;
@@ -362,6 +366,8 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
         } else {
             pmount.*.orientation = motomove.orientation;
             pmount.*.speed = motomove.speed;
+            pmount.move_to(motomove.midpoint);
+            player.move_to(motomove.midpoint);
             pmount.move_to(motomove.position);
             player.move_to(motomove.position);
         }
@@ -433,6 +439,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     var player_acted = false;
 
     if (ux.resolve_input(key)) |action| {
+        globals.animation_queue.hurry(1.5);
         switch (action) {
             .move => |movedata| {
                 const d, const shift = movedata;
