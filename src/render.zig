@@ -5,7 +5,7 @@ const Self = @This();
 
 dest_pos: [*]Vec2,
 src_idx: [*]u8,
-color: [*]u8,
+color: [*]Color,
 occupancy: usize,
 max: usize,
 last_seen_size: Vec2 = .ZERO,
@@ -19,18 +19,35 @@ pub fn clear() void {
     js.clear();
 }
 
+pub const Color = enum(u8) {
+    white = 0,
+    green = 1,
+    yellow = 2,
+    red = 3,
+    orange = 4,
+    chartreuse = 5,
+    green2 = 6,
+    teal = 7,
+    cyan = 8,
+    blue = 9,
+    indigo = 10,
+    purple = 11,
+    magenta = 12,
+    black = 13,
+};
+
 pub const Sprite = struct {
     pos: Vec2,
     size: Vec2,
     src_idx: u8,
-    color: u8,
+    color: Color,
 };
 
 pub fn init(allocator: std.mem.Allocator, max: usize) !Self {
     return .{
         .dest_pos = (try allocator.alloc(Vec2, max)).ptr,
         .src_idx = (try allocator.alloc(u8, max)).ptr,
-        .color = (try allocator.alloc(u8, max)).ptr,
+        .color = (try allocator.alloc(Color, max)).ptr,
         .occupancy = 0,
         .max = max,
     };
@@ -52,7 +69,7 @@ pub fn push(self: *Self, sprite: Sprite) void {
 pub fn flush(self: *Self) void {
     const dstPtr: i32 = @intCast(@intFromPtr(self.dest_pos));
     const srcPtr: i32 = @intCast(@intFromPtr(self.src_idx));
-    const colorPtr: i32 = @intCast(@intFromPtr(self.color));
+    const colorPtr: i32 = @intCast(@intFromPtr(@as([*]u8, @ptrCast(self.color))));
     const count: i32 = @intCast(self.occupancy);
     js.draw(dstPtr, srcPtr, colorPtr, count, 8, 8, self.last_seen_size.x, self.last_seen_size.y);
     self.occupancy = 0;

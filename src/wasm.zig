@@ -75,7 +75,7 @@ pub export fn resize(w: f32, h: f32) void {
     _ = h;
 }
 
-fn splatString(x: f32, y: f32, text: []const u8, color: u8, size: f32) void {
+fn splatString(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
     var cx = x;
     for (text) |ch| {
         render_buffer.push(.{
@@ -94,7 +94,7 @@ const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 const DrawOptions = struct {
     clear_back: bool = false,
     size: u8 = 1,
-    color: u8 = WHITE,
+    color: Color = .white,
 };
 pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     const screen_pos = world_pos.minus(camera.pos()).scale(SPRITE_SCALE);
@@ -104,7 +104,7 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
         render_buffer.push(.{
             .pos = screen_pos,
             .size = dim,
-            .color = BLACK,
+            .color = .black,
             .src_idx = 0xDB,
         });
     }
@@ -143,7 +143,7 @@ fn render_kaiju(kaiju: *const main.Unit) void {
                 else if (is_left or is_right) 0xB3 // │
                 else ' ';
 
-            draw_world_glyph(pos.float(), glyph, .{ .clear_back = true, .color = 1 });
+            draw_world_glyph(pos.float(), glyph, .{ .clear_back = true, .color = .green });
         }
     }
 
@@ -151,7 +151,7 @@ fn render_kaiju(kaiju: *const main.Unit) void {
     render_buffer.flush();
     const k_offset: f32 = 1.0 + @as(f32, @floatFromInt(kaiju.size - 2)) / 16.0;
     const k_pos = kaiju.render_position.plus(.{ .x = k_offset, .y = k_offset });
-    draw_world_glyph(k_pos, 'K', .{ .clear_back = true, .color = 3, .size = @intCast(kaiju.size - 2) });
+    draw_world_glyph(k_pos, 'K', .{ .clear_back = true, .color = .red, .size = @intCast(kaiju.size - 2) });
     render_buffer.flush();
 }
 
@@ -178,10 +178,7 @@ fn render_unit(unit: *const main.Unit) void {
     }
 }
 
-// TODO: fill out this list. convert into enum.
-const WHITE = 0;
-const YELLOW = 2;
-const BLACK = 13;
+const Color = RenderBuffer.Color;
 
 pub fn bounding_box(positions: []const Vec2) Rect {
     var min_x = positions[0].x;
@@ -212,7 +209,7 @@ pub fn render_debug(val: anytype) void {
     inline for (fields) |field| {
         const field_val = @field(val, field.name);
         const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
-        splatString(x, y, text, YELLOW, size);
+        splatString(x, y, text, .yellow, size);
         render_buffer.flush();
         y += size;
     }
@@ -282,7 +279,7 @@ pub export fn frame(t: f64) void {
             const screen_pos = world_pos.float().minus(camera.pos()).scale(SPRITE_SCALE);
             const draw_sprite = Sprite{
                 .pos = screen_pos,
-                .color = WHITE,
+                .color = .white,
                 .size = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE },
                 .src_idx = terrain.glyph(),
             };
@@ -325,7 +322,7 @@ pub export fn frame(t: f64) void {
             }
             draw_world_glyph(pos.float(), '%', .{
                 .clear_back = true,
-                .color = YELLOW,
+                .color = .yellow,
             });
         }
     }
