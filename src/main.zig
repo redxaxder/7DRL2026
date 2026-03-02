@@ -1,5 +1,6 @@
 const std = @import("std");
 const lib = @import("_7DRL2026");
+const animation = @import("animation.zig");
 const keyboard = @import("keyboard.zig");
 const audio = @import("audio.zig");
 const mouse = @import("mouse.zig");
@@ -17,6 +18,8 @@ const sector = @import("sector.zig");
 
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
+
+const ANIMATION_QUEUE_LEN = 128;
 
 pub const UnitType = enum {
     Nil,
@@ -133,12 +136,7 @@ pub const Unit = struct {
                 return .{};
             },
             .Player, .PendingRubble => {
-                return core.IRect{
-                    .x = self.position.x,
-                    .y = self.position.y,
-                    .w = 1,
-                    .h = 1,
-                };
+                return core.IRect.singleton(self.position);
             },
             .Kaiju, .PendingExplosion => {
                 return core.IRect{
@@ -243,6 +241,7 @@ pub const globals = struct {
 
     pub var attack_chain_target: ?UnitId = 0;
     pub var attack_chain_count: i64 = 0;
+    pub var animation_queue: animation.Queue = undefined;
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];
@@ -273,6 +272,7 @@ pub fn spawn(u: Unit) UnitId {
 
 pub fn init(rng: std.Random) !void {
     sector.init();
+    globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
 
     globals.units[PLAYER_ID] = .init_player(IVec2.ZERO);
     sector.add(PLAYER_ID, globals.player());
@@ -395,7 +395,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
             }
         }
     }
-    std.log.info("whiff!");
+    std.log.info("whiff!", .{});
     return true;
 }
 

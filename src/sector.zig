@@ -43,75 +43,44 @@ fn free_node(idx: NodeIndex) void {
     free_head = idx;
 }
 
-fn sector_index(pos: IVec2) ?usize {
-    if (pos.x < 0 or pos.y < 0) return null;
-    const sx: usize = @intCast(@divFloor(pos.x, SECTOR_SIZE));
-    const sy: usize = @intCast(@divFloor(pos.y, SECTOR_SIZE));
-    if (sx >= SECTORS_PER_SIDE or sy >= SECTORS_PER_SIDE) return null;
-    return sy * SECTORS_PER_SIDE + sx;
+fn sector_head(pos: IVec2) *NodeIndex {
+    return &sector_heads[@as(usize, @intCast(pos.y)) * SECTORS_PER_SIDE + @as(usize, @intCast(pos.x))];
 }
 
-const MAX_UNIT_SECTORS = 4;
-const SectorSet = struct {
-    buf: [MAX_UNIT_SECTORS]usize = undefined,
-    len: usize = 0,
-
-    fn append(self: *SectorSet, val: usize) void {
-        if (self.len < MAX_UNIT_SECTORS) {
-            self.buf[self.len] = val;
-            self.len += 1;
-        }
-    }
-
-    fn slice(self: *const SectorSet) []const usize {
-        return self.buf[0..self.len];
-    }
-};
-
-fn sectors_for_unit(u: *const Unit) SectorSet {
-    var result = SectorSet{};
-    const rect = u.get_rect();
-    var it = rect.iter();
-    while (it.next()) |pos| {
-        const si = sector_index(pos) orelse continue;
-        // deduplicate
-        var found = false;
-        for (result.slice()) |existing| {
-            if (existing == si) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) result.append(si);
-    }
-    return result;
+fn sector_bounds(rect: core.IRect) core.IRect {
+    const sx_min: i16 = @intCast(@as(usize, @intCast(@max(0, @divFloor(rect.x, SECTOR_SIZE)))));
+    const sx_max: i16 = @intCast(@min(SECTORS_PER_SIDE - 1, @as(usize, @intCast(@max(0, @divFloor(rect.x + rect.w - 1, SECTOR_SIZE))))));
+    const sy_min: i16 = @intCast(@as(usize, @intCast(@max(0, @divFloor(rect.y, SECTOR_SIZE)))));
+    const sy_max: i16 = @intCast(@min(SECTORS_PER_SIDE - 1, @as(usize, @intCast(@max(0, @divFloor(rect.y + rect.h - 1, SECTOR_SIZE))))));
+    return .{ .x = sx_min, .y = sy_min, .w = sx_max - sx_min + 1, .h = sy_max - sy_min + 1 };
 }
 
 pub fn add(id: UnitId, u: *const Unit) void {
-    const secs = sectors_for_unit(u);
-    for (secs.slice()) |si| {
+    var it = sector_bounds(u.get_rect()).iter();
+    while (it.next()) |pos| {
+        const head = sector_head(pos);
         const ni = alloc_node();
         nodes[ni] = .{
             .unit_id = id,
-            .next = sector_heads[si],
+            .next = head.*,
         };
-        sector_heads[si] = ni;
+        head.* = ni;
     }
 }
 
 pub fn remove(id: UnitId, u: *const Unit) void {
-    const secs = sectors_for_unit(u);
-    for (secs.slice()) |si| {
+    var it = sector_bounds(u.get_rect()).iter();
+    while (it.next()) |pos| {
+        const head = sector_head(pos);
         var prev: ?NodeIndex = null;
-        var cur: NodeIndex = sector_heads[si];
+        var cur: NodeIndex = head.*;
         while (cur != SENTINEL) {
             const node = &nodes[cur];
             if (node.unit_id == id) {
-                // unlink
                 if (prev) |p| {
                     nodes[p].next = node.next;
                 } else {
-                    sector_heads[si] = node.next;
+                    head.* = node.next;
                 }
                 free_node(cur);
                 break;
@@ -122,25 +91,40 @@ pub fn remove(id: UnitId, u: *const Unit) void {
     }
 }
 
+pub fn get_occupants(pos: IVec2) OccupantIterator {
+    return get_occupants_rect(core.IRect.singleton(pos));
+}
+
 pub const OccupantIterator = struct {
-    pos: IVec2,
+    rect: core.IRect,
+    sector_iter: core.IRect.LocationIterator,
     cur: NodeIndex,
 
     pub fn next(self: *OccupantIterator) ?UnitId {
-        while (self.cur != SENTINEL) {
-            const node = &nodes[self.cur];
-            self.cur = node.next;
-            if (main.globals.unit(node.unit_id).occupies(self.pos)) {
-                return node.unit_id;
+        while (true) {
+            while (self.cur != SENTINEL) {
+                const node = &nodes[self.cur];
+                self.cur = node.next;
+                if (main.globals.unit(node.unit_id).get_rect().intersects(self.rect)) {
+                    return node.unit_id;
+                }
             }
+            const pos = self.sector_iter.next() orelse return null;
+            self.cur = sector_head(pos).*;
         }
-        return null;
     }
 };
 
-pub fn get_occupants(pos: IVec2) OccupantIterator {
+pub fn get_occupants_rect(rect: core.IRect) OccupantIterator {
+    var sector_iter = sector_bounds(rect).iter();
+    const first = sector_iter.next() orelse return .{
+        .rect = rect,
+        .sector_iter = sector_iter,
+        .cur = SENTINEL,
+    };
     return .{
-        .pos = pos,
-        .cur = if (sector_index(pos)) |si| sector_heads[si] else SENTINEL,
+        .rect = rect,
+        .sector_iter = sector_iter,
+        .cur = sector_head(first).*,
     };
 }

@@ -237,6 +237,15 @@ pub const IRect = struct {
         return .{ .x = loc.x, .y = loc.y, .w = size.x, .h = size.y };
     }
 
+    pub fn singleton(pos: IVec2) IRect {
+        return .{ .x = pos.x, .y = pos.y, .w = 1, .h = 1 };
+    }
+
+    pub fn intersects(self: IRect, other: IRect) bool {
+        return self.x < other.x + other.w and other.x < self.x + self.w and
+            self.y < other.y + other.h and other.y < self.y + self.h;
+    }
+
     pub const LocationIterator = struct {
         rect: IRect,
         ix: i16 = 0,

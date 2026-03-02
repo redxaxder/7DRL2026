@@ -21,8 +21,8 @@ v0.1 technically a game
     + wall
     + interior
     + door
-- 1 weapon (gun)
-- can attack
++ 1 weapon (gun)
++ can attack
 - can be attacked
 - enemy behavior:
   + chase player
@@ -58,7 +58,7 @@ v0.2 core features
   - a-star to path around eggs
   - broken obstacles turn into things to dodge
   - sleep
-- dismounting/mounting motorcycles
++ dismounting/mounting motorcycles
 - weapons
   - motorcycle
   - radioactive
