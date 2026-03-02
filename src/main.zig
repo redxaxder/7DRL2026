@@ -479,7 +479,6 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     const size: IVec2 = .{ .x = demolitionist.size + 2, .y = demolitionist.size + 2 };
     var destructable: IRect.LocationIterator = IRect.from(from, size).iter();
     while (destructable.next()) |boom_coord| {
-        std.log.info("attempting demolition at {} {}", .{ boom_coord.x, boom_coord.y });
         if (map.get_terrain_at(boom_coord, &globals.mapdata) == .Wall) {
             const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
             map.set_terrain_at(boom_coord, terrain, &globals.mapdata);
@@ -494,40 +493,38 @@ fn smack_player(smacker: *const Unit, dir: Dir4) void {
 }
 
 fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
-    const rect: IRect = from.get_rect().displace(dir.ivec().scaled(from.size + 1));
-    var iter = rect.iter();
-    var step_dist: ?i16 = null;
-    while (iter.next()) |pos| {
-        if (map.get_terrain_at(pos, &globals.mapdata) == .Wall) {
-            const dist: IVec2 = from.get_rect().point_distance(pos);
-            switch (dir) {
-                .Left, .Right => {
-                    if (step_dist) |s| {
-                        step_dist = if (s < dist.x) s else dist.x;
-                    } else {
-                        step_dist = dist.x;
-                    }
-                },
-                .Up, .Down => {
-                    if (step_dist) |s| {
-                        step_dist = if (s < dist.y) s else dist.y;
-                    } else {
-                        step_dist = dist.y;
-                    }
-                },
+    const source_rect: IRect = from.get_rect();
+    const distance: i16 = switch (dir) {
+        .Right, .Down => 2 * source_rect.w - 1,
+        .Up, .Left => source_rect.w,
+    };
+    var source_iter = source_rect.iter();
+    var step_dist: i16 = 100;
+    var wall_hit: bool = false;
+    while (source_iter.next()) |source| {
+        var scan_iter = source.scan(dir, distance);
+        while (scan_iter.next()) |target| {
+            if (map.get_terrain_at(target, &globals.mapdata) == .Wall) {
+                wall_hit = true;
+                const rect_dist: IVec2 = source_rect.point_distance(target);
+                const dist: i16 = switch (dir) {
+                    .Up, .Down => rect_dist.y,
+                    .Right, .Left => rect_dist.x,
+                };
+                step_dist = if (dist < step_dist) dist else step_dist;
             }
         }
     }
-    if (step_dist) |s| {
-        std.log.info("distance to wall {}", .{s});
+    if (wall_hit) {
+        std.log.info("wall distance {}", .{step_dist});
+        return step_dist;
     }
-    return step_dist;
+    return null;
 }
 
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
     if (step_distance_to_obstacle(k, dir)) |distance| {
-        std.log.info("distance to wall {}", .{distance});
         //   if there is a wall in the way, and wall > size distance, take full step
         if (distance > k.size) {
             k.move(dir, k.size);
@@ -535,7 +532,6 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
             //   if there is a wall in the way, and wall < size distance, take partial step to wall
             k.move(dir, distance - 1);
         } else if (distance == 1) {
-            std.log.info("the BOOM", .{});
             //   if there is a wall in the way, and adjacent to wall, DESTROY
             destroy_wall(k, dir, rng);
         }

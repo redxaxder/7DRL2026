@@ -244,6 +244,7 @@ pub const IRect = struct {
     pub fn intersects(self: IRect, other: IRect) bool {
         return self.x < other.x + other.w and other.x < self.x + self.w and
             self.y < other.y + other.h and other.y < self.y + self.h;
+    }
 
     pub fn displace(self: IRect, displacement: IVec2) IRect {
         return .{ .x = self.x + displacement.x, .y = self.y + displacement.y, .w = self.w, .h = self.h };
@@ -266,8 +267,8 @@ pub const IRect = struct {
     pub fn point_distance(self: IRect, point: IVec2) IVec2 {
         const l: i16 = self.x;
         const t: i16 = self.y;
-        const r: i16 = self.x + self.w;
-        const b: i16 = self.x + self.h;
+        const r: i16 = self.x + self.w - 1;
+        const b: i16 = self.x + self.h - 1;
 
         var xDist: i16 = undefined;
         var yDist: i16 = undefined;
