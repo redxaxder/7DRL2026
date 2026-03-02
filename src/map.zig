@@ -116,6 +116,7 @@ pub fn mapgen(rng: std.Random, map: []Terrain) void {
         }
         block_offset_x += @rem(zone_size.x, block_size_x);
     }
+    rubble(map, .{ .x = 7, .y = 4 }, .{ .x = 15, .y = 15 });
 }
 
 pub const MAP_SIZE = 2500;
@@ -126,6 +127,7 @@ pub const Terrain = enum(u8) {
     Asphalt,
     Wall,
     Door,
+    Rubble,
     _,
 
     pub fn glyph(self: @This()) u8 {
@@ -134,6 +136,7 @@ pub const Terrain = enum(u8) {
             .Floor => return '.',
             .Wall => return '#',
             .Door => return '+',
+            .Rubble => return '&',
             else => return '?',
         }
     }
@@ -164,4 +167,23 @@ fn set_terrain_at(position: IVec2, terrain: Terrain, map: []Terrain) void {
 fn get_terrain_at(position: IVec2, map: []Terrain) ?Terrain {
     const ix = map_index(position) orelse return null;
     return map[ix];
+}
+
+fn rubble(map: []Terrain, radius: IVec2, at: IVec2) void {
+    var buffer: [2 << 16]u8 = undefined;
+    var fba: std.heap.FixedBufferAllocator = .init(&buffer);
+    const allocator = fba.allocator();
+    const max_radius: i16 = if (radius.x >= radius.y) radius.x else radius.y;
+    const bound: i16 = max_radius * 4;
+    const crater_template = allocator.alloc(bool, @as(usize, @intCast(max_radius * max_radius * 16))) catch unreachable;
+    defer allocator.free(crater_template);
+    core.splat(@floatFromInt(radius.x), @floatFromInt(radius.y), bound, crater_template);
+    for (0..crater_template.len) |ixu| {
+        const ix: i16 = @as(i16, @intCast(ixu));
+        const x: i16 = @divTrunc(ix, bound) + at.x - max_radius * 2;
+        const y: i16 = @mod(ix, bound) + at.y - max_radius * 2;
+        if (crater_template[ixu]) {
+            set_terrain_at(.{ .x = x, .y = y }, .Rubble, map);
+        }
+    }
 }

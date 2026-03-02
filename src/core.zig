@@ -1,6 +1,24 @@
 const std = @import("std");
 const animation = @import("animation.zig");
 
+// draws a discretized ellipse into grid
+// x and y radius must fit within grid dimensions
+pub fn splat(x_radius: f64, y_radius: f64, grid_size: i16, grid: []bool) void {
+    for (0..@as(usize, @intCast(grid_size))) |rix| {
+        for (0..@as(usize, @intCast(grid_size))) |cix| {
+            const x: f64 = @as(f64, @floatFromInt(rix)) - @as(f64, @floatFromInt(grid_size)) / 2.0;
+            const y: f64 = @as(f64, @floatFromInt(cix)) - @as(f64, @floatFromInt(grid_size)) / 2.0;
+            const ix: usize = @as(usize, @intCast(grid_size)) * rix + cix;
+            const lhs: f64 = (x * x) / (x_radius * x_radius) + (y * y) / (y_radius * y_radius);
+            if (lhs <= 1.0) {
+                grid[ix] = true;
+            } else {
+                grid[ix] = false;
+            }
+        }
+    }
+}
+
 pub const IVec2 = struct {
     x: i16 = 0,
     y: i16 = 0,
