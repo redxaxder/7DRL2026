@@ -132,7 +132,10 @@ fn render_kaiju(kaiju: *const main.Unit) void {
     while (dy < kaiju.size) : (dy += 1) {
         var dx: i16 = 0;
         while (dx < kaiju.size) : (dx += 1) {
-            const pos = kaiju.position.plus(.{ .x = dx, .y = dy });
+            const pos = kaiju.render_position.plus(.{
+                .x = @floatFromInt(dx),
+                .y = @floatFromInt(dy),
+            });
             const is_top = dy == 0;
             const is_bottom = dy == kaiju.size - 1;
             const is_left = dx == 0;
@@ -147,7 +150,7 @@ fn render_kaiju(kaiju: *const main.Unit) void {
                 else if (is_left or is_right) 0xB3 // │
                 else ' ';
 
-            draw_world_glyph(pos.float(), glyph, .{
+            draw_world_glyph(pos, glyph, .{
                 .bgcolor = .black,
                 .color = .green,
             });
@@ -175,11 +178,11 @@ fn render_unit(unit: *const main.Unit) void {
             );
         },
         .Motorcycle => {
-            const p0 = unit.position;
-            const p1 = p0.plus(unit.orientation.ivec());
-            draw_world_glyph(p0.float(), 'o', .{ .bgcolor = .black });
+            const p0 = unit.render_position;
+            const p1 = p0.plus(unit.orientation.ivec().float());
+            draw_world_glyph(p0, 'o', .{ .bgcolor = .black });
 
-            draw_world_glyph(p1.float(), '%', .{ .bgcolor = .black });
+            draw_world_glyph(p1, '%', .{ .bgcolor = .black });
         },
         .Kaiju => render_kaiju(unit),
         else => {
@@ -231,6 +234,7 @@ pub export fn frame(t: f64) void {
     prev_time = t;
 
     audio.tick(dt);
+    main.globals.animation_queue.tick(dt);
     keyboard.globals.update();
     mouse.globals.update();
 

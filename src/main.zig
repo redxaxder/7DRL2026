@@ -21,6 +21,24 @@ const IRect = core.IRect;
 
 const ANIMATION_QUEUE_LEN = 128;
 
+const animlib = struct {
+    pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
+        const t = time.progress();
+        target.* = x0.scaled(1 - t).plus(x1.scaled(t));
+    }
+
+    pub fn lock_unit_id(uid: UnitId) animation.LockData {
+        if (uid == 0) {
+            return .initEmpty();
+        }
+        if (uid == 1) {
+            return animation.singleton(255);
+        }
+        const i = uid % 255;
+        return animation.singleton(@intCast(i));
+    }
+};
+
 pub const UnitType = enum {
     Nil,
     Player,
@@ -109,16 +127,28 @@ pub const Unit = struct {
         }
     }
 
-    pub fn unit_id(self: *const Unit) UnitId {
+    pub fn get_id(self: *const Unit) UnitId {
         return @intCast((@intFromPtr(self) - @intFromPtr(&globals.units)) / @sizeOf(Unit));
     }
 
     pub fn move_to(self: *Unit, pos: IVec2) void {
-        const id = self.unit_id();
+        const from = self.position.float();
+        const to = pos.float();
+
+        const id = self.get_id();
         sector.remove(id, self);
         self.position = pos;
         sector.add(id, self);
-        self.render_position = pos.float();
+        const anim: *animation.Animation = globals.animation_queue.add(
+            .{ .duration = 500 },
+            animlib.linear_slide,
+            .{ from, to, &self.render_position },
+        ) catch {
+            std.log.err("animation queue full. skipping animation for unit {} {}", .{ id, self.tag });
+            self.render_position = to;
+            return;
+        };
+        _ = anim.lock_exclusive(animlib.lock_unit_id(id));
     }
 
     pub fn damage(self: *Unit, amount: i64) void {
