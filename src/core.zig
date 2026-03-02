@@ -253,13 +253,13 @@ pub const IRect = struct {
     pub fn distance(self: IRect, other: IRect) IVec2 {
         const most_left: IRect = if (self.x < other.x) self else other;
         const most_right: IRect = if (self.x < other.x) other else self;
-        const xDiff1: i16 = if (most_left.x == most_right.x) 0 else most_right.x - (most_left.x + most_left.w);
-        const xDiff: i16 = if (xDiff1 > 0) xDiff1 else 0;
+        var xDiff: i16 = if (most_left.x == most_right.x) 0 else 1 + most_right.x - (most_left.x + most_left.w);
+        xDiff = if (xDiff > 0) xDiff else 0;
 
         const most_up: IRect = if (self.y < other.y) self else other;
         const most_down: IRect = if (self.y < other.y) other else self;
-        const yDiff1: i16 = if (most_up.y == most_down.y) 0 else most_down.y - (most_up.y + most_up.h);
-        const yDiff: i16 = if (yDiff1 > 0) yDiff1 else 0;
+        var yDiff: i16 = if (most_up.y == most_down.y) 0 else 1 + most_down.y - (most_up.y + most_up.h);
+        yDiff = if (yDiff > 0) yDiff else 0;
 
         return .{ .x = xDiff, .y = yDiff };
     }

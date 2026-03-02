@@ -31,6 +31,9 @@ v0.1 technically a game
       + we don't need to be clever if they can smash through walls
       + they get stuck behind eggs (if we even add them)
   - smack player
+    - if the player has 1 hp, you lose turkey
+    - if the player has >1 hp, go to 1hp and get flung 10 spaces
+    - destroy interveining walls
   - break obstacles
     + kaiju must spend a turn getting to the wall before tearing it down
   - spawning
@@ -41,6 +44,8 @@ v0.2 core features
 - progression
   - gain inventory limit based on largest kaiju killed
 - ui
+  - death
+  - title screen
   - combat log
   - legend
   - inventory

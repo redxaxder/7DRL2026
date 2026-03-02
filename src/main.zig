@@ -89,6 +89,10 @@ pub const Unit = struct {
         };
     }
 
+    pub fn mounted(self: *const Unit) bool {
+        return self.mount().tag != .Nil;
+    }
+
     pub fn init_motorcycle(pos: IVec2, orientation: Dir4) Unit {
         return Unit{
             .tag = .Motorcycle,
@@ -313,13 +317,13 @@ pub fn init(rng: std.Random) !void {
     const moto_id = spawn(.init_motorcycle(IVec2.ZERO, .Right));
     globals.player().mounted_on = moto_id;
 
-    _ = spawn(.init_kaiju(
-        IVec2{ .x = 6, .y = 6 },
-        3,
-    ));
+    // _ = spawn(.init_kaiju(
+    //     IVec2{ .x = 6, .y = 6 },
+    //     3,
+    // ));
 
     _ = spawn(.init_kaiju(
-        IVec2{ .x = 9, .y = 18 },
+        IVec2{ .x = 9, .y = 28 },
         5,
     ));
     map.mapgen(rng, &globals.mapdata);
@@ -493,10 +497,45 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     }
 }
 
-fn smack_player(smacker: *const Unit, dir: Dir4) void {
-    _ = smacker;
-    _ = dir;
-    std.log.info("SMACK player smacked", .{});
+fn die() void {
+    std.log.info("YOU LOSE TURKEY", .{});
+}
+
+fn harm() void {
+    std.log.info("ouchie", .{});
+    globals.player().hp = 1;
+}
+
+fn destroy(pos: IVec2, rng: std.Random) void {
+    const rubble_type: Terrain = if (rng.boolean()) .Debris else .Rubble;
+    map.set_terrain_at(pos, rubble_type, &globals.mapdata);
+}
+
+fn smack_player(dir: Dir4, rng: std.Random) void {
+    const fling_distance: i16 = 10;
+    if (globals.player().hp <= 1) {
+        die();
+    } else {
+        harm();
+        const moto_rect: IRect = globals.player().mount().get_rect();
+        var moto_iter = moto_rect.iter();
+        while (moto_iter.next()) |source| {
+            const target: IVec2 = source.plus(dir.ivec().scaled(fling_distance));
+            var iter = source.scan(dir, fling_distance);
+            while (iter.next()) |pos| {
+                if (map.get_terrain_at(pos, &globals.mapdata) == .Wall) {
+                    destroy(pos, rng);
+                }
+            }
+            if (map.get_terrain_at(target, &globals.mapdata) == .Wall) {
+                destroy(target, rng); // maybe this is unnecessary?
+            }
+        }
+        const target: IVec2 = globals.player().position.plus(dir.ivec().scaled(fling_distance));
+        globals.player().move_to(target);
+        globals.player().mount().move_to(target);
+        globals.player().mount().speed = 0;
+    }
 }
 
 fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
@@ -523,7 +562,6 @@ fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
         }
     }
     if (wall_hit) {
-        std.log.info("wall distance {}", .{step_dist});
         return step_dist;
     }
     return null;
@@ -543,15 +581,22 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
             destroy_wall(k, dir, rng);
         }
     } else {
-        const fudge: i16 = if (dir == .Right or dir == .Down) k.size - 1 else 0;
-        const distance: i16 = k.position.max_norm_distance(globals.player().position) - fudge;
+        // const width: i16 = if (dir == .Right or dir == .Down) k.get_rect().w else 0;
+        // const distance: i16 = k.position.max_norm_distance(globals.player().position) - width;
+        const distance_vec: IVec2 = if (globals.player().mounted()) k.get_rect().distance(globals.player().mount().get_rect()) else k.get_rect().point_distance(globals.player().position);
+        const distance: i16 = switch (dir) {
+            .Left, .Right => distance_vec.x,
+            .Up, .Down => distance_vec.y,
+        };
         // if there is line of sight to the player and player > size distance, take full step
+        std.log.info("player rect {} kaiju rect {}", .{ globals.player().mount().get_rect(), k.get_rect() });
+        std.log.info("distance to player {} in dir {} mounted {}", .{ distance_vec, dir, globals.player().mounted() });
         if (distance > k.size) {
             k.move(dir, k.size);
         } else if (distance > 1) {
             k.move(dir, distance - 1);
         } else if (distance == 1) {
-            smack_player(k, dir);
+            smack_player(dir, rng);
         }
         // if there is line of sight to player and player < size distance, take partial step
         // if there is not line of sight to player
