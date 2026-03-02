@@ -83,6 +83,11 @@ pub const Unit = struct {
 
     pub fn handlepos(self: *const @This()) IVec2 {
         return self.position.plus(self.orientation.ivec());
+
+    pub fn move(self: *@This(), dir: Dir4) void {
+        if (self.tag == .Kaiju) {
+            self.position = self.position.plus(dir.ivec().scaled(self.size));
+        }
     }
 };
 
@@ -127,12 +132,12 @@ pub fn init(rng: std.Random) !void {
         .orientation = .Right,
     };
     globals.player().mounted_on = moto_id;
-    const kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
-    globals.unit(kaiju_id).* = Unit{
-        .tag = .Kaiju,
-        .position = IVec2{ .x = 6, .y = 6 },
-        .size = 1,
-    };
+    // const kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
+    // globals.unit(kaiju_id).* = Unit{
+    //     .tag = .Kaiju,
+    //     .position = IVec2{ .x = 6, .y = 6 },
+    //     .size = 1,
+    // };
 
     const big_kaiju_id = globals.free_unit_id() orelse @panic("how did we run out so fast");
     globals.unit(big_kaiju_id).* = Unit{
@@ -144,8 +149,6 @@ pub fn init(rng: std.Random) !void {
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
-    _ = rng;
-
     var move_dir: ?Dir4 = null;
     switch (key) {
         .KeyW, .ArrowUp => {
@@ -216,9 +219,22 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         }
     }
 
-    // std.log.info("player at {}", .{globals.units[PLAYER_ID].position});
+    tick_kaiju(rng);
+}
 
-    //TODO
+fn tick_kaiju(rng: std.Random) void {
+    _ = rng;
+    // kaiju behavior is based on proximity
+    for (globals.units[1..]) |*u| {
+        if (u.tag == .Kaiju) {
+            // kaiju sleep if outside of 1 camera radius
+            // TODO make more complex?
+            if (u.position.max_norm_distance(globals.player().position) < 64) {
+                // relentless chase the player
+                u.move(u.position.facing(globals.player().position));
+            }
+        }
+    }
 }
 
 pub const MAX_SPEED = 20;

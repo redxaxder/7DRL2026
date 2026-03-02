@@ -72,8 +72,26 @@ pub const IVec2 = struct {
         return @intCast(@max(@abs(self.x), @abs(self.y)));
     }
 
+    pub fn max_norm_distance(self: IVec2, other: IVec2) i16 {
+        return self.minus(other).max_norm();
+    }
+
     pub fn projection(self: IVec2, dir: Dir4) IVec2 {
         return self.times(dir.ivec());
+    }
+
+    pub fn facing(self: IVec2, other: IVec2) Dir4 {
+        const diff: IVec2 = other.minus(self);
+        std.log.info("diff x {} y {}", .{ diff.x, diff.y });
+        if (diff.x > 0 and @abs(diff.x) >= @abs(diff.y)) {
+            return .Right;
+        } else if (diff.y < 0 and @abs(diff.y) >= @abs(diff.x)) {
+            return .Up;
+        } else if (diff.x < 0 and @abs(diff.x) >= @abs(diff.x)) {
+            return .Left;
+        } else {
+            return .Down;
+        }
     }
 };
 
