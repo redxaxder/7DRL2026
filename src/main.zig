@@ -110,10 +110,12 @@ pub const Unit = struct {
 
     pub fn handlepos(self: *const @This()) IVec2 {
         return self.position.plus(self.orientation.ivec());
+    }
 
     pub fn move(self: *@This(), dir: Dir4) void {
         if (self.tag == .Kaiju) {
-            self.position = self.position.plus(dir.ivec().scaled(self.size));
+            const target = self.position.plus(dir.ivec().scaled(self.size));
+            self.move_to(target);
         }
     }
 };
@@ -167,6 +169,7 @@ pub fn init(rng: std.Random) !void {
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
+    var player_acted = false;
     var move_dir: ?Dir4 = null;
     switch (key) {
         .KeyW, .ArrowUp => {
@@ -235,9 +238,12 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 player.move_to(target);
             }
         }
+        player_acted = true;
     }
 
-    tick_kaiju(rng);
+    if (player_acted) {
+        tick_kaiju(rng);
+    }
 }
 
 fn tick_kaiju(rng: std.Random) void {
