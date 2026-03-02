@@ -46,6 +46,33 @@ pub const Unit = struct {
 
     pub const default: Unit = .{};
 
+    // a unit occupies a position if it potentially obscructs travel into it
+    // the only things that can do this are:
+    //   - the player
+    //   - motorcycles
+    //   - kaiju
+    // these are considered to have mutually exclusive ownership over locations,
+    // except when the player is riding a motorcycle
+    pub inline fn occupies(self: *const @This(), pos: IVec2) bool {
+        const u: UnitType = self.tag;
+
+        switch (u) {
+            .Player => {
+                return self.position.eq(pos);
+            },
+            .Motorcycle => {
+                const p2 = self.position.plus(self.orientation.ivec());
+                return self.position.eq(pos) or p2.eq(pos);
+            },
+            .Kaiju => {
+                const delta = pos.minus(self.position);
+                return delta.x >= 0 and delta.y >= 0 and delta.max_norm() <= self.size;
+            },
+            else => {
+                return false;
+            },
+        }
+    }
     pub fn mount(self: *const @This()) *Unit {
         return globals.unit(self.mounted_on);
     }
@@ -143,6 +170,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 pmount.*.position = crashed.position;
                 pmount.*.orientation = crashed.orientation;
                 pmount.*.speed = 0;
+                player.*.speed = 0;
                 // TODO: handle post-midpoint crash
                 player.*.mounted_on = 0;
             } else {
@@ -154,12 +182,23 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         } else {
             // unmounted movement
             const dv = d.ivec();
-            player.*.position.x += dv.x;
-            player.*.position.y += dv.y;
+            const target = player.position.plus(dv);
+
+            if (get_occupant(target)) |occupant_id| {
+                const occupant = globals.unit(occupant_id);
+                if (occupant.tag == .Motorcycle) { // Mount it
+                    player.*.position = occupant.position;
+                    player.*.mounted_on = occupant_id;
+                } else {
+                    // TODO: do something other than move here
+                }
+            } else {
+                player.*.position = target;
+            }
         }
     }
 
-    std.log.info("player at {}", .{globals.units[PLAYER_ID].position});
+    // std.log.info("player at {}", .{globals.units[PLAYER_ID].position});
 
     //TODO
 }
@@ -178,13 +217,19 @@ pub const MotoResult = struct {
     dismount: bool,
 };
 
-pub fn signum(x: anytype) @TypeOf(x) {
-    if (x > 0) {
-        return 1;
-    } else if (x < 0) {
-        return -1;
-    } else {
-        return 0;
+pub fn get_occupant(pos: IVec2) ?UnitId {
+    for (globals.units[1..], 1..) |u, id| {
+        if (u.occupies(pos)) {
+            return @intCast(id);
+        }
+    }
+    return null;
+}
+
+pub fn player_passable(pos: IVec2) bool {
+    const t = get_terrain_at(pos) orelse return false;
+    if (!t.passable()) {
+        return false;
     }
 }
 
@@ -200,22 +245,6 @@ pub const CrashInfo = struct {
     orientation: Dir4,
     midpoint: bool = false,
 };
-
-pub fn linear_crash_check(from: IVec2, dir: Dir4, steps: i16) ?CrashInfo {
-    var cursor = CrashInfo{
-        .position = from,
-        .orientation = dir,
-    };
-    const vec = dir.ivec();
-    for (0..@intCast(steps)) |_| {
-        const next = cursor.position.plus(vec);
-        if (!moto_passable(next, dir)) {
-            return cursor;
-        }
-        cursor.position = next;
-    }
-    return null;
-}
 
 pub fn full_crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
     const delta = move.position.minus(moto.position);
@@ -250,23 +279,30 @@ pub fn full_crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         return null;
     }
 
-    if (linear_crash_check(
-        moto.position,
-        moto.orientation,
-        delta.projection(moto.orientation).max_norm(),
-    )) |crash| {
-        return crash;
+    var cursor = CrashInfo{
+        .position = moto.position,
+        .orientation = moto.orientation,
+    };
+    const steps: usize = @intCast(delta.projection(moto.orientation).max_norm());
+    for (0..steps) |i| {
+        const next = cursor.position.plus(moto.orientation.ivec());
+        const o = if ((i + 1) < steps)
+            moto.orientation
+        else
+            move.orientation;
+        if (!moto_passable(next, o)) {
+            return cursor;
+        }
+        cursor.position = next;
     }
-    if (!moto_passable(move.midpoint, move.orientation)) {}
-
-    if (linear_crash_check(
-        move.midpoint,
-        move.orientation,
-        delta.projection(move.orientation).max_norm(),
-    )) |crash| {
-        var got = crash;
-        got.midpoint = true;
-        return got;
+    cursor.orientation = move.orientation;
+    const steps2 = delta.projection(move.orientation).max_norm();
+    for (0..@intCast(steps2)) |_| {
+        const next = cursor.position.plus(move.orientation.ivec());
+        if (!moto_passable(next, move.orientation)) {
+            return cursor;
+        }
+        cursor.position = next;
     }
     return null;
 }

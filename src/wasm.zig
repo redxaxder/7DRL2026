@@ -208,6 +208,22 @@ pub fn bounding_box(positions: []const Vec2) Rect {
     };
 }
 
+pub fn render_debug(val: anytype) void {
+    const T = @TypeOf(val);
+    const fields = @typeInfo(T).@"struct".fields;
+    const x: f32 = 10;
+    const size: f32 = 32;
+    var y: f32 = 10;
+
+    inline for (fields) |field| {
+        const field_val = @field(val, field.name);
+        const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
+        splatString(x, y, text, YELLOW, size);
+        render_buffer.flush();
+        y += size;
+    }
+}
+
 pub export fn frame(t: f64) void {
     const rawdt = t - prev_time;
     const dt: f32 = @floatCast(@min(20, rawdt));
@@ -251,7 +267,7 @@ pub export fn frame(t: f64) void {
             if (right > camera.xmax()) camera.x = right - camera.w;
             if (bottom > camera.ymax()) camera.y = bottom - camera.h;
 
-            std.log.info("camera {}", .{camera});
+            // std.log.info("camera {}", .{camera});
         }
     }
 
@@ -322,7 +338,12 @@ pub export fn frame(t: f64) void {
 
     render_buffer.flush();
 
-    splatString(10, 10, "hello world", 0, 32);
+    const pl = main.globals.player();
+    render_debug(.{
+        .ppos = pl.position,
+        .mount = pl.mounted_on,
+        .motopos = main.globals.unit(2).position,
+    });
 
     render_buffer.flush();
 }
