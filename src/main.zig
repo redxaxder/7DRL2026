@@ -6,6 +6,9 @@ const mouse = @import("mouse.zig");
 const func = @import("func.zig");
 const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
+const map = @import("map.zig");
+const Terrain = map.Terrain;
+const IVec2 = @import("core.zig").IVec2;
 
 const Vec2 = @import("core.zig").Vec2;
 const Rect = @import("core.zig").Rect;
@@ -17,49 +20,6 @@ pub const UnitType = enum {
     Motorcycle,
     PendingExplosion,
     PendingRubble,
-};
-
-pub const IVec2 = struct {
-    x: i16 = 0,
-    y: i16 = 0,
-
-    pub const zero: IVec2 = .{
-        .x = 0,
-        .y = 0,
-    };
-    pub const default: IVec2 = .{
-        .x = -3200,
-        .y = -3200,
-    };
-
-    pub fn float(self: IVec2) Vec2 {
-        return .{ .x = @floatFromInt(self.x), .y = @floatFromInt(self.y) };
-    }
-
-    pub fn plus(self: IVec2, rhs: IVec2) IVec2 {
-        return .{
-            .x = self.x + rhs.x,
-            .y = self.y + rhs.y,
-        };
-    }
-
-    pub fn minus(self: IVec2, rhs: IVec2) IVec2 {
-        return .{
-            .x = self.x - rhs.x,
-            .y = self.y - rhs.y,
-        };
-    }
-
-    pub fn scaled(self: IVec2, c: i16) IVec2 {
-        return .{
-            .x = self.x * c,
-            .y = self.y * c,
-        };
-    }
-
-    pub fn eq(self: IVec2, rhs: IVec2) bool {
-        return self.x == rhs.x and self.y == rhs.y;
-    }
 };
 
 pub const Dir4 = enum {
@@ -134,50 +94,19 @@ pub const Unit = struct {
     }
 };
 
-const MAP_SIZE = 2500;
-const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
-
-pub const Terrain = enum(u8) {
-    Floor,
-    Asphalt,
-    Wall,
-    Door,
-    _,
-
-    pub fn glyph(self: @This()) u8 {
-        switch (self) {
-            .Asphalt => return 0xB0,
-            .Floor => return '.',
-            .Wall => return '#',
-            .Door => return '+',
-            else => return '?',
-        }
-    }
-};
-
-pub fn map_index(position: IVec2) ?usize {
-    if (position.x < 0 or position.x >= MAP_SIZE) {
-        return null;
-    }
-    if (position.y < 0 or position.y >= MAP_SIZE) {
-        return null;
-    }
-    return (@as(usize, @intCast(position.y)) * MAP_SIZE) + @as(usize, @intCast(position.x));
-}
-
 pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
-    const ix = map_index(position) orelse return;
+    const ix = map.map_index(position) orelse return;
     globals.mapdata[ix] = terrain;
 }
 
 pub fn get_terrain_at(position: IVec2) ?Terrain {
-    const ix = map_index(position) orelse return null;
+    const ix = map.map_index(position) orelse return null;
     return globals.mapdata[ix];
 }
 
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.default} ** 2000;
-    pub var mapdata: [MAPDATA_LEN]Terrain = .{.Floor} ** MAPDATA_LEN;
+    pub var mapdata: [map.MAPDATA_LEN]Terrain = .{.Floor} ** map.MAPDATA_LEN;
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];
@@ -197,116 +126,7 @@ pub const globals = struct {
     }
 };
 
-fn is_street(pos: IVec2, street_size: i16, block_size: IVec2) bool {
-    return pos.y < street_size or pos.x < street_size or pos.x >= block_size.x - street_size or pos.y >= block_size.y - street_size;
-}
-
-fn is_wall_y(pos: IVec2, street_size: i16, block_size: IVec2) bool {
-    return (pos.y == street_size or pos.y == block_size.y - street_size - 1) and !is_street(pos, street_size, block_size);
-}
-
-fn is_wall_x(pos: IVec2, street_size: i16, block_size: IVec2) bool {
-    return (pos.x == street_size or pos.x == block_size.x - street_size - 1) and !is_street(pos, street_size, block_size);
-}
-
-const DirFlags = packed struct(u4) {
-    north: bool = false,
-    south: bool = false,
-    east: bool = false,
-    west: bool = false,
-};
-
-fn is_door(pos: IVec2, street_size: i16, block_size: IVec2, doors: DirFlags) bool {
-    if (doors.east) {
-        //right
-        if (is_wall_x(pos, street_size, block_size) and @abs(pos.y - @divFloor(block_size.y, 2)) < 2 and pos.x == block_size.x - street_size - 1) {
-            return true;
-        }
-    }
-    if (doors.north) {
-        //top
-        if (is_wall_y(pos, street_size, block_size) and @abs(pos.x - @divFloor(block_size.x, 2)) < 2 and pos.y == street_size) {
-            return true;
-        }
-    }
-    if (doors.west) {
-        //left
-        if (is_wall_x(pos, street_size, block_size) and @abs(pos.y - @divFloor(block_size.y, 2)) < 2 and pos.x == street_size) {
-            return true;
-        }
-    }
-    if (doors.south) {
-        //bottom
-        if (is_wall_y(pos, street_size, block_size) and @abs(pos.x - @divFloor(block_size.x, 2)) < 2 and pos.y == block_size.y - street_size - 1) {
-            return true;
-        }
-    }
-    return false;
-}
-
 const PLAYER_ID: UnitId = 1;
-
-fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: i16, rng: std.Random, block_offset: IVec2) void {
-    // iterate over blocks
-    for (0..@as(usize, @intCast(@divFloor(zone_size.x, block_size.x)))) |bx| {
-        for (0..@as(usize, @intCast(@divFloor(zone_size.y, block_size.y)))) |by| {
-            const doors: DirFlags = @bitCast(rng.int(u4));
-            for (0..@as(usize, @intCast(block_size.x))) |xx| {
-                for (0..@as(usize, @intCast(block_size.y))) |yy| {
-                    const block_x: i16 = @as(i16, @intCast(bx));
-                    const block_y: i16 = @as(i16, @intCast(by));
-                    const x: i16 = @as(i16, @intCast(xx));
-                    const y: i16 = @as(i16, @intCast(yy));
-                    // streets
-                    const local_pos: IVec2 = .{
-                        .x = x,
-                        .y = y,
-                    };
-                    const world_x: i16 = (zone.x * zone_size.x) + (block_x * block_size.x) - block_offset.x + x;
-                    const world_y: i16 = (zone.y * zone_size.y) + (block_y * block_size.y) - block_offset.y + y;
-                    const world_pos: IVec2 = .{ .x = world_x, .y = world_y };
-                    if (is_street(local_pos, street_size, block_size)) {
-                        set_terrain_at(world_pos, .Asphalt);
-                    }
-                    // buildings
-                    if (is_wall_x(local_pos, street_size, block_size) or is_wall_y(local_pos, street_size, block_size)) {
-                        set_terrain_at(world_pos, .Wall);
-                    }
-                    // doors
-                    if (is_door(local_pos, street_size, block_size, doors)) {
-                        set_terrain_at(world_pos, .Door);
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub fn mapgen(rng: std.Random) void {
-    // basic mapgen strategy:
-    // the map is chunked into zones, each zone is chunked into blocks, each block is made up of tiles
-    const num_zones_x: i16 = rng.intRangeAtMost(i16, 3, 8);
-    const num_zones_y: i16 = rng.intRangeAtMost(i16, 3, 8);
-    const zone_size: IVec2 = .{ .x = @divFloor(MAP_SIZE, num_zones_x), .y = @divFloor(MAP_SIZE, num_zones_y) };
-
-    // for each zone, we track block offsets, because a zone with width z and block width b will have z % b leftover space
-    // we use these block offsets so that the zones mesh with no gap
-    // TODO probably a big gap on the far edges of the map
-    var block_offset_x: i16 = 0;
-    for (0..@as(usize, @intCast(num_zones_x))) |zx| {
-        const block_size_x = rng.intRangeAtMost(i16, 20, 50);
-        var block_offset_y: i16 = 0;
-        for (0..@as(usize, @intCast(num_zones_y))) |zy| {
-            const block_size: IVec2 = .{ .x = block_size_x, .y = rng.intRangeAtMost(i16, 20, 50) };
-            const street_size: i16 = rng.intRangeAtMost(i16, 1, 5);
-            const zone: IVec2 = .{ .x = @as(i16, @intCast(zx)), .y = @as(i16, @intCast(zy)) };
-            const block_offset: IVec2 = .{ .x = block_offset_x, .y = block_offset_y };
-            mapgen_blocks(zone, zone_size, block_size, street_size, rng, block_offset);
-            block_offset_y += @rem(zone_size.y, block_size.y);
-        }
-        block_offset_x += @rem(zone_size.x, block_size_x);
-    }
-}
 
 pub fn init(rng: std.Random) !void {
     globals.player().* = Unit{
@@ -333,7 +153,7 @@ pub fn init(rng: std.Random) !void {
         .position = IVec2{ .x = 9, .y = 18 },
         .size = 2,
     };
-    mapgen(rng);
+    map.mapgen(rng, &globals.mapdata);
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {

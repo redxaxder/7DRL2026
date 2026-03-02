@@ -8,7 +8,7 @@ const Sprite = RenderBuffer.Sprite;
 const main = @import("main.zig");
 
 const Vec2 = @import("core.zig").Vec2;
-const IVec2 = main.IVec2;
+const IVec2 = @import("core.zig").IVec2;
 const Rect = @import("core.zig").Rect;
 
 const CameraWidth = 65;

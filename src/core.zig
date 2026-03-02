@@ -1,6 +1,49 @@
 const std = @import("std");
 const animation = @import("animation.zig");
 
+pub const IVec2 = struct {
+    x: i16 = 0,
+    y: i16 = 0,
+
+    pub const zero: IVec2 = .{
+        .x = 0,
+        .y = 0,
+    };
+    pub const default: IVec2 = .{
+        .x = -3200,
+        .y = -3200,
+    };
+
+    pub fn float(self: IVec2) Vec2 {
+        return .{ .x = @floatFromInt(self.x), .y = @floatFromInt(self.y) };
+    }
+
+    pub fn plus(self: IVec2, rhs: IVec2) IVec2 {
+        return .{
+            .x = self.x + rhs.x,
+            .y = self.y + rhs.y,
+        };
+    }
+
+    pub fn minus(self: IVec2, rhs: IVec2) IVec2 {
+        return .{
+            .x = self.x - rhs.x,
+            .y = self.y - rhs.y,
+        };
+    }
+
+    pub fn scaled(self: IVec2, c: i16) IVec2 {
+        return .{
+            .x = self.x * c,
+            .y = self.y * c,
+        };
+    }
+
+    pub fn eq(self: IVec2, rhs: IVec2) bool {
+        return self.x == rhs.x and self.y == rhs.y;
+    }
+};
+
 pub const Vec2 = extern struct {
     x: f32,
     y: f32,
