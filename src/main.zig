@@ -112,11 +112,9 @@ pub const Unit = struct {
         return self.position.plus(self.orientation.ivec());
     }
 
-    pub fn move(self: *@This(), dir: Dir4) void {
-        if (self.tag == .Kaiju) {
-            const target = self.position.plus(dir.ivec().scaled(self.size));
-            self.move_to(target);
-        }
+    pub fn move(self: *@This(), dir: Dir4, distance: i16) void {
+        const target = self.position.plus(dir.ivec().scaled(distance));
+        self.move_to(target);
     }
 };
 
@@ -255,9 +253,58 @@ fn tick_kaiju(rng: std.Random) void {
             // TODO make more complex?
             if (u.position.max_norm_distance(globals.player().position) < 64) {
                 // relentless chase the player
-                u.move(u.position.facing(globals.player().position));
+                kaiju_logic(u);
+                // u.move(u.position.facing(globals.player().position));
             }
         }
+    }
+}
+
+// destroys wall
+// TODO, fling rubble
+fn destroy_wall(demolitionist: *const Unit, dir: Dir4) void {
+    _ = demolitionist;
+    _ = dir;
+}
+
+// raycasts in an orthogonal direction to see if there is a wall between units
+// return is either null for no wall or distance to wall
+// from is typically a kaiju
+// to is typically the player
+fn wall_between(from: *const Unit, to: *const Unit) ?i16 {
+    const give_up: usize = 65;
+    var iter_coord: IVec2 = from.position;
+    const to_coord: IVec2 = to.position;
+    const increment: IVec2 = from.position.facing(to.position).ivec();
+    for (0..give_up) |distance| {
+        if (get_terrain_at(iter_coord) == .Wall) {
+            return @intCast(distance);
+        }
+        if (iter_coord.eq(to_coord)) {
+            return null;
+        }
+        iter_coord = iter_coord.plus(increment);
+    }
+    return null;
+}
+
+fn kaiju_logic(k: *Unit) void {
+    const dir: Dir4 = k.position.facing(globals.player().position);
+    if (wall_between(k, globals.player())) |distance| {
+        //   if there is a wall in the way, and wall > size distance, take full step
+        if (k.size > distance) {
+            k.move(dir, k.size);
+        } else if (distance > 1) {
+            //   if there is a wall in the way, and wall < size distance, take partial step to wall
+            k.move(dir, distance - 1);
+        } else if (distance == 1) {
+            //   if there is a wall in the way, and adjacent to wall, DESTROY
+            destroy_wall(k, dir);
+        }
+    } else {
+        // if there is line of sight to the player and player > size distance, take full step
+        // if there is line of sight to player and player < size distance, take partial step
+        // if there is not line of sight to player
     }
 }
 
