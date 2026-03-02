@@ -173,14 +173,13 @@ fn render_kaiju(kaiju: *const main.Unit) void {
 fn update_camera() void {
     const CAMERA_BUFFER: f32 = 10;
     const player = main.globals.player();
-    const mount = player.mount();
 
     var points: [7]Vec2 = undefined;
     points[0] = player.render_position;
     var count: usize = 1;
 
-    if (mount.tag != .Nil) {
-        for (main.get_reticle_positions(mount)) |pos| {
+    if (main.get_reticle_positions()) |reticles| {
+        for (reticles) |pos| {
             points[count] = pos.float();
             count += 1;
         }
@@ -262,6 +261,30 @@ pub fn bounding_box(positions: []const Vec2) Rect {
     };
 }
 
+const IRect = @import("core.zig").IRect;
+
+pub fn debug_draw_rect(rect: IRect, color: Color) void {
+    var it = rect.iter();
+    while (it.next()) |pos| {
+        const is_top = pos.y == rect.y;
+        const is_bottom = pos.y == rect.y + rect.h - 1;
+        const is_left = pos.x == rect.x;
+        const is_right = pos.x == rect.x + rect.w - 1;
+
+        const glyph: u8 =
+            if (is_top and is_left) 0xDA // ┌
+        else if (is_top and is_right) 0xBF // ┐
+        else if (is_bottom and is_left) 0xC0 // └
+        else if (is_bottom and is_right) 0xD9 // ┘
+        else if (is_top or is_bottom) 0xC4 // ─
+        else if (is_left or is_right) 0xB3 // │
+        else continue;
+
+        draw_world_glyph(pos.float(), glyph, .{ .color = color });
+    }
+    render_buffer.flush();
+}
+
 pub fn render_debug(val: anytype) void {
     const T = @TypeOf(val);
     const fields = @typeInfo(T).@"struct".fields;
@@ -332,23 +355,20 @@ pub export fn frame(t: f64) void {
     }
 
     // Draw movement preview reticles
-    blk: {
+    const reticles: ?[5]IVec2 = main.get_reticle_positions();
+    if (reticles) |highlight| {
         const mount = main.globals.player().mount();
-        if (mount.tag == .Nil) {
-            break :blk;
-        }
-        for (main.get_reticle_positions(mount)) |pos| {
-            const p0 = mount.position;
-            const p1 = mount.position.plus(mount.orientation.ivec());
+        const p0 = mount.position;
+        const p1 = mount.position.plus(mount.orientation.ivec());
+        for (highlight) |pos| {
             if (pos.eq(p0)) {
                 continue;
             }
             if (pos.eq(p1)) {
                 continue;
             }
-            draw_world_glyph(pos.float(), '%', .{
-                .bgcolor = .black,
-                .color = .yellow,
+            draw_world_glyph(pos.float(), 0x09, .{
+                .color = .blue,
             });
         }
     }

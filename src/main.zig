@@ -794,15 +794,19 @@ pub fn resolve_motorcycle_movement(
     return it;
 }
 
-pub fn get_reticle_positions(unit: *const Unit) [5]IVec2 {
+pub fn get_reticle_positions() ?[5]IVec2 {
+    const mount = globals.player().mount();
+    if (mount.tag == .Nil) {
+        return null;
+    }
     var result: [5]IVec2 = undefined;
     for (std.enums.values(Dir4), 0..) |d, i| {
-        const projection = resolve_motorcycle_movement(unit, .{ .dir = d });
+        const projection = resolve_motorcycle_movement(mount, .{ .dir = d });
         const ppos = projection.position;
         const handlepos = ppos.plus(projection.orientation.ivec());
         result[i] = handlepos;
     }
-    const projection = resolve_motorcycle_movement(unit, .{});
+    const projection = resolve_motorcycle_movement(mount, .{});
     const ppos = projection.position;
     const handlepos = ppos.plus(projection.orientation.ivec());
     result[4] = handlepos;
