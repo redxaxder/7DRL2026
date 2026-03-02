@@ -201,6 +201,46 @@ pub const Vec2 = extern struct {
     }
 };
 
+pub const IRect = struct {
+    x: i16,
+    y: i16,
+    w: i16,
+    h: i16,
+
+    pub fn from(pos: IVec2, size: IVec2) IRect {
+        return .{ .x = pos.x, .y = pos.y, .w = size.x, .h = size.y };
+    }
+
+    pub fn contains(self: IRect, p: IVec2) bool {
+        return p.x >= self.x and p.x < self.x + self.w and
+            p.y >= self.y and p.y < self.y + self.h;
+    }
+
+    pub fn iter(self: IRect) LocationIterator {
+        return .{ .rect = self };
+    }
+
+    pub const LocationIterator = struct {
+        rect: IRect,
+        ix: i16 = 0,
+        iy: i16 = 0,
+
+        pub fn next(self: *LocationIterator) ?IVec2 {
+            if (self.iy >= self.rect.h) return null;
+            const result = IVec2{
+                .x = self.rect.x + self.ix,
+                .y = self.rect.y + self.iy,
+            };
+            self.ix += 1;
+            if (self.ix >= self.rect.w) {
+                self.ix = 0;
+                self.iy += 1;
+            }
+            return result;
+        }
+    };
+};
+
 pub const Rect = struct {
     x: f32,
     y: f32,
