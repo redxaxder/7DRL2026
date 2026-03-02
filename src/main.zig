@@ -61,8 +61,7 @@ pub const Unit = struct {
                 return self.position.eq(pos);
             },
             .Motorcycle => {
-                const p2 = self.position.plus(self.orientation.ivec());
-                return self.position.eq(pos) or p2.eq(pos);
+                return self.position.eq(pos) or self.handlepos().eq(pos);
             },
             .Kaiju => {
                 const delta = pos.minus(self.position);
@@ -75,6 +74,10 @@ pub const Unit = struct {
     }
     pub fn mount(self: *const @This()) *Unit {
         return globals.unit(self.mounted_on);
+    }
+
+    pub fn handlepos(self: *const @This()) IVec2 {
+        return self.position.plus(self.orientation.ivec());
     }
 };
 
@@ -166,13 +169,20 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                     .shift = keyboard.isShiftDown(),
                 },
             );
-            if (full_crash_check(pmount, motomove)) |crashed| {
+            if (crash_check(pmount, motomove)) |crashed| {
                 pmount.*.position = crashed.position;
                 pmount.*.orientation = crashed.orientation;
                 pmount.*.speed = 0;
-                player.*.speed = 0;
-                // TODO: handle post-midpoint crash
-                player.*.mounted_on = 0;
+                if (motomove.brake) {
+                    player.*.position = pmount.position;
+                } else {
+                    player.*.mounted_on = 0;
+                }
+                if (crashed.fling) {
+                    const delta = motomove.midpoint.minus(player.position);
+                    // TODO: slide player toward this position instead  (ie interrupted by obstacles) instead of assigning it
+                    player.*.position = motomove.midpoint.plus(delta);
+                }
             } else {
                 pmount.*.position = motomove.position;
                 pmount.*.orientation = motomove.orientation;
@@ -214,6 +224,8 @@ pub const MotoResult = struct {
     position: IVec2,
     orientation: Dir4,
     speed: u8,
+    brake: bool,
+    slide: bool,
     dismount: bool,
 };
 
@@ -231,6 +243,8 @@ pub fn player_passable(pos: IVec2) bool {
     if (!t.passable()) {
         return false;
     }
+    //TODO: kaiju obstruction
+    return true;
 }
 
 pub fn moto_passable(pos: IVec2, orientation: Dir4) bool {
@@ -243,15 +257,45 @@ pub fn moto_passable(pos: IVec2, orientation: Dir4) bool {
 pub const CrashInfo = struct {
     position: IVec2,
     orientation: Dir4,
-    midpoint: bool = false,
+    fling: bool = false,
 };
 
-pub fn full_crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
+pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
     const delta = move.position.minus(moto.position);
     const n = delta.max_norm();
 
+    if (core.RelativeDir.from(moto.orientation, move.orientation) == .Reverse) {
+        return null;
+    }
+
     // we're strafing if we haven't changed direction, but we're moving on both x and y
     const strafe_mode = (move.orientation == moto.orientation) and delta.x != 0 and delta.y != 0;
+
+    if (move.brake) {
+        const v = moto.orientation.ivec();
+        var cursor = CrashInfo{
+            .position = moto.position,
+            .orientation = moto.orientation,
+        };
+        if (move.slide) {
+            const p = moto.handlepos().minus(move.orientation.ivec());
+            if (!moto_passable(p, move.orientation)) {
+                // we shouldnt end up here
+                std.log.err("unhandled movement case", .{});
+            }
+            cursor.position = p;
+            cursor.orientation = move.orientation;
+        }
+        const steps: usize = @intCast(delta.max_norm());
+        for (0..steps) |_| {
+            const next = cursor.position.plus(v);
+            if (!moto_passable(next, cursor.orientation)) {
+                return cursor;
+            }
+            cursor.position = next;
+        }
+        return null;
+    }
 
     if (strafe_mode) {
         // strafe crash resolution is generous:
@@ -302,14 +346,17 @@ pub fn full_crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         }
         cursor.position = next;
     }
-    cursor.orientation = move.orientation;
-    const steps2 = delta.projection(move.orientation).max_norm();
-    for (0..@intCast(steps2)) |_| {
-        const next = cursor.position.plus(move.orientation.ivec());
-        if (!moto_passable(next, move.orientation)) {
-            return cursor;
+    if (move.orientation != moto.orientation) {
+        cursor.orientation = move.orientation;
+        cursor.fling = true;
+        const steps2 = delta.projection(move.orientation).max_norm();
+        for (0..@intCast(steps2)) |_| {
+            const next = cursor.position.plus(move.orientation.ivec());
+            if (!moto_passable(next, move.orientation)) {
+                return cursor;
+            }
+            cursor.position = next;
         }
-        cursor.position = next;
     }
     return null;
 }
@@ -324,6 +371,8 @@ pub fn resolve_motorcycle_movement(
         .speed = moto.speed,
         .orientation = moto.orientation,
         .dismount = false,
+        .brake = false,
+        .slide = false,
     };
 
     const change = move.dir orelse {
@@ -372,7 +421,7 @@ pub fn resolve_motorcycle_movement(
             }
         },
         .Reverse => { // brake!
-
+            it.brake = true;
             if (move.shift) { // slight brake
                 const drift = moto.orientation.ivec()
                     .scaled(@intCast(it.speed))
@@ -388,9 +437,14 @@ pub fn resolve_motorcycle_movement(
                     it.orientation = change;
                 }
                 it.speed = 0;
-                // if speed is high enough, brake via akira slide
-                if (slide_dist >= 2) {
-                    it.orientation = moto.orientation.turn(.Right);
+                // if speed is high enough, brake via akira slide.
+                // we hold the handlebar position constant,
+                // rotate the player's position around them
+                const slidestart = moto.handlepos().plus(moto.orientation.turn(.Right).ivec());
+                if (slide_dist >= 2 and player_passable(slidestart)) {
+                    it.slide = true;
+                    it.position = it.position.plus(it.orientation.ivec());
+                    it.orientation = moto.orientation.turn(.Left);
                     it.position = it.position.minus(it.orientation.ivec());
                 }
             }
