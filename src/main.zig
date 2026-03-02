@@ -276,6 +276,13 @@ pub fn full_crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
             }
             cursor.position = next;
         }
+        if (!shifted) {
+            const final = cursor.position.plus(secondary_vector);
+            if (!moto_passable(final, moto.orientation)) {
+                return cursor;
+            }
+        }
+
         return null;
     }
 
