@@ -28,7 +28,7 @@ pub const Unit = struct {
     // Universal
     tag: UnitType = .Nil,
     position: IVec2 = IVec2.default,
-    // TODO: add render_position Vec2
+    render_position: Vec2 = Vec2.default,
 
     // Healthy
     hp: i64 = 0,
@@ -72,6 +72,11 @@ pub const Unit = struct {
             },
         }
     }
+    pub fn move_to(self: *@This(), pos: IVec2) void {
+        self.position = pos;
+        self.render_position = pos.float();
+    }
+
     pub fn mount(self: *const @This()) *Unit {
         return globals.unit(self.mounted_on);
     }
@@ -170,27 +175,27 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 },
             );
             if (motomove.dismount) {
-                player.*.position = motomove.position;
+                player.move_to(motomove.position);
                 player.*.mounted_on = 0;
             } else if (crash_check(pmount, motomove)) |crashed| {
-                pmount.*.position = crashed.position;
+                pmount.move_to(crashed.position);
                 pmount.*.orientation = crashed.orientation;
                 pmount.*.speed = 0;
                 if (motomove.brake) {
-                    player.*.position = pmount.position;
+                    player.*.move_to(pmount.position);
                 } else {
                     player.*.mounted_on = 0;
                 }
                 if (crashed.fling) {
                     const delta = motomove.midpoint.minus(player.position);
                     // TODO: slide player toward this position instead  (ie interrupted by obstacles) instead of assigning it
-                    player.*.position = motomove.midpoint.plus(delta);
+                    player.move_to(motomove.midpoint.plus(delta));
                 }
             } else {
-                pmount.*.position = motomove.position;
                 pmount.*.orientation = motomove.orientation;
                 pmount.*.speed = motomove.speed;
-                player.*.position = pmount.position;
+                pmount.move_to(motomove.position);
+                player.move_to(motomove.position);
             }
         } else {
             // unmounted movement
@@ -200,13 +205,13 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
             if (get_occupant(target)) |occupant_id| {
                 const occupant = globals.unit(occupant_id);
                 if (occupant.tag == .Motorcycle) { // Mount it
-                    player.*.position = occupant.position;
+                    player.move_to(occupant.position);
                     player.*.mounted_on = occupant_id;
                 } else {
                     // TODO: do something other than move here
                 }
             } else {
-                player.*.position = target;
+                player.move_to(target);
             }
         }
     }

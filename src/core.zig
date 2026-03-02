@@ -128,6 +128,11 @@ pub const Vec2 = extern struct {
 
     pub const ZERO: Vec2 = .{ .x = 0, .y = 0 };
 
+    pub const default: Vec2 = .{
+        .x = -3200,
+        .y = -3200,
+    };
+
     pub fn plus(self: Vec2, rhs: Vec2) Vec2 {
         return .{
             .x = self.x + rhs.x,
