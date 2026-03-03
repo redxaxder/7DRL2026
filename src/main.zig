@@ -327,6 +327,20 @@ pub fn init(rng: std.Random) !void {
         5,
     ));
     map.mapgen(rng, &globals.mapdata);
+
+    const a = IRect{
+        .x = 0,
+        .y = 0,
+        .w = 3,
+        .h = 3,
+    };
+    const b = IRect{
+        .x = 10,
+        .y = 0,
+        .w = 1,
+        .h = 1,
+    };
+    std.log.info("rdist {}", .{a.distance(b)});
 }
 
 pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
@@ -583,7 +597,16 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
     } else {
         // const width: i16 = if (dir == .Right or dir == .Down) k.get_rect().w else 0;
         // const distance: i16 = k.position.max_norm_distance(globals.player().position) - width;
-        const distance_vec: IVec2 = if (globals.player().mounted()) k.get_rect().distance(globals.player().mount().get_rect()) else k.get_rect().point_distance(globals.player().position);
+
+        const player = globals.player();
+        const p_rect = if (player.mounted())
+            player.mount().get_rect()
+        else
+            player.get_rect();
+        const krect = k.get_rect();
+        const distance_vec = krect.distance(p_rect);
+
+        // const distance_vec: IVec2 = if (globals.player().mounted()) k.get_rect().distance(globals.player().mount().get_rect()) else k.get_rect().point_distance(globals.player().position);
         const distance: i16 = switch (dir) {
             .Left, .Right => distance_vec.x,
             .Up, .Down => distance_vec.y,
