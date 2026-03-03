@@ -203,6 +203,7 @@ pub const Terrain = enum(u5) {
     pub fn glyph(self: Terrain) u8 {
         switch (self) {
             .Asphalt => return 0,
+            // .Asphalt => return '\\',
             .Floor => return '.',
             .Wall => return '#',
             .Door => return '+',
@@ -233,6 +234,13 @@ pub const Terrain = enum(u5) {
         return switch (self) {
             .Wall, .Void => false,
             else => true,
+        };
+    }
+
+    pub fn smashable(self: Terrain) bool {
+        return switch (self) {
+            .Wall, .Door, .Rubble, .Viscera => true,
+            else => false,
         };
     }
 

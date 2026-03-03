@@ -7,6 +7,7 @@ const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
 const main = @import("main.zig");
 const map = @import("map.zig");
+const inventory = @import("inventory.zig");
 
 const Vec2 = @import("core.zig").Vec2;
 const IVec2 = @import("core.zig").IVec2;
@@ -425,8 +426,10 @@ fn draw_gamefield(t: f64) void {
             if (u.tag == .Nil) {
                 continue;
             }
+            if (u.mounted()) {
+                u.render_position = u.mount().render_position;
+            }
             render_unit(u);
-            // debug_draw_rect(u.get_rect(), .yellow);
         }
     }
 

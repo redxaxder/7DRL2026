@@ -213,8 +213,18 @@ pub const Unit = struct {
                     halt = true;
                     _ = animate_terrain_to(p, .Floor).chain();
                 }
+                if (self.tag == .Player) {
+                    const r = IRect.singleton(p);
+                    var iter = if (self.mounted()) r.expand(1).iter() else r.iter();
+                    while (iter.next()) |q| {
+                        if (map.get_terrain_at(q) == .Trinket) {
+                            _ = animate_terrain_to(q, .Floor).chain();
+                            inventory.add_pending_pickup();
+                        }
+                    }
+                }
             }
-            // kaiju crush motorcycles
+            // kaiju crush motorcycles and smashable terrain
             if (self.tag == .Kaiju) {
                 var occupants = sector.get_occupants_rect(edge);
                 while (occupants.next()) |uid| {
@@ -225,7 +235,6 @@ pub const Unit = struct {
                 }
             }
         }
-        try_pickup(self.position, pos, facing);
 
         const id = self.get_id();
         sector.remove(id, self);
@@ -323,41 +332,6 @@ pub const Unit = struct {
     }
 };
 
-pub fn try_pickup(from: IVec2, to: IVec2, dir: Dir4) void {
-    const player = globals.player();
-    const mounted: bool = player.mounted();
-    const speed = from.minus(to).max_norm();
-    var front_iter = player.get_rect().expand(1).slide(dir, speed);
-    var accum_items: [10]?Item = .{null} ** 10;
-    var accum_ix: usize = 0;
-    while (front_iter.next()) |front_rect| {
-        var rect_iter = front_rect.iter();
-        while (rect_iter.next()) |p| {
-            // if on foot, only pick up
-            if (!(mounted or p.eq(player.position.plus(dir.ivec())))) {
-                continue;
-            }
-            if (map.get_terrain_at(p) == .Trinket) {
-                // randomly roll new item
-                const name_ix: usize = globals.rng.intRangeAtMost(usize, 0, inventory.NAMES.len - 1);
-                const name: []const u8 = inventory.NAMES[name_ix];
-                const item: Item = .{
-                    .tag = .Trinket,
-                    .name = name,
-                    .position = p,
-                };
-                accum_items[accum_ix] = item;
-                accum_ix += 1;
-                if (accum_ix >= 10) {
-                    break;
-                }
-            }
-        }
-    }
-
-    inventory.try_add_items(&accum_items);
-}
-
 pub const ux = struct {
     pub const InputMode = enum { Movement, Attack };
     pub const Action = union(enum) {
@@ -376,7 +350,7 @@ pub const ux = struct {
         }
     }
 
-    pub fn resolve_input(key: keyboard.Code) ?Action {
+    pub fn resolve_input(key: keyboard.Code, rng: std.Random) ?Action {
         const dir: ?Dir4 = switch (key) {
             .KeyW, .ArrowUp => .Up,
             .KeyA, .ArrowLeft => .Left,
@@ -384,8 +358,24 @@ pub const ux = struct {
             .KeyD, .ArrowRight => .Right,
             else => null,
         };
+        const number: ?usize = switch (key) {
+            .Digit1, .Numpad1 => 1,
+            .Digit2, .Numpad2 => 2,
+            .Digit3, .Numpad3 => 3,
+            .Digit4, .Numpad4 => 4,
+            .Digit6, .Numpad6 => 6,
+            .Digit7, .Numpad7 => 7,
+            .Digit8, .Numpad8 => 8,
+            .Digit9, .Numpad9 => 9,
+            .Digit0, .Numpad0 => 0,
+            else => null,
+        };
 
-        if (dir) |d| {
+        if (inventory.has_pending_pickups()) {
+            if (number) |slot| {
+                inventory.overwrite_slot(rng, slot);
+            }
+        } else if (dir) |d| {
             switch (input_mode) {
                 .Movement => {
                     const shift = keyboard.isShiftDown();
@@ -395,22 +385,8 @@ pub const ux = struct {
                     return .{ .attack = d };
                 },
             }
-        } else {
-            const weapon_id: ?usize = switch (key) {
-                .Digit1, .Numpad1 => 1,
-                .Digit2, .Numpad2 => 2,
-                .Digit3, .Numpad3 => 3,
-                .Digit4, .Numpad4 => 4,
-                .Digit6, .Numpad6 => 6,
-                .Digit7, .Numpad7 => 7,
-                .Digit8, .Numpad8 => 8,
-                .Digit9, .Numpad9 => 9,
-                .Digit0, .Numpad0 => 0,
-                else => null,
-            };
-            if (weapon_id) |weap| {
-                toggle_weapon(weap);
-            }
+        } else if (number) |weapon_id| {
+            toggle_weapon(weapon_id);
         }
 
         return null;
@@ -469,6 +445,7 @@ pub fn init(rng: std.Random) !void {
 
     const moto_id = spawn(.init_motorcycle(IVec2.ZERO, .Right));
     globals.player().mounted_on = moto_id;
+    inventory.roll_next_item(rng);
 
     // _ = spawn(.init_kaiju(
     //     IVec2{ .x = 6, .y = 6 },
@@ -613,7 +590,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     var player_acted = false;
     const player_start = globals.player().position;
 
-    if (ux.resolve_input(key)) |action| {
+    if (ux.resolve_input(key, rng)) |action| {
         globals.animation_queue.hurry(1.5);
         switch (action) {
             .move => |movedata| {
@@ -635,7 +612,6 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         player_acted = true;
     }
     if (player_acted) {
-        fov.refresh_fov(globals.player().position, FOV_RANGE);
         resolve_pending(rng);
         const player_end = globals.player().position;
         const travel_distance: u64 = @intCast(player_start.max_norm_distance(player_end));
@@ -651,6 +627,10 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         }
 
         units_cleanup(rng);
+
+        fov.refresh_fov(globals.player().position, FOV_RANGE);
+        inventory.handle_pending_pickups(rng);
+        std.log.info("inventory {any}", .{inventory.inventory});
     }
 }
 
@@ -872,8 +852,10 @@ fn harm() void {
 }
 
 fn destroy(pos: IVec2, rng: std.Random) void {
-    const rubble_type: Terrain = if (rng.boolean()) .Debris else .Rubble;
-    _ = animate_terrain_to(pos, rubble_type);
+    if (map.get_terrain_at(pos).smashable()) {
+        const rubble_type: Terrain = if (rng.boolean()) .Debris else .Rubble;
+        _ = set_terrain(pos, rubble_type);
+    }
 }
 
 fn smack_player(dir: Dir4, rng: std.Random) void {
@@ -891,9 +873,7 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
         while (fling_iter.next()) |fling_slice| {
             var iter = fling_slice.iter();
             while (iter.next()) |pos| {
-                if (map.get_terrain_at(pos) == .Wall) {
-                    destroy(pos, rng);
-                }
+                destroy(pos, rng);
             }
         }
         const target: IVec2 = player.position.plus(dir.ivec().scaled(fling_distance));

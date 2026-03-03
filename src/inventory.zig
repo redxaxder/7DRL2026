@@ -3,71 +3,118 @@ const Dir4 = @import("core.zig").Dir4;
 const map = @import("map.zig");
 const std = @import("std");
 
-pub const NAME_LEN: usize = 32;
+const BASE_ITEM_CAPACITY: usize = 3;
+const INVENTORY_SIZE: usize = 10;
 
-pub const NAMES = [_][]const u8{
-    "labubu",
-    "cell phone",
-    "figurine",
-    "pencil case",
-    "omamori",
-    "talisman",
-    "amulet",
-    "sakazuki",
-    "hachimaki",
-    "briefcase",
-    "hair clip",
-    "juzu beads",
-    "credit card",
-    "stamp seal",
-};
+var pending_pickups: usize = 0;
+pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
+var item_count: usize = 0;
+var item_capacity: usize = 3;
 
-const INVENTORY_SIZE = 10;
+var next_item: Item = undefined;
 
-pub const ItemType = enum(u8) {
+pub fn has_pending_pickups() bool {
+    return pending_pickups > 0;
+}
+
+pub fn extend_item_capacity(ksize: u8) void {
+    const sz: usize = @intCast(ksize);
+    const bonus = sz - 2;
+    item_capacity = @max(item_capacity, BASE_ITEM_CAPACITY + bonus);
+    item_capacity = @min(item_capacity, INVENTORY_SIZE);
+}
+
+pub fn roll_next_item(rng: std.Random) void {
+    const t = blk: while (true) {
+        const c = rng.int(usize) % std.enums.values(ItemTag).len;
+        const x: ItemTag = @enumFromInt(c);
+        if (x != .Nil) {
+            break :blk x;
+        }
+    };
+    next_item = .tagged(t);
+}
+
+pub fn add_pending_pickup() void {
+    pending_pickups += 1;
+}
+
+pub fn handle_pending_pickups(rng: std.Random) void {
+    while (pending_pickups > 0) {
+        const slot = inventory_first_free() orelse return;
+        if (slot < item_capacity) {
+            overwrite_slot(rng, slot);
+        } else {
+            return;
+        }
+    }
+}
+
+pub fn overwrite_slot(rng: std.Random, slot: usize) void {
+    std.log.info("got! {any}", .{next_item});
+    if (slot < item_capacity) {
+        inventory[slot] = next_item;
+        roll_next_item(rng);
+        pending_pickups -= 1;
+    }
+}
+
+pub const ItemTag = enum {
     Nil,
-    Trinket,
-    Gun,
+    Labubu,
+    Cell_Phone,
+    Figurine,
+    Pencil_Case,
+    Omamori,
+    Talisman,
+    Amulet,
+    Sakazuki,
+    Hachimaki,
+    Briefcase,
+    Hair_Clip,
+    Juzu_Beads,
+    Credit_Card,
+    Stamp_Seal,
+    Odd_Odometer,
+    Odder_Odometer,
+    Oddest_Odometer,
+
+    pub fn name(self: ItemTag) []const u8 {
+        if (self == .nil) {
+            return "";
+        }
+        const tag_name = @tagName(self);
+        const result = comptime blk: {
+            var buf: [tag_name.len]u8 = undefined;
+            for (&buf, tag_name) |*b, c| {
+                b.* = if (c == '_') ' ' else c;
+            }
+            break :blk buf;
+        };
+        return &result;
+    }
 };
 
 pub const Item = struct {
     // universal
-    tag: ItemType = .Nil,
-    in_inventory: bool = false,
-    position: IVec2 = .{ .x = 0, .y = 0 },
+    tag: ItemTag = .Nil,
+    // in_inventory: bool = false,
+    // position: IVec2 = .{ .x = 0, .y = 0 },
 
     //trinkets
-    name: []const u8 = undefined,
 
     pub const DEFAULT: Item = .{};
+
+    pub fn tagged(t: ItemTag) Item {
+        return .{ .tag = t };
+    }
 };
 
-var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
-
-fn inventory_add(index: usize, item: Item) void {
-    inventory[index] = item;
-    inventory[index].in_inventory = true;
-    std.log.info("get equipped with {s}", .{item.name});
-}
-
-fn inventory_destroy(index: usize) void {
-    inventory[index] = Item.DEFAULT;
-}
-
 fn inventory_first_free() ?usize {
-    for (inventory, 0..) |slot, i| {
-        if (!slot.in_inventory) return i;
-    }
-    return null;
-}
-
-pub fn try_add_items(accum_items: []?Item) void {
-    for (accum_items) |ai| {
-        if (ai) |i| {
-            // TODO do item replace UI
-            const slot = inventory_first_free() orelse return;
-            inventory_add(slot, i);
-            map.set_terrain_at(i.position, .Floor);
+    for (inventory, 0..) |item, i| {
+        if (item.tag == .Nil) {
+            return i;
         }
     }
+    return null;
 }
