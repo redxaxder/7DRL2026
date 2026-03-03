@@ -15,6 +15,7 @@ const Dir4 = core.Dir4;
 const Vec2 = core.Vec2;
 const Rect = core.Rect;
 const sector = @import("sector.zig");
+const inventory = @import("inventory.zig");
 
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
@@ -341,22 +342,6 @@ pub const ux = struct {
     }
 };
 
-pub const INVENTORY_SIZE = 10;
-
-pub const ItemType = enum(u8) {
-    Nil,
-    Trinket,
-    Gun,
-};
-
-pub const Item = struct {
-    tag: ItemType = .Nil,
-    in_inventory: bool = false,
-    position: IVec2 = .{ .x = 0, .y = 0 },
-
-    pub const DEFAULT: Item = .{};
-};
-
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
     pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
@@ -386,8 +371,30 @@ pub const globals = struct {
 
 pub const PLAYER_ID: UnitId = 1;
 
-pub fn inventory_add(index: usize) void {
-    globals.inventory[index] = Item.DEFAULT;
+pub const INVENTORY_SIZE = 10;
+
+pub const ItemType = enum(u8) {
+    Nil,
+    Trinket,
+    Gun,
+};
+
+pub const Item = struct {
+    // universal
+    tag: ItemType = .Nil,
+    in_inventory: bool = false,
+    position: IVec2 = .{ .x = 0, .y = 0 },
+
+    //trinkets
+    name: []const u8 = undefined,
+
+    pub const DEFAULT: Item = .{};
+};
+
+pub fn inventory_add(index: usize, item: Item) void {
+    globals.inventory[index] = item;
+    globals.inventory[index].in_inventory = true;
+    std.log.info("get equipped with {}", item.name);
 }
 
 pub fn inventory_destroy(index: usize) void {
@@ -401,10 +408,18 @@ pub fn inventory_first_free() ?usize {
     return null;
 }
 
-fn try_pickup(pos: IVec2) void {
+fn try_pickup(pos: IVec2, rng: std.Random) void {
     if (map.get_terrain_at(pos) != .Trinket) return;
     const slot = inventory_first_free() orelse return;
-    inventory_add(slot);
+
+    // randomly roll new item
+    const name_ix: usize = rng.intRangeAtMost(usize, 0, inventory.NAMES.len);
+    const name: []const u8 = inventory.NAMES[name_ix];
+    const item: Item = .{
+        .tag = .Trinket,
+        .name = name,
+    };
+    inventory_add(slot, item);
     map.set_terrain_at(pos, .Floor);
 }
 
@@ -455,7 +470,8 @@ pub fn init(rng: std.Random) !void {
     }
 }
 
-pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
+// rng is just for item pickup
+pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
     const player = globals.player();
     const pmount = player.mount();
     if (pmount.tag == .Motorcycle) {
@@ -525,7 +541,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 }
             }
             player.move_to(target);
-            try_pickup(target);
+            try_pickup(target, rng);
         }
     }
     return true;
@@ -577,7 +593,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         switch (action) {
             .move => |movedata| {
                 const d, const shift = movedata;
-                player_acted = handle_player_move(d, shift);
+                player_acted = handle_player_move(d, shift, rng);
                 if (player_acted) {
                     globals.attack_chain_target = 0;
                 }
@@ -585,7 +601,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
             .attack => |d| {
                 player_acted = handle_player_attack(d);
                 if (player_acted) {
-                    _ = handle_player_move(null, false);
+                    _ = handle_player_move(null, false, rng);
                     // TODO: motorcycle with speed moves
                 }
             },
