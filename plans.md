@@ -54,6 +54,8 @@ v0.2 core features
   - inventory
     - pick up item
     - replace item (item in inventory slot is destroyed to accomodate new item)
+      - if several items are picked up in the same turn, accumulate them and ask one at a time
+        to replace
   - select weapon
     - indicate selected weapon
   - projectile indicator

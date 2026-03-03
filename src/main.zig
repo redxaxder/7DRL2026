@@ -200,6 +200,7 @@ pub const Unit = struct {
         const to = pos.float();
         const facing = self.position.facing(pos);
         const idist = self.position.max_norm_distance(pos);
+        try_pickup(self.position, pos, facing);
 
         const id = self.get_id();
         sector.remove(id, self);
@@ -349,6 +350,7 @@ pub const globals = struct {
     pub var attack_chain_count: i64 = 0;
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
+    pub var rng: std.Random = undefined;
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];
@@ -407,19 +409,46 @@ pub fn inventory_first_free() ?usize {
     return null;
 }
 
-fn try_pickup(pos: IVec2, rng: std.Random) void {
-    if (map.get_terrain_at(pos) != .Trinket) return;
-    const slot = inventory_first_free() orelse return;
+fn try_pickup(from: IVec2, to: IVec2, dir: Dir4) void {
+    const player = globals.player();
+    const mounted: bool = player.mounted();
+    const speed = from.minus(to).max_norm();
+    var front_iter = globals.player().get_rect().expand(1).slide(dir, speed);
+    var accum_items: [10]?Item = .{null} ** 10;
+    var accum_ix: usize = 0;
+    while (front_iter.next()) |front_rect| {
+        var rect_iter = front_rect.iter();
+        while (rect_iter.next()) |p| {
+            // if on foot, only pick up
+            if (!(mounted or p.eq(player.position.plus(dir.ivec())))) {
+                continue;
+            }
+            if (map.get_terrain_at(p) == .Trinket) {
+                // randomly roll new item
+                const name_ix: usize = globals.rng.intRangeAtMost(usize, 0, inventory.NAMES.len - 1);
+                const name: []const u8 = inventory.NAMES[name_ix];
+                const item: Item = .{
+                    .tag = .Trinket,
+                    .name = name,
+                    .position = p,
+                };
+                accum_items[accum_ix] = item;
+                accum_ix += 1;
+                if (accum_ix >= 10) {
+                    break;
+                }
+            }
+        }
+    }
 
-    // randomly roll new item
-    const name_ix: usize = rng.intRangeAtMost(usize, 0, inventory.NAMES.len);
-    const name: []const u8 = inventory.NAMES[name_ix];
-    const item: Item = .{
-        .tag = .Trinket,
-        .name = name,
-    };
-    inventory_add(slot, item);
-    map.set_terrain_at(pos, .Floor);
+    for (accum_items) |ai| {
+        if (ai) |i| {
+            // TODO do item replace UI
+            const slot = inventory_first_free() orelse return;
+            inventory_add(slot, i);
+            map.set_terrain_at(i.position, .Floor);
+        }
+    }
 }
 
 pub fn spawn(u: Unit) UnitId {
@@ -438,6 +467,7 @@ pub fn unspawn(u: *Unit) void {
 pub fn init(rng: std.Random) !void {
     sector.init();
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
+    globals.rng = rng;
 
     globals.units[PLAYER_ID] = .init_player(IVec2.ZERO);
     sector.add(PLAYER_ID, globals.player());
@@ -470,8 +500,8 @@ pub fn init(rng: std.Random) !void {
     }
 }
 
-// rng is just for item pickup
-pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
+// dir is null when you turn is not an active move, you are maybe just coasting
+pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
     const player = globals.player();
     const pmount = player.mount();
     if (pmount.tag == .Motorcycle) {
@@ -541,7 +571,6 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 }
             }
             player.move_to(target);
-            try_pickup(target, rng);
         }
     }
     return true;
@@ -593,7 +622,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         switch (action) {
             .move => |movedata| {
                 const d, const shift = movedata;
-                player_acted = handle_player_move(d, shift, rng);
+                player_acted = handle_player_move(d, shift);
                 if (player_acted) {
                     globals.attack_chain_target = 0;
                 }
@@ -601,7 +630,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
             .attack => |d| {
                 player_acted = handle_player_attack(d);
                 if (player_acted) {
-                    _ = handle_player_move(null, false, rng);
+                    _ = handle_player_move(null, false);
                     // TODO: motorcycle with speed moves
                 }
             },
