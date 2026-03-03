@@ -281,8 +281,8 @@ pub const IRect = struct {
         const abs_x: i16 = @intCast(@abs(step.x));
         const abs_y: i16 = @intCast(@abs(step.y));
         const edge = IRect{
-            .x = self.x + @max(step.x, 0) * self.w,
-            .y = self.y + @max(step.y, 0) * self.h,
+            .x = self.x + @max(step.x, 0) * (self.w - 1),
+            .y = self.y + @max(step.y, 0) * (self.h - 1),
             .w = abs_x + self.w * abs_y,
             .h = abs_y + self.h * abs_x,
         };

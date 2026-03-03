@@ -551,76 +551,66 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
     }
 }
 
-fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
-    const source_rect: IRect = from.get_rect();
-    const distance: i16 = 20;
-    var source_iter = source_rect.iter();
-    var step_dist: i16 = 100;
-    var wall_hit: bool = false;
-    while (source_iter.next()) |source| {
-        var scan_iter = source.scan(dir, distance);
-        while (scan_iter.next()) |target| {
-            if (map.get_terrain_at(target, &globals.mapdata) == .Wall) {
-                wall_hit = true;
-                const rect_dist: IVec2 = source_rect.point_distance(target);
-                const dist: i16 = switch (dir) {
-                    .Up, .Down => rect_dist.y,
-                    .Right, .Left => rect_dist.x,
-                };
-                step_dist = if (dist < step_dist) dist else step_dist;
+const KaijuLook = struct {
+    distance: i16 = 0,
+    unit: ?UnitId = null,
+    terrain: ?Terrain = null,
+};
+fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
+    var slide_iter = from.get_rect().slide(dir, limit);
+    var result: KaijuLook = .{};
+    while (slide_iter.next()) |edge| {
+        var frontier_iter = edge.iter();
+        while (frontier_iter.next()) |pos| {
+            const terrain = get_terrain_at(pos);
+            if (!terrain.kaiju_passable()) {
+                result.terrain = terrain;
+                return result;
             }
         }
+        var occupant_iter = sector.get_occupants_rect(edge);
+        while (occupant_iter.next()) |uid| {
+            const u = globals.unit(uid);
+            switch (u.tag) {
+                .Kaiju, .Player => {
+                    result.unit = uid;
+                    return result;
+                },
+                .Motorcycle => {
+                    if (uid == globals.player().mounted_on) {
+                        result.unit = uid;
+                        return result;
+                    }
+                },
+                else => {},
+            }
+        }
+        result.distance += 1;
     }
-    if (wall_hit) {
-        return step_dist;
-    }
-    return null;
+    return result;
 }
 
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
-    if (step_distance_to_obstacle(k, dir)) |distance| {
-        std.log.info("kaiju wall distance {} dir {}", .{ distance, dir });
-        //   if there is a wall in the way, and wall > size distance, take full step
-        if (distance > k.size) {
-            k.move(dir, k.size);
-        } else if (distance > 1) {
-            //   if there is a wall in the way, and wall < size distance, take partial step to wall
-            k.move(dir, distance - 1);
-        } else if (distance == 1) {
-            //   if there is a wall in the way, and adjacent to wall, DESTROY
+    const seen = kaiju_look(k, dir, k.size);
+    const attack_range = (k.size + 1) / 2;
+    if (seen.terrain) |_| {
+        if (seen.distance == 0) {
             destroy_wall(k, dir, rng);
+            return;
         }
-    } else {
-        // const width: i16 = if (dir == .Right or dir == .Down) k.get_rect().w else 0;
-        // const distance: i16 = k.position.max_norm_distance(globals.player().position) - width;
-
-        const player = globals.player();
-        const p_rect = if (player.mounted())
-            player.mount().get_rect()
-        else
-            player.get_rect();
-        const krect = k.get_rect();
-        const distance_vec = krect.distance(p_rect);
-
-        // const distance_vec: IVec2 = if (globals.player().mounted()) k.get_rect().distance(globals.player().mount().get_rect()) else k.get_rect().point_distance(globals.player().position);
-        const distance: i16 = switch (dir) {
-            .Left, .Right => distance_vec.x,
-            .Up, .Down => distance_vec.y,
-        };
-        // if there is line of sight to the player and player > size distance, take full step
-        std.log.info("player rect {} kaiju rect {}", .{ globals.player().mount().get_rect(), k.get_rect() });
-        std.log.info("distance to player {} in dir {} mounted {}", .{ distance_vec, dir, globals.player().mounted() });
-        if (distance > k.size) {
-            k.move(dir, k.size);
-        } else if (distance > 1) {
-            k.move(dir, distance - 1);
-        } else if (distance == 1) {
-            smack_player(dir, rng);
+    } else if (seen.unit) |u| {
+        switch (globals.unit(u).tag) {
+            .Player, .Motorcycle => {
+                if (seen.distance <= attack_range) {
+                    smack_player(dir, rng);
+                    return;
+                }
+            },
+            else => {},
         }
-        // if there is line of sight to player and player < size distance, take partial step
-        // if there is not line of sight to player
     }
+    k.move(dir, seen.distance);
 }
 
 pub const MAX_SPEED = 20;

@@ -155,7 +155,7 @@ pub const Terrain = enum(u8) {
     Void,
     _,
 
-    pub fn glyph(self: @This()) u8 {
+    pub fn glyph(self: Terrain) u8 {
         switch (self) {
             .Asphalt => return 0,
             .Floor => return '.',
@@ -167,14 +167,28 @@ pub const Terrain = enum(u8) {
         }
     }
 
-    pub fn passable(self: @This()) bool {
+    pub fn passable(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Door, .Rubble, .Void => false,
+            .Wall, .Rubble, .Void => false,
             else => true,
         };
     }
 
-    pub fn blocks_shot(self: @This()) bool {
+    pub fn halting(self: Terrain) bool {
+        return switch (self) {
+            .Door => true,
+            else => false,
+        };
+    }
+
+    pub fn kaiju_passable(self: Terrain) bool {
+        return switch (self) {
+            .Wall, .Void => false,
+            else => true,
+        };
+    }
+
+    pub fn blocks_shot(self: Terrain) bool {
         return switch (self) {
             .Wall, .Door, .Void => true,
             else => false,
