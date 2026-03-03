@@ -177,19 +177,26 @@ pub const Unit = struct {
             self.render_position = to;
             return;
         };
-        _ = anim.lock_exclusive(animlib.lock_unit_id(id));
+        _ = anim.lock_exclusive(self.lock());
+    }
+
+    pub fn deferred_set(self: *Unit, comptime field: std.meta.FieldEnum(Unit), val: @TypeOf(@field(self.*, @tagName(field)))) ?*animation.Animation {
+        const name = @tagName(field);
+        return globals.animation_queue.add(.{}, animlib.set(@TypeOf(@field(self.*, name))), .{ val, &@field(self, name) }) catch {
+            std.log.err("animation queue full. skipping deferred set for unit {} {}", .{ self.get_id(), self.tag });
+            @field(self, name) = val;
+            return null;
+        };
+    }
+
+    pub fn lock(self: *const Unit) animation.LockData {
+        return animlib.lock_unit_id(self.get_id());
     }
 
     pub fn set_orientation(self: *Unit, dir: Dir4) void {
-        const id = self.get_id();
         self.orientation = dir;
-
-        const anim = globals.animation_queue.add(.{}, animlib.set(Dir4), .{ dir, &self.render_orientation }) catch {
-            std.log.err("animation queue full. skipping animation for unit {} {}", .{ id, self.tag });
-            self.render_orientation = dir;
-            return;
-        };
-        _ = anim.lock_exclusive(animlib.lock_unit_id(id));
+        const anim = self.deferred_set(.render_orientation, dir) orelse return;
+        _ = anim.lock_exclusive(self.lock());
     }
 
     pub fn damage(self: *Unit, amount: i64) void {
