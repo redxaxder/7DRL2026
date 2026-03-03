@@ -203,6 +203,28 @@ pub const Unit = struct {
         const to = pos.float();
         const facing = self.position.facing(pos);
         const idist = self.position.max_norm_distance(pos);
+        var slide = self.get_rect().slide(facing, idist);
+
+        var halt = false;
+        while (slide.next()) |edge| {
+            var positions = edge.iter();
+            while (positions.next()) |p| {
+                if (map.get_terrain_at(p).halting()) {
+                    halt = true;
+                    _ = animate_terrain_to(p, .Floor).chain();
+                }
+            }
+            // kaiju crush motorcycles
+            if (self.tag == .Kaiju) {
+                var occupants = sector.get_occupants_rect(edge);
+                while (occupants.next()) |uid| {
+                    const occupant = globals.unit(uid);
+                    if (occupant.tag == .Motorcycle) {
+                        occupant.hp = 0;
+                    }
+                }
+            }
+        }
         try_pickup(self.position, pos, facing);
 
         const id = self.get_id();
@@ -219,6 +241,21 @@ pub const Unit = struct {
             animlib.linear_slide,
             .{ from, to, &self.render_position },
         );
+
+        var landed = if (self.mounted())
+            self.mount().get_rect().iter()
+        else
+            self.get_rect().iter();
+        while (landed.next()) |p| {
+            if (map.get_terrain_at(p).halting()) {
+                halt = true;
+                _ = animate_terrain_to(p, .Floor).chain();
+            }
+        }
+        if (halt) {
+            self.speed = 0;
+            self.mount().speed = 0;
+        }
     }
     const Field: type = std.meta.FieldEnum(Unit);
 
@@ -617,6 +654,28 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     }
 }
 
+fn set_terrain(pos: IVec2, terrain: Terrain) void {
+    if (map.map_index(pos)) |ix| {
+        if (map.mapdata[ix].is_masked) {
+            _ = animate_terrain_to(pos, terrain);
+            return;
+        }
+    }
+    map.set_terrain_at(pos, terrain);
+}
+
+fn animate_terrain_to(pos: IVec2, terrain: Terrain) *animation.Animation {
+    const prev_terrain = map.get_render_terrain_at(pos);
+    // update the real terrain state
+    map.set_terrain_at(pos, terrain);
+    // hide it with a fake image
+    map.set_render_terrain_at(pos, prev_terrain);
+    return globals.animation_queue.force_add_empty(.{
+        .lock_exclusive = animlib.lock_position(pos),
+        .on_wake = .lambda(map.set_render_terrain_at, .{ pos, terrain }),
+    });
+}
+
 fn resolve_pending(rng: std.Random) void {
     // TODO this could be more efficient
     for (globals.units[1..]) |*u| {
@@ -624,17 +683,7 @@ fn resolve_pending(rng: std.Random) void {
             const terrain: Terrain = if (rng.boolean()) .Debris else .Rubble;
             const pos = u.position;
             unspawn(u);
-            const prev_terrain = map.get_render_terrain_at(pos);
-            // update the real terrain state
-            map.set_terrain_at(pos, terrain);
-            // hide it with a fake image
-            map.set_render_terrain_at(pos, prev_terrain);
-            _ = globals.animation_queue.force_add_empty(
-                .{
-                    .chain = true,
-                    .on_wake = .lambda(map.set_render_terrain_at, .{ pos, terrain }),
-                },
-            );
+            _ = animate_terrain_to(pos, terrain).chain();
 
             var player: *Unit = globals.player();
             const moto: ?*Unit = if (player.mounted()) player.mount() else null;
@@ -694,6 +743,7 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
                     if (viscera) {
                         tp.terrain = .Viscera;
                     }
+
                     map.set_terrain_payload_at(pos, tp);
                     map.set_render_terrain_payload_at(pos, prev);
                 },
@@ -792,7 +842,7 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
         while (boom_iter.next()) |boom_coord| {
             if (map.get_terrain_at(boom_coord) == .Wall) {
                 const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
-                map.set_terrain_at(boom_coord, terrain);
+                _ = animate_terrain_to(boom_coord, terrain).chain();
             }
         }
     }
@@ -823,7 +873,7 @@ fn harm() void {
 
 fn destroy(pos: IVec2, rng: std.Random) void {
     const rubble_type: Terrain = if (rng.boolean()) .Debris else .Rubble;
-    map.set_terrain_at(pos, rubble_type);
+    _ = animate_terrain_to(pos, rubble_type);
 }
 
 fn smack_player(dir: Dir4, rng: std.Random) void {

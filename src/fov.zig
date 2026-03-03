@@ -180,20 +180,12 @@ fn is_blocked(pos: IVec2) bool {
     return map.get_terrain_at(pos).blocks_fov();
 }
 
-fn mark_seen(pos: IVec2) void {
-    var payload = map.get_terrain_payload_at(pos);
-    if (!payload.seen) {
-        payload.seen = true;
-        map.set_terrain_payload_at(pos, payload);
-    }
-}
-
 pub fn refresh_fov(center: IVec2, distance: u8) void {
     // mark the center tile
-    mark_seen(center);
+    map.mark_seen(center);
 
     // scan all four quadrants
     for (0..4) |r| {
-        scan_quadrant(center, @intCast(r), distance, &is_blocked, &mark_seen);
+        scan_quadrant(center, @intCast(r), distance, &is_blocked, &map.mark_seen);
     }
 }

@@ -155,6 +155,7 @@ pub fn mapgen(rng: std.Random) void {
     }
 }
 
+pub const ENABLE_MASKING = true;
 pub const MAP_SIZE = 2500;
 pub const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
 
@@ -216,14 +217,14 @@ pub const Terrain = enum(u5) {
 
     pub fn passable(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Rubble, .Viscera, .Void => false,
+            .Wall, .Rubble, .Void => false,
             else => true,
         };
     }
 
     pub fn halting(self: Terrain) bool {
         return switch (self) {
-            .Door => true,
+            .Door, .Viscera => true,
             else => false,
         };
     }
@@ -260,6 +261,22 @@ pub fn map_index(position: IVec2) ?usize {
     return (@as(usize, @intCast(position.y)) * MAP_SIZE) + @as(usize, @intCast(position.x));
 }
 
+pub fn mark_seen(pos: IVec2) void {
+    var payload = get_terrain_payload_at(pos);
+    if (!payload.seen) {
+        payload.seen = true;
+        set_terrain_payload_at(pos, payload);
+    }
+}
+
+pub fn mark_bloody(pos: IVec2) void {
+    var payload = get_terrain_payload_at(pos);
+    if (!payload.bloody) {
+        payload.bloody = true;
+        set_terrain_payload_at(pos, payload);
+    }
+}
+
 pub fn get_terrain_payload_at(position: IVec2) FullTerrain.Payload {
     const ix = map_index(position) orelse return .{ .terrain = .Void };
     const tile = mapdata[ix];
@@ -285,12 +302,12 @@ pub fn set_terrain_payload_at(position: IVec2, payload: FullTerrain.Payload) voi
         const mask_ix = tile.mask_index();
         const entry = &get_mask(position).sim[mask_ix];
         entry.terrain = payload.terrain;
-        entry.seen = payload.seen;
-        entry.bloody = payload.bloody;
+        entry.seen = entry.seen or payload.seen;
+        entry.bloody = entry.bloody or payload.bloody;
     } else {
         tile.terrain = payload.terrain;
-        tile.seen = payload.seen;
-        tile.bloody = payload.bloody;
+        tile.seen = tile.seen or payload.seen;
+        tile.bloody = tile.bloody or payload.bloody;
     }
 }
 
@@ -301,7 +318,9 @@ pub fn set_render_terrain_payload_at(position: IVec2, payload: FullTerrain.Paylo
     const payload_index: u7 = @bitCast(payload);
     if (tile.is_masked) {
         const mask_ix = tile.mask_index();
-        if (payload_index == mask.sim[mask_ix].mask_index()) {
+        if (payload.terrain == mask.sim[mask_ix].terrain) {
+            mask.sim[mask_ix].seen = mask.sim[mask_ix].seen or payload.seen;
+            mask.sim[mask_ix].bloody = mask.sim[mask_ix].bloody or payload.bloody;
             mask.unmask(position);
         } else {
             const entry = &mask.render[mask_ix];
@@ -309,7 +328,7 @@ pub fn set_render_terrain_payload_at(position: IVec2, payload: FullTerrain.Paylo
             entry.seen = payload.seen;
             entry.bloody = payload.bloody;
         }
-    } else {
+    } else if (ENABLE_MASKING) {
         if (payload_index != tile.mask_index()) {
             const mask_ix = mask.mask(position) catch {
                 std.log.err("mask buffer full. skipping terrain mask at {}", .{position});
@@ -377,7 +396,10 @@ pub const TerrainMask = struct {
         const tile = mapdata[ix];
         if (!tile.is_masked) return;
         const index = tile.mask_index();
-        mapdata[ix] = self.sim[index];
+        var result = self.sim[index];
+        result.seen = result.seen or self.render[index].seen;
+        result.bloody = result.bloody or self.render[index].bloody;
+        mapdata[ix] = result;
         self.free[self.free_count] = index;
         self.free_count += 1;
     }
