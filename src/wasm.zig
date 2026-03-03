@@ -228,7 +228,7 @@ fn render_unit(unit: *const main.Unit) void {
         },
         .Motorcycle => {
             const p0 = unit.render_position;
-            const p1 = p0.plus(unit.orientation.ivec().float());
+            const p1 = p0.plus(unit.render_orientation.ivec().float());
             draw_world_glyph(p0, 'o', .{ .bgcolor = .black });
 
             draw_world_glyph(p1, '%', .{ .bgcolor = .black });

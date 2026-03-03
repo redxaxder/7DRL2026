@@ -27,6 +27,17 @@ pub const animlib = struct {
         target.* = x0.scaled(1 - t).plus(x1.scaled(t));
     }
 
+    pub fn set(comptime T: type) fn (T, *T, animation.Time) animation.Exit!void {
+        return struct {
+            pub fn call(val: T, ptr: *T, time: animation.Time) animation.Exit!void {
+                _ = time;
+                std.log.info("set {}", .{val});
+                ptr.* = val;
+                return error.Exit;
+            }
+        }.call;
+    }
+
     pub const lock_camera = animation.singleton(255);
     pub const lock_player = animation.singleton(254);
     pub fn lock_unit_id(uid: UnitId) animation.LockData {
@@ -66,6 +77,7 @@ pub const Unit = struct {
 
     // Motorcycle
     orientation: Dir4 = .Right,
+    render_orientation: Dir4 = .Right,
     speed: u8 = 0,
     //TODO: model
 
@@ -108,6 +120,7 @@ pub const Unit = struct {
             .position = pos,
             .render_position = pos.float(),
             .orientation = orientation,
+            .render_orientation = orientation,
             .hp = 80,
         };
     }
@@ -162,6 +175,18 @@ pub const Unit = struct {
         ) catch {
             std.log.err("animation queue full. skipping animation for unit {} {}", .{ id, self.tag });
             self.render_position = to;
+            return;
+        };
+        _ = anim.lock_exclusive(animlib.lock_unit_id(id));
+    }
+
+    pub fn set_orientation(self: *Unit, dir: Dir4) void {
+        const id = self.get_id();
+        self.orientation = dir;
+
+        const anim = globals.animation_queue.add(.{}, animlib.set(Dir4), .{ dir, &self.render_orientation }) catch {
+            std.log.err("animation queue full. skipping animation for unit {} {}", .{ id, self.tag });
+            self.render_orientation = dir;
             return;
         };
         _ = anim.lock_exclusive(animlib.lock_unit_id(id));
@@ -379,8 +404,8 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 player.move_to(landed_at);
             }
             pmount.move_to(motomove.midpoint);
+            pmount.set_orientation(crashed.orientation);
             pmount.move_to(crashed.position);
-            pmount.*.orientation = crashed.orientation;
             pmount.*.speed = 0;
             if (motomove.brake) {
                 player.*.move_to(pmount.position);
@@ -388,10 +413,10 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 player.*.mounted_on = 0;
             }
         } else {
-            pmount.*.orientation = motomove.orientation;
             pmount.*.speed = motomove.speed;
             pmount.move_to(motomove.midpoint);
             player.move_to(motomove.midpoint);
+            pmount.set_orientation(motomove.orientation);
             pmount.move_to(motomove.position);
             player.move_to(motomove.position);
         }
