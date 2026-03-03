@@ -138,7 +138,8 @@ pub const Queue = struct {
         options: struct {
             duration: f32 = 0,
             speed: f32 = 1,
-            lock: AnimationLock = .EMPTY,
+            lock_exclusive: LockData = .initEmpty(),
+            lock_shared: LockData = .initEmpty(),
             on_wake: func.Callback = func.nil,
             on_finish: func.Callback = func.nil,
             chain: bool = false,
@@ -146,11 +147,15 @@ pub const Queue = struct {
         f: anytype,
         captures: anytype,
     ) *Animation {
+        const lock: AnimationLock = .{
+            .exclusive = options.lock_exclusive,
+            .shared = options.lock_shared,
+        };
         const got = self.force_push(.{
             .duration = options.duration,
             .speed = options.speed,
             .func = .lambda(f, captures),
-            .lock = options.lock,
+            .lock = lock,
             .on_wake = options.on_wake,
             .on_finish = options.on_finish,
         });

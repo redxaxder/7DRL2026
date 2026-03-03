@@ -58,6 +58,34 @@ pub const animlib = struct {
         const i = uid % 254;
         return animation.singleton(@intCast(i));
     }
+
+    pub fn lock_position(pos: IVec2) animation.LockData {
+        const bx: u4 = @truncate(pos.x);
+        const by: u4 = @truncate(pos.x);
+        const bit = @as(u8, @intCast(bx)) << 4 + @as(u8, @intCast(by));
+        return animation.singleton(@intCast(bit));
+    }
+
+    pub fn lock_position_sweep(pos: IVec2, dir: Dir4, dist: usize) animation.LockData {
+        return lock_rect_sweep(IRect.singleton(pos), dir, dist);
+    }
+
+    pub fn lock_rect(rect: IRect) animation.LockData {
+        var data = animation.LockData.initEmpty();
+        var it = rect.iter();
+        while (it.next()) |pos| {
+            data.setUnion(lock_position(pos));
+        }
+        return data;
+    }
+
+    pub fn lock_rect_sweep(rect: IRect, dir: Dir4, dist: usize) animation.LockData {
+        var data = lock_rect(rect);
+        var slide = rect.slide(dir, dist);
+        while (slide.next()) |edge| {
+            data.setUnion(lock_rect(edge));
+        }
+    }
 };
 
 pub const UnitType = enum {
@@ -179,12 +207,14 @@ pub const Unit = struct {
         self.position = pos;
         sector.add(id, self);
         const dist = to.distance(from);
-        const anim = globals.animation_queue.force_add(
-            .{ .duration = 50 * dist },
+        _ = globals.animation_queue.force_add(
+            .{
+                .duration = 50 * dist,
+                .lock_exclusive = self.lock(),
+            },
             animlib.linear_slide,
             .{ from, to, &self.render_position },
         );
-        _ = anim.lock_exclusive(self.lock());
     }
     const Field: type = std.meta.FieldEnum(Unit);
 
@@ -204,7 +234,6 @@ pub const Unit = struct {
     }
 
     pub fn damage(self: *Unit, amount: i64) void {
-        // TODO: consequences
         self.hp -= amount;
     }
 
@@ -387,7 +416,6 @@ pub fn spawn(u: Unit) UnitId {
 }
 
 pub fn unspawn(u: *Unit) void {
-    // TODO make this work with animations
     const anim = u.deferred_set(.tag, .Nil);
     _ = anim.lock_exclusive(u.lock());
 }
@@ -651,6 +679,8 @@ fn units_cleanup(rng: std.Random) void {
             unspawn(u);
             switch (u.tag) {
                 .Kaiju => {
+                    // const r = u.get_rect().expand(1);
+                    // TODO:
                     return;
                 },
                 .Motorcycle => {
