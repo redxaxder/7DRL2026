@@ -6,3 +6,19 @@
 - dont walk through walls on foot
 + fix masking
 + update fov at end of turn
+
+
+
+- item attributes:
+  - extra radioactive damage
+  - explosion radius
+  - explosion damage
+  - gun damage
+  - gun combo
+  - crit3 bonus
+  - crit4 bonus
+  - crit5 bonus
+  - motorcycle damage
+  - motorcycle armor
+  - top speed
+  - acceleration
