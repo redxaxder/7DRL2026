@@ -78,14 +78,14 @@ pub export fn resize(w: f32, h: f32) void {
     screen_h = h;
 }
 
-fn splatWrapString(x: f32, y: f32, text: []const u8, color: Color, size: f32, width: i16) void {
+fn splat_wrap_string(x: f32, y: f32, text: []const u8, color: Color, size: f32, width: i16) void {
     for (wrapText(text, width), 0..) |lineText, line| {
         const vshift = size * @as(f32, @floatFromInt(line));
-        splatString(x, y + vshift, lineText, color, size);
+        splat_string(x, y + vshift, lineText, color, size);
     }
 }
 
-fn splatString(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
+fn splat_string(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
     var cx = x;
     for (text) |ch| {
         push(.{
@@ -397,7 +397,7 @@ pub fn render_debug(val: anytype) void {
     inline for (fields) |field| {
         const field_val = @field(val, field.name);
         const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
-        splatWrapString(x, y, text, .magenta, size, 10);
+        splat_wrap_string(x, y, text, .magenta, size, 10);
         render_buffer.flush();
         y += size;
     }
