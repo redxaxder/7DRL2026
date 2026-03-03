@@ -394,7 +394,7 @@ pub const Item = struct {
 pub fn inventory_add(index: usize, item: Item) void {
     globals.inventory[index] = item;
     globals.inventory[index].in_inventory = true;
-    std.log.info("get equipped with {}", item.name);
+    std.log.info("get equipped with {s}", .{item.name});
 }
 
 pub fn inventory_destroy(index: usize) void {
