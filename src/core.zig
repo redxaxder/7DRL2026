@@ -273,31 +273,7 @@ pub const IRect = struct {
     }
 
     pub fn point_distance(self: IRect, point: IVec2) IVec2 {
-        const l: i16 = self.x;
-        const t: i16 = self.y;
-        const r: i16 = self.x + self.w - 1;
-        const b: i16 = self.y + self.h - 1;
-
-        var xDist: i16 = undefined;
-        var yDist: i16 = undefined;
-
-        if (point.x > r) {
-            xDist = point.x - r;
-        } else if (point.x < l) {
-            xDist = l - point.x;
-        } else {
-            xDist = 0;
-        }
-
-        if (point.y > b) {
-            yDist = point.y - b;
-        } else if (point.y < t) {
-            yDist = t - point.y;
-        } else {
-            yDist = 0;
-        }
-
-        return .{ .x = xDist, .y = yDist };
+        return self.distance(IRect.singleton(point));
     }
 
     pub const LocationIterator = struct {
