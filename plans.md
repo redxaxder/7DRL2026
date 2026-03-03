@@ -65,9 +65,9 @@ v0.2 core features
 - animation
 - audio
 - enemy behavior
-  - a-star to path around eggs
+  - a-star to path around eggs? (maybe not eggs seem eh)
   - broken obstacles turn into things to dodge
-  - sleep
+  + sleep
 + dismounting/mounting motorcycles
 - weapons
   - motorcycle
@@ -77,7 +77,7 @@ v0.2 core features
   - varying street sizes
     - alleys
   - zones
-    - multiple zones of the same type can abut in a not grid-aligned way
+    + multiple zones of the same type can abut in a not grid-aligned way
     - commercial
     - nest
   - mechanical map features
