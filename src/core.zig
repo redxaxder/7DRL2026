@@ -23,10 +23,8 @@ pub const IVec2 = struct {
     x: i16 = 0,
     y: i16 = 0,
 
-    pub const ZERO: IVec2 = .{
-        .x = 0,
-        .y = 0,
-    };
+    pub const ZERO: IVec2 = .{ .x = 0, .y = 0 };
+    pub const ONE: IVec2 = .{ .x = 1, .y = 1 };
     pub const DEFAULT: IVec2 = .{
         .x = -3200,
         .y = -3200,
@@ -232,6 +230,10 @@ pub const IRect = struct {
     w: i16 = 0,
     h: i16 = 0,
 
+    pub fn ivec(self: IRect) IVec2 {
+        return .{ .x = self.x, .y = self.y };
+    }
+
     pub fn contains(self: IRect, p: IVec2) bool {
         return p.x >= self.x and p.x < self.x + self.w and
             p.y >= self.y and p.y < self.y + self.h;
@@ -249,9 +251,25 @@ pub const IRect = struct {
         return .{ .x = pos.x, .y = pos.y, .w = 1, .h = 1 };
     }
 
+    pub fn from_linear_index(self: IRect, index: usize) IVec2 {
+        const w: usize = @intCast(self.w);
+        const ix: i16 = @intCast(index % w);
+        const iy: i16 = @intCast(index / w);
+        return .{ .x = self.x + ix, .y = self.y + iy };
+    }
+
     pub fn intersects(self: IRect, other: IRect) bool {
         return self.x < other.x + other.w and other.x < self.x + self.w and
             self.y < other.y + other.h and other.y < self.y + self.h;
+    }
+
+    pub fn expand(self: IRect, amount: i16) IRect {
+        return .{
+            .x = self.x - amount,
+            .y = self.y - amount,
+            .w = self.w + 2 * amount,
+            .h = self.h + 2 * amount,
+        };
     }
 
     pub fn displace(self: IRect, displacement: IVec2) IRect {

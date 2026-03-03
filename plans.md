@@ -62,7 +62,7 @@ v0.2 core features
   - motorcycle bonuses
   - crit clocks
   - autoconsumable heal
-- animation
++ animation
 - audio
 - enemy behavior
   - a-star to path around eggs? (maybe not eggs seem eh)

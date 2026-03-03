@@ -19,6 +19,9 @@ const sector = @import("sector.zig");
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
 
+const DANGER_GROWTH = 90;
+const SPAWN_ROLL = 10000;
+
 const ANIMATION_QUEUE_LEN = 128;
 
 pub const animlib = struct {
@@ -335,6 +338,7 @@ pub const globals = struct {
 
     pub var attack_chain_target: ?UnitId = 0;
     pub var attack_chain_count: i64 = 0;
+    pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
 
     pub fn unit(u: UnitId) *Unit {
@@ -540,6 +544,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     // TODO currently we are iterating through all the units
     // to get at kaiju. This is an optimization opportunity
     var player_acted = false;
+    const player_start = globals.player().position;
 
     if (ux.resolve_input(key)) |action| {
         globals.animation_queue.hurry(1.5);
@@ -565,7 +570,18 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
     if (player_acted) {
         resolve_pending(rng);
+        const player_end = globals.player().position;
+        const travel_distance: u64 = @intCast(player_start.max_norm_distance(player_end));
+        // TODO: vary danger growth by location
+        globals.danger += (travel_distance + 1) * DANGER_GROWTH;
+
         tick_kaiju(rng);
+
+        if (roll_new_enemy(rng)) |spawn_rect| {
+            new_kaiju(spawn_rect, rng) catch {
+                std.log.err("failed to spawn enemy at {}", .{spawn_rect});
+            };
+        }
     }
 }
 
@@ -594,17 +610,70 @@ fn resolve_pending(rng: std.Random) void {
     }
 }
 
+fn new_kaiju(target: IRect, rng: std.Random) !void {
+    const size = target.w;
+    const id = globals.free_unit_id() orelse return error.OutOfUnitSlots;
+    var to_clear = target.expand(@divTrunc(size, 2)).iter();
+    while (to_clear.next()) |pos| {
+        destroy(pos, rng);
+    }
+    globals.units[id] = .init_kaiju(target.ivec(), @intCast(size));
+}
+
 fn tick_kaiju(rng: std.Random) void {
     // kaiju behavior is based on proximity
     for (globals.units[1..]) |*u| {
         if (u.tag == .Kaiju) {
             // kaiju sleep if outside of 1 camera radius
             // TODO make more complex?
-            if (u.position.max_norm_distance(globals.player().position) < 64) {
+            const ppos = globals.player().position;
+            if (u.get_rect().point_distance(ppos).max_norm() < 64) {
                 kaiju_logic(u, rng);
             }
         }
     }
+}
+
+fn roll_new_enemy(rng: std.Random) ?IRect {
+    const player = globals.player();
+    const roll = rng.int(u64) % SPAWN_ROLL;
+    if (roll > globals.danger) {
+        return null;
+    }
+    // how far away they can spawn
+    const RADIUS: i16 = 90;
+    // how close they can spawn
+    const MIN_RADIUS: i16 = 50;
+    // how much the candidate spawn zone moves in
+    // the direction of travel
+    const SHIFT: i16 = 60;
+    const rolled_size = @as(i16, @clz(rng.int(u32))) + 3;
+    var arena: IRect = (IRect{
+        .x = player.position.x - RADIUS,
+        .y = player.position.y - RADIUS,
+        .w = 2 * RADIUS + 1 - (rolled_size - 1),
+        .h = 2 * RADIUS + 1 - (rolled_size - 1),
+    });
+    if (player.mounted()) {
+        const mount = player.mount();
+        const v = mount.orientation.ivec().scaled(SHIFT);
+        arena = arena.displace(v);
+    }
+    const w: usize = @intCast(arena.w);
+    const h: usize = @intCast(arena.h);
+    const rolled_pos = arena.from_linear_index(
+        rng.int(usize) % (w * h),
+    );
+    const target_rect = IRect.from(
+        rolled_pos,
+        IVec2.ONE.scaled(rolled_size),
+    );
+    if (target_rect.point_distance(player.position).max_norm() < MIN_RADIUS) {
+        return null;
+    }
+
+    globals.danger -= roll;
+    return target_rect;
 }
 
 // destroys wall
