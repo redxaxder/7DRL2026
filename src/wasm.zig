@@ -363,7 +363,7 @@ pub export fn frame(t: f64) void {
                 continue;
             }
             render_unit(u);
-            debug_draw_rect(u.get_rect(), .yellow);
+            // debug_draw_rect(u.get_rect(), .yellow);
         }
     }
 
