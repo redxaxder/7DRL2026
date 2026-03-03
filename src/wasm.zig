@@ -336,7 +336,10 @@ pub export fn frame(t: f64) void {
                 .y = y,
             };
             const payload = map.get_render_terrain_payload_at(world_pos);
-            const terrain = payload.terrain;
+            const terrain = if (payload.seen)
+                payload.terrain
+            else
+                .Void;
             const color: Color = if (payload.bloody)
                 .red
             else

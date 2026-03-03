@@ -17,10 +17,12 @@ const Vec2 = core.Vec2;
 const Rect = core.Rect;
 const sector = @import("sector.zig");
 const inventory = @import("inventory.zig");
+const fov = @import("fov.zig");
 
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
 
+const FOV_RANGE = 80;
 const DANGER_GROWTH = 90;
 const SPAWN_ROLL = 100000;
 
@@ -485,6 +487,7 @@ pub fn init(rng: std.Random) !void {
         5,
     ));
     map.mapgen(rng);
+    fov.refresh_fov(globals.player().position, FOV_RANGE);
 
     map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.Void);
 
@@ -639,6 +642,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         player_acted = true;
     }
     if (player_acted) {
+        fov.refresh_fov(globals.player().position, FOV_RANGE);
         resolve_pending(rng);
         const player_end = globals.player().position;
         const travel_distance: u64 = @intCast(player_start.max_norm_distance(player_end));

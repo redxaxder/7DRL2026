@@ -210,7 +210,7 @@ pub const Terrain = enum(u5) {
             .Money => return 0x9D,
             .Debris => return ';',
             .Trinket => return 0xF0,
-            else => return '?',
+            else => return '/',
         }
     }
 
@@ -232,6 +232,13 @@ pub const Terrain = enum(u5) {
         return switch (self) {
             .Wall, .Void => false,
             else => true,
+        };
+    }
+
+    pub fn blocks_fov(self: Terrain) bool {
+        return switch (self) {
+            .Void, .Wall, .Door => true,
+            else => false,
         };
     }
 
