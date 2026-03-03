@@ -158,6 +158,7 @@ pub fn mapgen(rng: std.Random) void {
 pub const ENABLE_MASKING = true;
 pub const MAP_SIZE = 2500;
 pub const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
+pub const BOUNDS: core.IRect = .{ .x = 0, .y = 0, .w = MAP_SIZE, .h = MAP_SIZE };
 
 pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.Floor)} ** MAPDATA_LEN;
 

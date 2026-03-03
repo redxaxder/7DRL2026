@@ -796,6 +796,10 @@ fn roll_new_enemy(rng: std.Random) ?IRect {
         return null;
     }
 
+    if (!map.BOUNDS.contains(target_rect)) {
+        return null;
+    }
+
     globals.danger -= roll;
     return target_rect;
 }
