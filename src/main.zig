@@ -554,19 +554,16 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
 
 fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
     const source_rect: IRect = from.get_rect();
-    const distance: i16 = switch (dir) {
-        .Right, .Down => 2 * source_rect.w - 1,
-        .Up, .Left => source_rect.w,
-    };
+    const distance: i16 = 20;
     var source_iter = source_rect.iter();
-    var step_dist: i16 = 100;
+    var step_dist: i16 = 100; // stupidly big number
     var wall_hit: bool = false;
     while (source_iter.next()) |source| {
         var scan_iter = source.scan(dir, distance);
         while (scan_iter.next()) |target| {
             if (map.get_terrain_at(target, &globals.mapdata) == .Wall) {
                 wall_hit = true;
-                const rect_dist: IVec2 = source_rect.point_distance(target);
+                const rect_dist: IVec2 = source.point_distance(target);
                 const dist: i16 = switch (dir) {
                     .Up, .Down => rect_dist.y,
                     .Right, .Left => rect_dist.x,
@@ -584,6 +581,7 @@ fn step_distance_to_obstacle(from: *const Unit, dir: Dir4) ?i16 {
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
     if (step_distance_to_obstacle(k, dir)) |distance| {
+        std.log.info("kaiju wall distance {} dir {}", .{ distance, dir });
         //   if there is a wall in the way, and wall > size distance, take full step
         if (distance > k.size) {
             k.move(dir, k.size);
