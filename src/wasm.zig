@@ -273,12 +273,12 @@ pub fn debug_draw_rect(rect: IRect, color: Color) void {
 
         const glyph: u8 =
             if (is_top and is_left) 0xDA // ┌
-        else if (is_top and is_right) 0xBF // ┐
-        else if (is_bottom and is_left) 0xC0 // └
-        else if (is_bottom and is_right) 0xD9 // ┘
-        else if (is_top or is_bottom) 0xC4 // ─
-        else if (is_left or is_right) 0xB3 // │
-        else continue;
+            else if (is_top and is_right) 0xBF // ┐
+            else if (is_bottom and is_left) 0xC0 // └
+            else if (is_bottom and is_right) 0xD9 // ┘
+            else if (is_top or is_bottom) 0xC4 // ─
+            else if (is_left or is_right) 0xB3 // │
+            else continue;
 
         draw_world_glyph(pos.float(), glyph, .{ .color = color });
     }
@@ -351,25 +351,29 @@ pub export fn frame(t: f64) void {
                 continue;
             }
             render_unit(u);
+            debug_draw_rect(u.get_rect(), .yellow);
         }
     }
 
     // Draw movement preview reticles
     const reticles: ?[5]IVec2 = main.get_reticle_positions();
-    if (reticles) |highlight| {
-        const mount = main.globals.player().mount();
-        const p0 = mount.position;
-        const p1 = mount.position.plus(mount.orientation.ivec());
-        for (highlight) |pos| {
-            if (pos.eq(p0)) {
-                continue;
+    const reticle_blink = @mod(t, 1000) < 500;
+    if (reticle_blink) {
+        if (reticles) |highlight| {
+            const mount = main.globals.player().mount();
+            const p0 = mount.position;
+            const p1 = mount.position.plus(mount.orientation.ivec());
+            for (highlight) |pos| {
+                if (pos.eq(p0)) {
+                    continue;
+                }
+                if (pos.eq(p1)) {
+                    continue;
+                }
+                draw_world_glyph(pos.float(), 0x09, .{
+                    .color = .blue,
+                });
             }
-            if (pos.eq(p1)) {
-                continue;
-            }
-            draw_world_glyph(pos.float(), 0x09, .{
-                .color = .blue,
-            });
         }
     }
 

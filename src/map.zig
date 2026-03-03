@@ -157,7 +157,7 @@ pub const Terrain = enum(u8) {
 
     pub fn glyph(self: @This()) u8 {
         switch (self) {
-            .Asphalt => return 0xB0,
+            .Asphalt => return 0,
             .Floor => return '.',
             .Wall => return '#',
             .Door => return '+',
