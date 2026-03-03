@@ -24,7 +24,7 @@ v0.1 technically a game
 + 1 weapon (gun)
 + can attack
 + can be attacked
-- enemy behavior:
++ enemy behavior:
   + chase player
     + kaiju can take partial steps
     + pathfinding
@@ -36,12 +36,12 @@ v0.1 technically a game
     + destroy interveining walls
   + break obstacles
     + kaiju must spend a turn getting to the wall before tearing it down
-  - spawning
+  + spawning
   + kaiju obstruct each other's movement
 + no vision restrictions
 v0.2 core features
 - motorcycle destruction
-  - if the motorcycle is destroyed when the player is on it, it becomes rubble and the player
+  - if the motorcycle is destroyed when the player is on it, it becomes debris/rubble and the player
     is flung at speed
 - vision (fov, reveal terrain)
 - progression

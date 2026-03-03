@@ -20,9 +20,9 @@ const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
 
 const DANGER_GROWTH = 90;
-const SPAWN_ROLL = 10000;
+const SPAWN_ROLL = 100000;
 
-const ANIMATION_QUEUE_LEN = 128;
+const ANIMATION_QUEUE_LEN = 256;
 
 pub const animlib = struct {
     pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
@@ -34,7 +34,6 @@ pub const animlib = struct {
         return struct {
             pub fn call(val: T, ptr: *T, time: animation.Time) animation.Exit!void {
                 _ = time;
-                std.log.info("set {}", .{val});
                 ptr.* = val;
                 return error.Exit;
             }
@@ -73,6 +72,7 @@ pub const Unit = struct {
 
     // Healthy
     hp: i64 = 0,
+    alive: bool = false,
 
     // Kaiju
     size: u8 = 1,
@@ -100,6 +100,7 @@ pub const Unit = struct {
             .tag = .Player,
             .position = pos,
             .hp = 50,
+            .alive = true,
             .render_position = pos.float(),
         };
     }
@@ -124,6 +125,7 @@ pub const Unit = struct {
             .orientation = orientation,
             .render_orientation = orientation,
             .hp = 80,
+            .alive = true,
         };
     }
 
@@ -133,6 +135,7 @@ pub const Unit = struct {
             .position = pos,
             .render_position = pos.float(),
             .hp = std.math.pow(i64, 10, @intCast(size - 1)),
+            .alive = true,
             .size = size,
         };
     }
@@ -252,8 +255,7 @@ pub const Unit = struct {
 };
 
 pub fn get_terrain_at(position: IVec2) Terrain {
-    const ix = map.map_index(position) orelse return .Void;
-    return globals.mapdata[ix];
+    return map.get_terrain_at(position, globals.mapdata[0..]);
 }
 
 pub const ux = struct {
@@ -333,7 +335,7 @@ pub const Item = struct {
 
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
-    pub var mapdata: [map.MAPDATA_LEN]Terrain = .{.Floor} ** map.MAPDATA_LEN;
+    pub var mapdata: [map.MAPDATA_LEN]map.FullTerrain = .{map.FullTerrain.from(.Floor)} ** map.MAPDATA_LEN;
     pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
 
     pub var attack_chain_target: ?UnitId = 0;
@@ -582,6 +584,8 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 std.log.err("failed to spawn enemy at {}", .{spawn_rect});
             };
         }
+
+        units_cleanup(rng);
     }
 }
 
@@ -623,12 +627,37 @@ fn new_kaiju(target: IRect, rng: std.Random) !void {
 fn tick_kaiju(rng: std.Random) void {
     // kaiju behavior is based on proximity
     for (globals.units[1..]) |*u| {
-        if (u.tag == .Kaiju) {
+        if (u.tag == .Kaiju and u.alive) {
             // kaiju sleep if outside of 1 camera radius
             // TODO make more complex?
             const ppos = globals.player().position;
             if (u.get_rect().point_distance(ppos).max_norm() < 64) {
                 kaiju_logic(u, rng);
+            }
+        }
+    }
+}
+
+fn units_cleanup(rng: std.Random) void {
+    _ = rng;
+    for (globals.units[1..]) |*u| {
+        if (u.hp <= 0 and u.alive) {
+            u.alive = false;
+            const anim = u.deferred_set(.tag, UnitType.Nil) orelse continue;
+            _ = anim.lock_exclusive(u.lock());
+            switch (u.tag) {
+                .Kaiju => {
+                    return;
+                },
+                .Motorcycle => {
+                    return;
+                },
+                .Player => {
+                    return;
+                },
+                else => {
+                    return;
+                },
             }
         }
     }
