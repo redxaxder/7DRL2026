@@ -18,6 +18,7 @@ const Rect = core.Rect;
 const sector = @import("sector.zig");
 const inventory = @import("inventory.zig");
 const fov = @import("fov.zig");
+const Item = inventory.Item;
 
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
@@ -285,6 +286,41 @@ pub const Unit = struct {
     }
 };
 
+pub fn try_pickup(from: IVec2, to: IVec2, dir: Dir4) void {
+    const player = globals.player();
+    const mounted: bool = player.mounted();
+    const speed = from.minus(to).max_norm();
+    var front_iter = player.get_rect().expand(1).slide(dir, speed);
+    var accum_items: [10]?Item = .{null} ** 10;
+    var accum_ix: usize = 0;
+    while (front_iter.next()) |front_rect| {
+        var rect_iter = front_rect.iter();
+        while (rect_iter.next()) |p| {
+            // if on foot, only pick up
+            if (!(mounted or p.eq(player.position.plus(dir.ivec())))) {
+                continue;
+            }
+            if (map.get_terrain_at(p) == .Trinket) {
+                // randomly roll new item
+                const name_ix: usize = globals.rng.intRangeAtMost(usize, 0, inventory.NAMES.len - 1);
+                const name: []const u8 = inventory.NAMES[name_ix];
+                const item: Item = .{
+                    .tag = .Trinket,
+                    .name = name,
+                    .position = p,
+                };
+                accum_items[accum_ix] = item;
+                accum_ix += 1;
+                if (accum_ix >= 10) {
+                    break;
+                }
+            }
+        }
+    }
+
+    inventory.try_add_items(&accum_items);
+}
+
 pub const ux = struct {
     pub const InputMode = enum { Movement, Attack };
     pub const Action = union(enum) {
@@ -346,7 +382,6 @@ pub const ux = struct {
 
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
-    pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
 
     pub var attack_chain_target: ?UnitId = 0;
     pub var attack_chain_count: i64 = 0;
@@ -373,85 +408,6 @@ pub const globals = struct {
 };
 
 pub const PLAYER_ID: UnitId = 1;
-
-pub const INVENTORY_SIZE = 10;
-
-pub const ItemType = enum(u8) {
-    Nil,
-    Trinket,
-    Gun,
-};
-
-pub const Item = struct {
-    // universal
-    tag: ItemType = .Nil,
-    in_inventory: bool = false,
-    position: IVec2 = .{ .x = 0, .y = 0 },
-
-    //trinkets
-    name: []const u8 = undefined,
-
-    pub const DEFAULT: Item = .{};
-};
-
-pub fn inventory_add(index: usize, item: Item) void {
-    globals.inventory[index] = item;
-    globals.inventory[index].in_inventory = true;
-    std.log.info("get equipped with {s}", .{item.name});
-}
-
-pub fn inventory_destroy(index: usize) void {
-    globals.inventory[index] = Item.DEFAULT;
-}
-
-pub fn inventory_first_free() ?usize {
-    for (globals.inventory, 0..) |slot, i| {
-        if (!slot.in_inventory) return i;
-    }
-    return null;
-}
-
-fn try_pickup(from: IVec2, to: IVec2, dir: Dir4) void {
-    const player = globals.player();
-    const mounted: bool = player.mounted();
-    const speed = from.minus(to).max_norm();
-    var front_iter = globals.player().get_rect().expand(1).slide(dir, speed);
-    var accum_items: [10]?Item = .{null} ** 10;
-    var accum_ix: usize = 0;
-    while (front_iter.next()) |front_rect| {
-        var rect_iter = front_rect.iter();
-        while (rect_iter.next()) |p| {
-            // if on foot, only pick up
-            if (!(mounted or p.eq(player.position.plus(dir.ivec())))) {
-                continue;
-            }
-            if (map.get_terrain_at(p) == .Trinket) {
-                // randomly roll new item
-                const name_ix: usize = globals.rng.intRangeAtMost(usize, 0, inventory.NAMES.len - 1);
-                const name: []const u8 = inventory.NAMES[name_ix];
-                const item: Item = .{
-                    .tag = .Trinket,
-                    .name = name,
-                    .position = p,
-                };
-                accum_items[accum_ix] = item;
-                accum_ix += 1;
-                if (accum_ix >= 10) {
-                    break;
-                }
-            }
-        }
-    }
-
-    for (accum_items) |ai| {
-        if (ai) |i| {
-            // TODO do item replace UI
-            const slot = inventory_first_free() orelse return;
-            inventory_add(slot, i);
-            map.set_terrain_at(i.position, .Floor);
-        }
-    }
-}
 
 pub fn spawn(u: Unit) UnitId {
     const id = globals.free_unit_id() orelse @panic("how did we run out so fast");
