@@ -342,10 +342,10 @@ pub const IRect = struct {
 };
 
 pub const Rect = struct {
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
+    x: f32 = 0,
+    y: f32 = 0,
+    w: f32 = 0,
+    h: f32 = 0,
 
     pub fn pos(self: Rect) Vec2 {
         return Vec2{ .x = self.x, .y = self.y };
@@ -356,5 +356,13 @@ pub const Rect = struct {
     }
     pub fn ymax(self: Rect) f32 {
         return self.y + self.h;
+    }
+    pub fn irect(self: Rect) IRect {
+        return .{
+            .x = @as(i16, @intFromFloat(self.x)),
+            .y = @as(i16, @intFromFloat(self.y)),
+            .w = @as(i16, @intFromFloat(self.w)),
+            .h = @as(i16, @intFromFloat(self.h)),
+        };
     }
 };

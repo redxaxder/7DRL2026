@@ -11,6 +11,7 @@ const map = @import("map.zig");
 const Vec2 = @import("core.zig").Vec2;
 const IVec2 = @import("core.zig").IVec2;
 const Rect = @import("core.zig").Rect;
+const IRect = @import("core.zig").IRect;
 
 pub const std_options: std.Options = .{
     .logFn = log,
@@ -48,6 +49,9 @@ var camera: Vec2 = .ZERO;
 var camera_target: Vec2 = .ZERO;
 const camera_w: f32 = 64;
 const camera_h: f32 = 64;
+var screen_offset: Vec2 = .ZERO;
+var screen_w: f32 = 0;
+var screen_h: f32 = 0;
 
 pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     const allocator = std.heap.wasm_allocator;
@@ -66,14 +70,14 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
 
 pub export fn resize(w: f32, h: f32) void {
     // TODO
-    _ = w;
-    _ = h;
+    screen_w = w;
+    screen_h = h;
 }
 
 fn splatString(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
     var cx = x;
     for (text) |ch| {
-        render_buffer.push(.{
+        push(.{
             .pos = .{ .x = cx, .y = y },
             .size = .{ .x = size, .y = size },
             .src_idx = ch,
@@ -92,6 +96,27 @@ const DrawOptions = struct {
     bgcolor: ?Color = null,
     pixel_shift: bool = false,
 };
+
+pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
+    const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
+
+    if (options.bgcolor) |bgcolor| {
+        push(.{
+            .pos = screen_pos,
+            .size = dim,
+            .color = bgcolor,
+            .src_idx = 0xDB,
+        });
+    }
+
+    push(.{
+        .pos = screen_pos,
+        .size = dim,
+        .color = options.color,
+        .src_idx = src_idx,
+    });
+}
+
 pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     const rcamera = Vec2{
         .x = std.math.round(camera.x * 8) / 8,
@@ -101,7 +126,7 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
     const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
 
     if (options.bgcolor) |bgcolor| {
-        render_buffer.push(.{
+        push(.{
             .pos = screen_pos,
             .size = dim,
             .color = bgcolor,
@@ -114,7 +139,7 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
     else
         0;
 
-    render_buffer.push(.{
+    push(.{
         .pos = screen_pos.plus(Vec2.ONE.scaled(offset)),
         .size = dim,
         .color = options.color,
@@ -265,9 +290,7 @@ pub fn bounding_box(positions: []const Vec2) Rect {
     };
 }
 
-const IRect = @import("core.zig").IRect;
-
-pub fn debug_draw_rect(rect: IRect, color: Color) void {
+pub fn draw_rect(rect: IRect, draw_options: DrawOptions) void {
     var it = rect.iter();
     while (it.next()) |pos| {
         const is_top = pos.y == rect.y;
@@ -275,16 +298,34 @@ pub fn debug_draw_rect(rect: IRect, color: Color) void {
         const is_left = pos.x == rect.x;
         const is_right = pos.x == rect.x + rect.w - 1;
 
-        const glyph: u8 =
-            if (is_top and is_left) 0xDA // ┌
+        const glyph: u8 = if (is_top and is_left) 0xDA // ┌
             else if (is_top and is_right) 0xBF // ┐
             else if (is_bottom and is_left) 0xC0 // └
             else if (is_bottom and is_right) 0xD9 // ┘
             else if (is_top or is_bottom) 0xC4 // ─
             else if (is_left or is_right) 0xB3 // │
             else continue;
+        draw_glyph(pos.float(), glyph, draw_options);
+    }
+    render_buffer.flush();
+}
 
-        draw_world_glyph(pos.float(), glyph, .{ .color = color });
+pub fn draw_world_rect(rect: IRect, draw_options: DrawOptions) void {
+    var it = rect.iter();
+    while (it.next()) |pos| {
+        const is_top = pos.y == rect.y;
+        const is_bottom = pos.y == rect.y + rect.h - 1;
+        const is_left = pos.x == rect.x;
+        const is_right = pos.x == rect.x + rect.w - 1;
+
+        const glyph: u8 = if (is_top and is_left) 0xDA // ┌
+            else if (is_top and is_right) 0xBF // ┐
+            else if (is_bottom and is_left) 0xC0 // └
+            else if (is_bottom and is_right) 0xD9 // ┘
+            else if (is_top or is_bottom) 0xC4 // ─
+            else if (is_left or is_right) 0xB3 // │
+            else continue;
+        draw_world_glyph(pos.float(), glyph, draw_options);
     }
     render_buffer.flush();
 }
@@ -305,23 +346,45 @@ pub fn render_debug(val: anytype) void {
     }
 }
 
-pub export fn frame(t: f64) void {
-    const rawdt = t - prev_time;
-    const dt: f32 = @floatCast(@min(20, rawdt));
-    prev_time = t;
-
-    audio.tick(dt);
-    main.globals.animation_queue.tick(dt);
-    keyboard.globals.update();
-    mouse.globals.update();
-
-    RenderBuffer.clear();
-
-    if (keyboard.firstJustPressed()) |key| {
-        main.logic_tick(key, prng.random());
-        update_camera();
+// todo - figure this out properly
+const Layout = struct {
+    inventory: Rect = .{},
+    log: Rect = .{},
+    gamefield: Rect = .{},
+    status_bar: Rect = .{},
+    pub fn init() Layout {
+        var l: Layout = .{};
+        const status_h: f32 = 30;
+        const margin: f32 = 32;
+        l.inventory = .{ .x = 0, .y = 0, .w = 1000, .h = 100 };
+        l.log = .{ .x = l.inventory.w + margin, .y = 0, .w = 100, .h = screen_h };
+        l.gamefield = .{ .x = 0, .y = l.inventory.h + margin, .w = screen_w - l.log.w, .h = screen_h - l.inventory.h - status_h };
+        l.status_bar = .{ .x = 0, .y = l.inventory.h + l.gamefield.h + margin, .w = screen_w - l.log.w, .h = status_h };
+        return l;
     }
+};
 
+fn draw_inventory() void {
+    const layout = Layout.init();
+    screen_offset = layout.inventory.pos();
+    defer screen_offset = .ZERO;
+    const num_boxen: usize = 1;
+    const iLayout = layout.inventory.irect();
+    const box_size: IRect = .{ .x = @divExact(iLayout.w, @as(i16, @intCast(num_boxen))), .y = iLayout.h };
+    const margin: i16 = 5;
+
+    for (0..num_boxen) |box| {
+        const b: i16 = @intCast(box);
+        draw_rect(.{ .x = iLayout.x + box_size.x * b + margin * b, .y = iLayout.y, .w = box_size.x, .h = box_size.y }, .{ .color = Color.white, .size = 1 });
+    }
+    // draw_world_rect(.{ .x = 5, .y = 5, .w = 5, .h = 5 }, .{ .color = Color.yellow });
+    render_buffer.flush();
+}
+
+fn draw_gamefield(t: f64) void {
+    const layout = Layout.init();
+    screen_offset = layout.gamefield.pos();
+    defer screen_offset = .ZERO;
     // Draw the terrain
     const imin = IVec2{
         .x = @intFromFloat(@floor(camera.x)),
@@ -390,10 +453,38 @@ pub export fn frame(t: f64) void {
     }
 
     render_buffer.flush();
+}
 
-    render_debug(.{
-        .mode = main.ux.input_mode,
-    });
+pub export fn frame(t: f64) void {
+    const rawdt = t - prev_time;
+    const dt: f32 = @floatCast(@min(20, rawdt));
+    prev_time = t;
 
-    render_buffer.flush();
+    audio.tick(dt);
+    main.globals.animation_queue.tick(dt);
+    keyboard.globals.update();
+    mouse.globals.update();
+
+    RenderBuffer.clear();
+
+    if (keyboard.firstJustPressed()) |key| {
+        main.logic_tick(key, prng.random());
+        update_camera();
+    }
+
+    draw_gamefield(t);
+
+    draw_inventory();
+
+    // render_debug(.{
+    //     .mode = main.ux.input_mode,
+    // });
+
+    // render_buffer.flush();
+}
+
+fn push(sprite: Sprite) void {
+    var s: Sprite = sprite;
+    s.pos = s.pos.plus(screen_offset);
+    render_buffer.push(s);
 }
