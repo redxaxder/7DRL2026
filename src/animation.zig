@@ -114,6 +114,52 @@ pub const Queue = struct {
         }
     }
 
+    fn evict_first(self: *Queue) void {
+        if (self.buffer.index(0)) |first| {
+            if (first.state != .Finished) {
+                first.state = .Active;
+                const remaining = first.duration - first.elapsed;
+                first.tick(if (first.speed > 0) remaining / first.speed else remaining);
+            }
+            first.deinit(self.allocator);
+        }
+        _ = self.buffer.pop_front();
+    }
+
+    pub fn force_push(self: *Queue, anim: Animation) *Animation {
+        if (self.buffer.full()) {
+            self.evict_first();
+        }
+        return self.buffer.try_push_back(anim) catch unreachable;
+    }
+
+    pub fn force_add(
+        self: *Queue,
+        options: struct {
+            duration: f32 = 0,
+            speed: f32 = 1,
+            lock: AnimationLock = .EMPTY,
+            on_wake: func.Callback = func.nil,
+            on_finish: func.Callback = func.nil,
+            chain: bool = false,
+        },
+        f: anytype,
+        captures: anytype,
+    ) *Animation {
+        const got = self.force_push(.{
+            .duration = options.duration,
+            .speed = options.speed,
+            .func = .lambda(f, captures),
+            .lock = options.lock,
+            .on_wake = options.on_wake,
+            .on_finish = options.on_finish,
+        });
+        if (options.chain) {
+            return got.chain();
+        }
+        return got;
+    }
+
     pub fn hurry(self: *Queue, mul: f32) void {
         for (0..self.buffer.len()) |ix| {
             if (self.buffer.index(@intCast(ix))) |animation| {

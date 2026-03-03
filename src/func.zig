@@ -1,11 +1,11 @@
 const std = @import("std");
 
-pub const CTX_WORDS = 2;
+pub const CTX_WORDS = 4;
 pub const Ctx = union {
     ptr: *anyopaque,
     data: [CTX_WORDS]u64,
 
-    const ZERO: Ctx = .{ .data = .{ 0, 0 } };
+    const ZERO: Ctx = .{ .data = .{ 0, 0, 0, 0 } };
 };
 
 pub fn noop_dealloc(_: Ctx, _: std.mem.Allocator) void {}
@@ -140,7 +140,7 @@ pub fn Closure(f: anytype, m: comptime_int) type {
                 if (@alignOf(Captures) > @alignOf(Ctx))
                     @compileError("align too large for inline closure");
             }
-            var ctx = Ctx{ .data = .{ 0, 0 } };
+            var ctx = Ctx{ .data = .{ 0, 0, 0, 0 } };
             const ptr: *Captures = @ptrCast(&ctx.data);
             ptr.* = captures;
             return .{

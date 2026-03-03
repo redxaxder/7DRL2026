@@ -199,17 +199,15 @@ fn update_camera() void {
     if (right > target.x + camera_w) target.x = right - camera_w;
     if (bottom > target.y + camera_h) target.y = bottom - camera_h;
 
-    animate_camera_to(target) catch {
-        // camera = target;
-    };
+    animate_camera_to(target);
 }
-fn animate_camera_to(target: Vec2) !void {
+fn animate_camera_to(target: Vec2) void {
     const dist = camera.distance(target);
-    _ = (try main.globals.animation_queue.add(
+    _ = main.globals.animation_queue.force_add(
         .{ .duration = dist * 20 },
         main.animlib.linear_slide,
         .{ camera_target, target, &camera },
-    )).lock_exclusive(main.animlib.lock_camera);
+    ).lock_exclusive(main.animlib.lock_camera);
 
     // _ = (try main.globals.animation_queue.push(.EMPTY))
     //     .chain()

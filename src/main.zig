@@ -179,26 +179,18 @@ pub const Unit = struct {
         self.position = pos;
         sector.add(id, self);
         const dist = to.distance(from);
-        const anim: *animation.Animation = globals.animation_queue.add(
+        const anim = globals.animation_queue.force_add(
             .{ .duration = 50 * dist },
             animlib.linear_slide,
             .{ from, to, &self.render_position },
-        ) catch {
-            std.log.err("animation queue full. skipping animation for unit {} {}", .{ id, self.tag });
-            self.render_position = to;
-            return;
-        };
+        );
         _ = anim.lock_exclusive(self.lock());
     }
     const Field: type = std.meta.FieldEnum(Unit);
 
-    pub fn deferred_set(self: *Unit, comptime field: Field, val: @TypeOf(@field(self.*, @tagName(field)))) ?*animation.Animation {
+    pub fn deferred_set(self: *Unit, comptime field: Field, val: @TypeOf(@field(self.*, @tagName(field)))) *animation.Animation {
         const name = @tagName(field);
-        return globals.animation_queue.add(.{}, animlib.defer_set(@TypeOf(@field(self.*, name))), .{ val, &@field(self, name) }) catch {
-            std.log.err("animation queue full. skipping deferred set for unit {} {}", .{ self.get_id(), self.tag });
-            @field(self, name) = val;
-            return null;
-        };
+        return globals.animation_queue.force_add(.{}, animlib.defer_set(@TypeOf(@field(self.*, name))), .{ val, &@field(self, name) });
     }
 
     pub fn lock(self: *const Unit) animation.LockData {
@@ -207,7 +199,7 @@ pub const Unit = struct {
 
     pub fn set_orientation(self: *Unit, dir: Dir4) void {
         self.orientation = dir;
-        const anim = self.deferred_set(.render_orientation, dir) orelse return;
+        const anim = self.deferred_set(.render_orientation, dir);
         _ = anim.lock_exclusive(self.lock());
     }
 
@@ -396,7 +388,7 @@ pub fn spawn(u: Unit) UnitId {
 
 pub fn unspawn(u: *Unit) void {
     // TODO make this work with animations
-    const anim = u.deferred_set(.tag, .Nil) orelse return;
+    const anim = u.deferred_set(.tag, .Nil);
     _ = anim.lock_exclusive(u.lock());
 }
 
@@ -605,14 +597,11 @@ fn resolve_pending(rng: std.Random) void {
             map.set_terrain_at(pos, terrain);
             // hide it with a fake image
             map.set_render_terrain_at(pos, prev_terrain);
-            _ = globals.animation_queue.add(
+            _ = globals.animation_queue.force_add(
                 .{ .chain = true },
                 animlib.defer_set_render_terrain,
                 .{ pos, terrain },
-            ) catch {
-                std.log.err("animation queue full. skipping terrain animation", .{});
-                map.set_render_terrain_at(pos, terrain);
-            };
+            );
 
             var player: *Unit = globals.player();
             const moto: ?*Unit = if (player.mounted()) player.mount() else null;
