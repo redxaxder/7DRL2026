@@ -234,6 +234,18 @@ fn render_unit(unit: *const main.Unit) void {
             draw_world_glyph(p1, '%', .{ .bgcolor = .black });
         },
         .Kaiju => render_kaiju(unit),
+        .PendingRubble => {
+            draw_world_glyph(unit.render_position, '&', .{
+                .color = .yellow,
+                .bgcolor = .black,
+            });
+        },
+        .PendingDebris => {
+            draw_world_glyph(unit.render_position, ';', .{
+                .color = .yellow,
+                .bgcolor = .black,
+            });
+        },
         else => {
             return;
         },

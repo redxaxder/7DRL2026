@@ -48,6 +48,7 @@ pub const UnitType = enum {
     Motorcycle,
     PendingExplosion,
     PendingRubble,
+    PendingDebris,
 };
 
 pub const UnitId = u16;
@@ -85,6 +86,14 @@ pub const Unit = struct {
             .tag = .Player,
             .position = pos,
             .hp = 50,
+            .render_position = pos.float(),
+        };
+    }
+
+    pub fn init_pending_destruction(pos: IVec2, is_debris: bool) Unit {
+        return .{
+            .tag = if (is_debris) .PendingDebris else .PendingRubble,
+            .position = pos,
             .render_position = pos.float(),
         };
     }
@@ -172,7 +181,7 @@ pub const Unit = struct {
             .Nil => {
                 return .{};
             },
-            .Player, .PendingRubble => {
+            .Player, .PendingRubble, .PendingDebris => {
                 return core.IRect.singleton(self.position);
             },
             .Kaiju, .PendingExplosion => {
@@ -496,14 +505,30 @@ fn tick_kaiju(rng: std.Random) void {
 // destroys wall
 // TODO, fling rubble
 fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
-    _ = dir;
-    const from: IVec2 = demolitionist.position.minus(.{ .x = 1, .y = 1 });
-    const size: IVec2 = .{ .x = demolitionist.size + 2, .y = demolitionist.size + 2 };
-    var destructable: IRect.LocationIterator = IRect.from(from, size).iter();
-    while (destructable.next()) |boom_coord| {
-        if (map.get_terrain_at(boom_coord, &globals.mapdata) == .Wall) {
-            const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
-            map.set_terrain_at(boom_coord, terrain, &globals.mapdata);
+    var wall_iter = demolitionist.get_rect().slide(dir, 1);
+
+    // destroy the wall
+    while (wall_iter.next()) |wall| {
+        var boom_iter = wall.iter();
+        while (boom_iter.next()) |boom_coord| {
+            if (map.get_terrain_at(boom_coord, &globals.mapdata) == .Wall) {
+                const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
+                map.set_terrain_at(boom_coord, terrain, &globals.mapdata);
+            }
+        }
+    }
+
+    // spawn pending rubble
+    const fling_distance: i16 = 10;
+    const rubble_spawn_chance: f32 = 0.05;
+    var rubble_iter = demolitionist.get_rect().slide(dir, fling_distance);
+    while (rubble_iter.next()) |front| {
+        var front_iter = front.iter();
+        while (front_iter.next()) |pos| {
+            if (rng.float(f32) < rubble_spawn_chance) {
+                const pr: Unit = Unit.init_pending_destruction(pos, rng.boolean());
+                _ = spawn(pr);
+            }
         }
     }
 }

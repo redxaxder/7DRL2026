@@ -53,6 +53,7 @@ v0.2 core features
     - replace item (item in inventory slot is destroyed to accomodate new item)
   - select weapon
     - indicate selected weapon
+  - projectile indicator
 - trinkets
   - damage bonuses
   - motorcycle bonuses
