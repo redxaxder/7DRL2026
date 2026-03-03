@@ -6,6 +6,7 @@ const func = @import("func.zig");
 const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
 const main = @import("main.zig");
+const map = @import("map.zig");
 
 const Vec2 = @import("core.zig").Vec2;
 const IVec2 = @import("core.zig").IVec2;
@@ -337,7 +338,7 @@ pub export fn frame(t: f64) void {
                 .x = x,
                 .y = y,
             };
-            const terrain = main.get_terrain_at(world_pos);
+            const terrain = map.get_render_terrain_at(world_pos);
             draw_world_glyph(world_pos.float(), terrain.glyph(), .{});
         }
     }

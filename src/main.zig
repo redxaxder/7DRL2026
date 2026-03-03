@@ -30,7 +30,13 @@ pub const animlib = struct {
         target.* = x0.scaled(1 - t).plus(x1.scaled(t));
     }
 
-    pub fn set(comptime T: type) fn (T, *T, animation.Time) animation.Exit!void {
+    pub fn defer_set_render_terrain(pos: IVec2, terrain: Terrain, time: animation.Time) animation.Exit!void {
+        _ = time;
+        map.set_render_terrain_at(pos, terrain);
+        return error.Exit;
+    }
+
+    pub fn defer_set(comptime T: type) fn (T, *T, animation.Time) animation.Exit!void {
         return struct {
             pub fn call(val: T, ptr: *T, time: animation.Time) animation.Exit!void {
                 _ = time;
@@ -184,10 +190,11 @@ pub const Unit = struct {
         };
         _ = anim.lock_exclusive(self.lock());
     }
+    const Field: type = std.meta.FieldEnum(Unit);
 
-    pub fn deferred_set(self: *Unit, comptime field: std.meta.FieldEnum(Unit), val: @TypeOf(@field(self.*, @tagName(field)))) ?*animation.Animation {
+    pub fn deferred_set(self: *Unit, comptime field: Field, val: @TypeOf(@field(self.*, @tagName(field)))) ?*animation.Animation {
         const name = @tagName(field);
-        return globals.animation_queue.add(.{}, animlib.set(@TypeOf(@field(self.*, name))), .{ val, &@field(self, name) }) catch {
+        return globals.animation_queue.add(.{}, animlib.defer_set(@TypeOf(@field(self.*, name))), .{ val, &@field(self, name) }) catch {
             std.log.err("animation queue full. skipping deferred set for unit {} {}", .{ self.get_id(), self.tag });
             @field(self, name) = val;
             return null;
@@ -253,10 +260,6 @@ pub const Unit = struct {
         self.move_to(target);
     }
 };
-
-pub fn get_terrain_at(position: IVec2) Terrain {
-    return map.get_terrain_at(position, globals.mapdata[0..]);
-}
 
 pub const ux = struct {
     pub const InputMode = enum { Movement, Attack };
@@ -335,7 +338,6 @@ pub const Item = struct {
 
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
-    pub var mapdata: [map.MAPDATA_LEN]map.FullTerrain = .{map.FullTerrain.from(.Floor)} ** map.MAPDATA_LEN;
     pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
 
     pub var attack_chain_target: ?UnitId = 0;
@@ -379,10 +381,10 @@ pub fn inventory_first_free() ?usize {
 }
 
 fn try_pickup(pos: IVec2) void {
-    if (get_terrain_at(pos) != .Trinket) return;
+    if (map.get_terrain_at(pos) != .Trinket) return;
     const slot = inventory_first_free() orelse return;
     inventory_add(slot);
-    map.set_terrain_at(pos, .Floor, &globals.mapdata);
+    map.set_terrain_at(pos, .Floor);
 }
 
 pub fn spawn(u: Unit) UnitId {
@@ -417,7 +419,9 @@ pub fn init(rng: std.Random) !void {
         IVec2{ .x = 9, .y = 28 },
         5,
     ));
-    map.mapgen(rng, &globals.mapdata);
+    map.mapgen(rng);
+
+    map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.Void);
 
     const a = IRect{
         .x = 0,
@@ -512,7 +516,7 @@ const SHOT_RANGE: usize = 64;
 pub fn handle_player_attack(dir: Dir4) bool {
     var scan = globals.player().position.scan(dir, SHOT_RANGE);
     while (scan.next()) |aim| {
-        const terrain = get_terrain_at(aim);
+        const terrain = map.get_terrain_at(aim);
         if (terrain.blocks_shot()) {
             // you shoot at the terrain
             // consequences TBD
@@ -596,7 +600,19 @@ fn resolve_pending(rng: std.Random) void {
             const terrain: Terrain = if (rng.boolean()) .Debris else .Rubble;
             const pos = u.position;
             unspawn(u);
-            map.set_terrain_at(pos, terrain, &globals.mapdata);
+            const prev_terrain = map.get_render_terrain_at(pos);
+            // update the real terrain state
+            map.set_terrain_at(pos, terrain);
+            // hide it with a fake image
+            map.set_render_terrain_at(pos, prev_terrain);
+            _ = globals.animation_queue.add(
+                .{ .chain = true },
+                animlib.defer_set_render_terrain,
+                .{ pos, terrain },
+            ) catch {
+                std.log.err("animation queue full. skipping terrain animation", .{});
+                map.set_render_terrain_at(pos, terrain);
+            };
 
             var player: *Unit = globals.player();
             const moto: ?*Unit = if (player.mounted()) player.mount() else null;
@@ -643,8 +659,7 @@ fn units_cleanup(rng: std.Random) void {
     for (globals.units[1..]) |*u| {
         if (u.hp <= 0 and u.alive) {
             u.alive = false;
-            const anim = u.deferred_set(.tag, UnitType.Nil) orelse continue;
-            _ = anim.lock_exclusive(u.lock());
+            unspawn(u);
             switch (u.tag) {
                 .Kaiju => {
                     return;
@@ -714,9 +729,9 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     while (wall_iter.next()) |wall| {
         var boom_iter = wall.iter();
         while (boom_iter.next()) |boom_coord| {
-            if (map.get_terrain_at(boom_coord, &globals.mapdata) == .Wall) {
+            if (map.get_terrain_at(boom_coord) == .Wall) {
                 const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
-                map.set_terrain_at(boom_coord, terrain, &globals.mapdata);
+                map.set_terrain_at(boom_coord, terrain);
             }
         }
     }
@@ -747,7 +762,7 @@ fn harm() void {
 
 fn destroy(pos: IVec2, rng: std.Random) void {
     const rubble_type: Terrain = if (rng.boolean()) .Debris else .Rubble;
-    map.set_terrain_at(pos, rubble_type, &globals.mapdata);
+    map.set_terrain_at(pos, rubble_type);
 }
 
 fn smack_player(dir: Dir4, rng: std.Random) void {
@@ -765,7 +780,7 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
         while (fling_iter.next()) |fling_slice| {
             var iter = fling_slice.iter();
             while (iter.next()) |pos| {
-                if (map.get_terrain_at(pos, &globals.mapdata) == .Wall) {
+                if (map.get_terrain_at(pos) == .Wall) {
                     destroy(pos, rng);
                 }
             }
@@ -790,7 +805,7 @@ fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
     while (slide_iter.next()) |edge| {
         var frontier_iter = edge.iter();
         while (frontier_iter.next()) |pos| {
-            const terrain = get_terrain_at(pos);
+            const terrain = map.get_terrain_at(pos);
             if (!terrain.kaiju_passable()) {
                 result.terrain = terrain;
                 return result;
@@ -821,7 +836,7 @@ fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
     const seen = kaiju_look(k, dir, k.size);
-    const attack_range = (k.size + 1) / 2;
+    const attack_range = (k.size + 1) / 3;
     if (seen.terrain) |_| {
         if (seen.distance == 0) {
             destroy_wall(k, dir, rng);
@@ -858,7 +873,7 @@ pub const MotoResult = struct {
 };
 
 pub fn player_passable(pos: IVec2) bool {
-    const t = get_terrain_at(pos);
+    const t = map.get_terrain_at(pos);
     if (!t.passable()) {
         return false;
     }
@@ -867,9 +882,9 @@ pub fn player_passable(pos: IVec2) bool {
 }
 
 pub fn moto_passable(pos: IVec2, orientation: Dir4) bool {
-    const t = get_terrain_at(pos);
+    const t = map.get_terrain_at(pos);
     const p2 = pos.plus(orientation.ivec());
-    const t2 = get_terrain_at(p2);
+    const t2 = map.get_terrain_at(p2);
     return t.passable() and t2.passable();
 }
 

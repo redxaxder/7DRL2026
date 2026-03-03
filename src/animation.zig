@@ -52,6 +52,7 @@ pub const Queue = struct {
             lock: AnimationLock = .EMPTY,
             on_wake: func.Callback = func.nil,
             on_finish: func.Callback = func.nil,
+            chain: bool = false,
         },
         f: anytype,
         captures: anytype,
@@ -60,7 +61,7 @@ pub const Queue = struct {
         errdefer options.on_finish.deinit(self.allocator);
         const closure: Fn = try .closure(self.allocator, f, captures);
         errdefer closure.deinit(self.allocator);
-        return try self.push(.{
+        const got = try self.push(.{
             .duration = options.duration,
             .speed = options.speed,
             .func = closure,
@@ -68,6 +69,10 @@ pub const Queue = struct {
             .on_wake = options.on_wake,
             .on_finish = options.on_finish,
         });
+        if (options.chain) {
+            return got.chain();
+        }
+        return got;
     }
 
     pub fn sync(self: *Queue) !void {

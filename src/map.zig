@@ -49,7 +49,7 @@ fn is_door(pos: IVec2, street_size: i16, block_size: IVec2, doors: DirFlags) boo
     return false;
 }
 
-fn mapgen_city_block(zone_size: IVec2, zone: IVec2, block_size: IVec2, block: IVec2, block_offset: IVec2, street_size: i16, rng: std.Random, map: []FullTerrain) void {
+fn mapgen_city_block(zone_size: IVec2, zone: IVec2, block_size: IVec2, block: IVec2, block_offset: IVec2, street_size: i16, rng: std.Random) void {
     const doors: DirFlags = @bitCast(rng.int(u4));
     for (0..@as(usize, @intCast(block_size.x))) |xx| {
         for (0..@as(usize, @intCast(block_size.y))) |yy| {
@@ -75,24 +75,24 @@ fn mapgen_city_block(zone_size: IVec2, zone: IVec2, block_size: IVec2, block: IV
             if (is_door(local_pos, street_size, block_size, doors)) {
                 terrain = .Door;
             }
-            set_terrain_at(world_pos, terrain, map);
+            set_terrain_at(world_pos, terrain);
         }
     }
 }
 
-fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: i16, rng: std.Random, block_offset: IVec2, map: []FullTerrain) void {
+fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: i16, rng: std.Random, block_offset: IVec2) void {
     // iterate over blocks
     for (0..@as(usize, @intCast(@divFloor(zone_size.x, block_size.x)))) |bx| {
         for (0..@as(usize, @intCast(@divFloor(zone_size.y, block_size.y)))) |by| {
             const block_x: i16 = @as(i16, @intCast(bx));
             const block_y: i16 = @as(i16, @intCast(by));
             // the body has been split into its own function so we can mess with different zone stuff later
-            mapgen_city_block(zone, zone_size, block_size, .{ .x = block_x, .y = block_y }, block_offset, street_size, rng, map);
+            mapgen_city_block(zone, zone_size, block_size, .{ .x = block_x, .y = block_y }, block_offset, street_size, rng);
         }
     }
 }
 
-pub fn mapgen(rng: std.Random, map: []FullTerrain) void {
+pub fn mapgen(rng: std.Random) void {
     // basic mapgen strategy:
     // the map is chunked into zones, each zone is chunked into blocks, each block is made up of tiles
     const num_zones_x: i16 = rng.intRangeAtMost(i16, 3, 8);
@@ -111,7 +111,7 @@ pub fn mapgen(rng: std.Random, map: []FullTerrain) void {
             const street_size: i16 = rng.intRangeAtMost(i16, 1, 5);
             const zone: IVec2 = .{ .x = @as(i16, @intCast(zx)), .y = @as(i16, @intCast(zy)) };
             const block_offset: IVec2 = .{ .x = block_offset_x, .y = block_offset_y };
-            mapgen_blocks(zone, zone_size, block_size, street_size, rng, block_offset, map);
+            mapgen_blocks(zone, zone_size, block_size, street_size, rng, block_offset);
             block_offset_y += @rem(zone_size.y, block_size.y);
         }
         block_offset_x += @rem(zone_size.x, block_size_x);
@@ -126,12 +126,12 @@ pub fn mapgen(rng: std.Random, map: []FullTerrain) void {
                     .Rubble => {
                         const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
                         const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng) catch continue;
+                        rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng) catch continue;
                     },
                     .Debris => {
                         const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
                         const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        rubblum(map, .{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng) catch continue;
+                        rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng) catch continue;
                     },
                     else => {
                         unreachable;
@@ -146,9 +146,9 @@ pub fn mapgen(rng: std.Random, map: []FullTerrain) void {
         for (0..MAP_SIZE - 1) |y| {
             const pos: IVec2 = .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) };
             if (rng.float(f32) < trinket_factor) {
-                const existing = get_terrain_at(pos, map);
+                const existing = get_terrain_at(pos);
                 if (existing.passable()) {
-                    set_terrain_at(pos, .Trinket, map);
+                    set_terrain_at(pos, .Trinket);
                 }
             }
         }
@@ -158,14 +158,31 @@ pub fn mapgen(rng: std.Random, map: []FullTerrain) void {
 pub const MAP_SIZE = 2500;
 pub const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
 
+pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.Floor)} ** MAPDATA_LEN;
+
 pub const FullTerrain = packed struct(u8) {
+    terrain: Terrain,
     seen: bool = false,
     bloody: bool = false,
-    tbd_flag: bool = false,
-    terrain: Terrain,
+    is_masked: bool = false,
+
+    const Payload = packed struct(u7) {
+        seen: bool = false,
+        bloody: bool = false,
+        terrain: Terrain,
+    };
 
     pub fn from(t: Terrain) FullTerrain {
         return .{ .terrain = t };
+    }
+
+    pub fn mask_index(self: FullTerrain) u7 {
+        return @bitCast(Payload{ .seen = self.seen, .bloody = self.bloody, .terrain = self.terrain });
+    }
+
+    pub fn from_mask_index(index: u7) FullTerrain {
+        const payload: Payload = @bitCast(index);
+        return .{ .seen = payload.seen, .bloody = payload.bloody, .is_masked = true, .terrain = payload.terrain };
     }
 };
 
@@ -232,17 +249,97 @@ pub fn map_index(position: IVec2) ?usize {
     return (@as(usize, @intCast(position.y)) * MAP_SIZE) + @as(usize, @intCast(position.x));
 }
 
-pub fn set_terrain_at(position: IVec2, terrain: Terrain, map: []FullTerrain) void {
+pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
     const ix = map_index(position) orelse return;
-    map[ix].terrain = terrain;
+    const tile = &mapdata[ix];
+    if (tile.is_masked) {
+        terrain_mask.sim[tile.mask_index()].terrain = terrain;
+    } else {
+        tile.terrain = terrain;
+    }
 }
 
-pub fn get_terrain_at(position: IVec2, map: []FullTerrain) Terrain {
+pub fn set_render_terrain_at(position: IVec2, terrain: Terrain) void {
+    const ix = map_index(position) orelse return;
+    const tile = &mapdata[ix];
+    if (tile.is_masked) {
+        if (terrain == terrain_mask.sim[tile.mask_index()].terrain) {
+            terrain_mask.unmask(position);
+        } else {
+            terrain_mask.render[tile.mask_index()].terrain = terrain;
+        }
+    } else {
+        if (terrain != tile.terrain) {
+            const mask_ix = terrain_mask.mask(position) catch {
+                std.log.err("mask buffer full. skipping terrain mask at {}", .{position});
+                return;
+            };
+            terrain_mask.render[mask_ix].terrain = terrain;
+        }
+    }
+}
+
+pub fn get_terrain_at(position: IVec2) Terrain {
     const ix = map_index(position) orelse return .Void;
-    return map[ix].terrain;
+    const tile = mapdata[ix];
+    if (tile.is_masked) {
+        return terrain_mask.sim[tile.mask_index()].terrain;
+    }
+    return tile.terrain;
 }
 
-fn rubblum(map: []FullTerrain, radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) !void {
+pub fn get_render_terrain_at(position: IVec2) Terrain {
+    const ix = map_index(position) orelse return .Void;
+    const tile = mapdata[ix];
+    if (tile.is_masked) {
+        return terrain_mask.render[tile.mask_index()].terrain;
+    }
+    return tile.terrain;
+}
+
+pub const TerrainMask = struct {
+    sim: [128]FullTerrain = .{FullTerrain.from(.Void)} ** 128,
+    render: [128]FullTerrain = .{FullTerrain.from(.Void)} ** 128,
+    free: [128]u7 = init_free_list(),
+    free_count: u8 = 128,
+
+    fn init_free_list() [128]u7 {
+        var list: [128]u7 = undefined;
+        for (0..128) |i| {
+            list[i] = @intCast(i);
+        }
+        return list;
+    }
+
+    // This marks a piece of mapdata indicating that
+    // the main array is no longer the source of truth for it.
+    // it's replaced with an index into the array here.
+    pub fn mask(self: *TerrainMask, pos: IVec2) !u7 {
+        const ix = map_index(pos) orelse return error.OutOfBounds;
+        if (self.free_count == 0) return error.MaskBufferFull;
+
+        self.free_count -= 1;
+        const index = self.free[self.free_count];
+        self.sim[index] = mapdata[ix];
+        self.render[index] = mapdata[ix];
+        mapdata[ix] = FullTerrain.from_mask_index(index);
+        return index;
+    }
+
+    pub fn unmask(self: *TerrainMask, pos: IVec2) void {
+        const ix = map_index(pos) orelse return;
+        const tile = mapdata[ix];
+        if (!tile.is_masked) return;
+        const index = tile.mask_index();
+        mapdata[ix] = self.sim[index];
+        self.free[self.free_count] = index;
+        self.free_count += 1;
+    }
+};
+
+pub var terrain_mask: TerrainMask = .{};
+
+fn rubblum(radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) !void {
     var buffer: [2 << 16]u8 = undefined;
     var fba: std.heap.FixedBufferAllocator = .init(&buffer);
     const allocator = fba.allocator();
@@ -258,7 +355,7 @@ fn rubblum(map: []FullTerrain, radius: IVec2, at: IVec2, terrain: Terrain, densi
         const x: i16 = @divTrunc(ix, bound) + at.x - max_radius * 2;
         const y: i16 = @mod(ix, bound) + at.y - max_radius * 2;
         if (crater_template[ixu] and rng.float(f32) < density) {
-            set_terrain_at(.{ .x = x, .y = y }, terrain, map);
+            set_terrain_at(.{ .x = x, .y = y }, terrain);
         }
     }
 }
