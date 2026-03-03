@@ -53,7 +53,6 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     const allocator = std.heap.wasm_allocator;
     resize(screenW, screenH);
 
-    // TODO: init rng with current time
     prng = std.Random.DefaultPrng.init(@bitCast(js.time()));
 
     render_buffer = RenderBuffer.init(allocator, @intCast(buffer_size)) catch return -1;

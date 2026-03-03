@@ -61,13 +61,13 @@ pub const animlib = struct {
     }
 
     pub fn lock_position(pos: IVec2) animation.LockData {
-        const bx: u4 = @truncate(pos.x);
-        const by: u4 = @truncate(pos.x);
-        const bit = @as(u8, @intCast(bx)) << 4 + @as(u8, @intCast(by));
+        const bx: u4 = @truncate(@as(u16, @bitCast(pos.x)));
+        const by: u4 = @truncate(@as(u16, @bitCast(pos.y)));
+        const bit = (@as(u8, @intCast(bx)) << 4) + @as(u8, @intCast(by));
         return animation.singleton(@intCast(bit));
     }
 
-    pub fn lock_position_sweep(pos: IVec2, dir: Dir4, dist: usize) animation.LockData {
+    pub fn lock_position_sweep(pos: IVec2, dir: Dir4, dist: i16) animation.LockData {
         return lock_rect_sweep(IRect.singleton(pos), dir, dist);
     }
 
@@ -80,12 +80,13 @@ pub const animlib = struct {
         return data;
     }
 
-    pub fn lock_rect_sweep(rect: IRect, dir: Dir4, dist: usize) animation.LockData {
+    pub fn lock_rect_sweep(rect: IRect, dir: Dir4, dist: i16) animation.LockData {
         var data = lock_rect(rect);
         var slide = rect.slide(dir, dist);
         while (slide.next()) |edge| {
             data.setUnion(lock_rect(edge));
         }
+        return data;
     }
 };
 
@@ -202,6 +203,8 @@ pub const Unit = struct {
     pub fn move_to(self: *Unit, pos: IVec2) void {
         const from = self.position.float();
         const to = pos.float();
+        const facing = self.position.facing(pos);
+        const idist = self.position.max_norm_distance(pos);
 
         const id = self.get_id();
         sector.remove(id, self);
@@ -212,6 +215,7 @@ pub const Unit = struct {
             .{
                 .duration = 50 * dist,
                 .lock_exclusive = self.lock(),
+                .lock_shared = animlib.lock_rect_sweep(self.get_rect(), facing, idist),
             },
             animlib.linear_slide,
             .{ from, to, &self.render_position },
@@ -432,7 +436,8 @@ pub fn spawn(u: Unit) UnitId {
 
 pub fn unspawn(u: *Unit) void {
     const anim = u.deferred_set(.tag, .Nil);
-    _ = anim.lock_exclusive(u.lock());
+    _ = anim.lock_exclusive(u.lock())
+        .lock_exclusive(animlib.lock_rect(u.get_rect()));
 }
 
 pub fn init(rng: std.Random) !void {
@@ -687,6 +692,33 @@ fn tick_kaiju(rng: std.Random) void {
     }
 }
 
+fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
+    var prng = std.Random.DefaultPrng.init(seed);
+    const rng = prng.random();
+    var it = rect.iter();
+    while (it.next()) |pos| {
+        if (rng.boolean()) {
+            switch (mode) {
+                .initial => {
+                    // make the real terrain bloody,
+                    // but hide this in the displayed terrain
+                    var tp = map.get_terrain_payload_at(pos);
+                    const prev = tp;
+                    tp.bloody = true;
+                    map.set_terrain_payload_at(pos, tp);
+                    map.set_render_terrain_payload_at(pos, prev);
+                },
+                .followup => {
+                    // make the displayed terrain bloody
+                    var tp = map.get_render_terrain_payload_at(pos);
+                    tp.bloody = true;
+                    map.set_render_terrain_payload_at(pos, tp);
+                },
+            }
+        }
+    }
+}
+
 fn units_cleanup(rng: std.Random) void {
     _ = rng;
     for (globals.units[1..]) |*u| {
@@ -695,7 +727,9 @@ fn units_cleanup(rng: std.Random) void {
             unspawn(u);
             switch (u.tag) {
                 .Kaiju => {
-                    // const r = u.get_rect().expand(1);
+                    // const splatter_zone = u.get_rect().expand(1);
+                    // globals.animation_queue.force_add(.{}, splatter, captures: anytype)
+
                     // TODO:
                     return;
                 },

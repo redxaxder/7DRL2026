@@ -166,7 +166,7 @@ pub const FullTerrain = packed struct(u8) {
     bloody: bool = false,
     is_masked: bool = false,
 
-    const Payload = packed struct(u7) {
+    pub const Payload = packed struct(u7) {
         seen: bool = false,
         bloody: bool = false,
         terrain: Terrain,
@@ -249,53 +249,87 @@ pub fn map_index(position: IVec2) ?usize {
     return (@as(usize, @intCast(position.y)) * MAP_SIZE) + @as(usize, @intCast(position.x));
 }
 
-pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
+pub fn get_terrain_payload_at(position: IVec2) FullTerrain.Payload {
+    const ix = map_index(position) orelse return .{ .terrain = .Void };
+    const tile = mapdata[ix];
+    if (tile.is_masked) {
+        return @bitCast(get_mask(position).sim[tile.mask_index()].mask_index());
+    }
+    return @bitCast(tile.mask_index());
+}
+
+pub fn get_render_terrain_payload_at(position: IVec2) FullTerrain.Payload {
+    const ix = map_index(position) orelse return .{ .terrain = .Void };
+    const tile = mapdata[ix];
+    if (tile.is_masked) {
+        return @bitCast(get_mask(position).render[tile.mask_index()].mask_index());
+    }
+    return @bitCast(tile.mask_index());
+}
+
+pub fn set_terrain_payload_at(position: IVec2, payload: FullTerrain.Payload) void {
     const ix = map_index(position) orelse return;
     const tile = &mapdata[ix];
     if (tile.is_masked) {
-        get_mask(position).sim[tile.mask_index()].terrain = terrain;
+        const mask_ix = tile.mask_index();
+        const entry = &get_mask(position).sim[mask_ix];
+        entry.terrain = payload.terrain;
+        entry.seen = payload.seen;
+        entry.bloody = payload.bloody;
     } else {
-        tile.terrain = terrain;
+        tile.terrain = payload.terrain;
+        tile.seen = payload.seen;
+        tile.bloody = payload.bloody;
     }
 }
 
-pub fn set_render_terrain_at(position: IVec2, terrain: Terrain) void {
+pub fn set_render_terrain_payload_at(position: IVec2, payload: FullTerrain.Payload) void {
     const ix = map_index(position) orelse return;
     const tile = &mapdata[ix];
     const mask = get_mask(position);
+    const payload_index: u7 = @bitCast(payload);
     if (tile.is_masked) {
-        if (terrain == mask.sim[tile.mask_index()].terrain) {
+        const mask_ix = tile.mask_index();
+        if (payload_index == mask.sim[mask_ix].mask_index()) {
             mask.unmask(position);
         } else {
-            mask.render[tile.mask_index()].terrain = terrain;
+            const entry = &mask.render[mask_ix];
+            entry.terrain = payload.terrain;
+            entry.seen = payload.seen;
+            entry.bloody = payload.bloody;
         }
     } else {
-        if (terrain != tile.terrain) {
+        if (payload_index != tile.mask_index()) {
             const mask_ix = mask.mask(position) catch {
                 std.log.err("mask buffer full. skipping terrain mask at {}", .{position});
                 return;
             };
-            mask.render[mask_ix].terrain = terrain;
+            const entry = &mask.render[mask_ix];
+            entry.terrain = payload.terrain;
+            entry.seen = payload.seen;
+            entry.bloody = payload.bloody;
         }
     }
 }
 
+pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
+    var payload = get_terrain_payload_at(position);
+    payload.terrain = terrain;
+    set_terrain_payload_at(position, payload);
+}
+
+pub fn set_render_terrain_at(position: IVec2, terrain: Terrain) void {
+    var payload = get_render_terrain_payload_at(position);
+    payload.terrain = terrain;
+    set_render_terrain_payload_at(position, payload);
+}
+
 pub fn get_terrain_at(position: IVec2) Terrain {
-    const ix = map_index(position) orelse return .Void;
-    const tile = mapdata[ix];
-    if (tile.is_masked) {
-        return get_mask(position).sim[tile.mask_index()].terrain;
-    }
-    return tile.terrain;
+    return get_terrain_payload_at(position).terrain;
 }
 
 pub fn get_render_terrain_at(position: IVec2) Terrain {
-    const ix = map_index(position) orelse return .Void;
-    const tile = mapdata[ix];
-    if (tile.is_masked) {
-        return get_mask(position).render[tile.mask_index()].terrain;
-    }
-    return tile.terrain;
+    return get_render_terrain_payload_at(position).terrain;
 }
 
 pub const TerrainMask = struct {

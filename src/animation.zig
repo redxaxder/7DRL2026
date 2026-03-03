@@ -133,17 +133,25 @@ pub const Queue = struct {
         return self.buffer.try_push_back(anim) catch unreachable;
     }
 
+    pub fn force_add_empty(self: *Queue, options: ForceAddOptions) *Animation {
+        return self.force_add(options, struct {
+            fn f(_: Time) Exit!void {}
+        }.f, .{});
+    }
+
+    pub const ForceAddOptions = struct {
+        duration: f32 = 0,
+        speed: f32 = 1,
+        lock_exclusive: LockData = .initEmpty(),
+        lock_shared: LockData = .initEmpty(),
+        on_wake: func.Callback = func.nil,
+        on_finish: func.Callback = func.nil,
+        chain: bool = false,
+    };
+
     pub fn force_add(
         self: *Queue,
-        options: struct {
-            duration: f32 = 0,
-            speed: f32 = 1,
-            lock_exclusive: LockData = .initEmpty(),
-            lock_shared: LockData = .initEmpty(),
-            on_wake: func.Callback = func.nil,
-            on_finish: func.Callback = func.nil,
-            chain: bool = false,
-        },
+        options: ForceAddOptions,
         f: anytype,
         captures: anytype,
     ) *Animation {
