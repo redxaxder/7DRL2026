@@ -335,8 +335,13 @@ pub export fn frame(t: f64) void {
                 .x = x,
                 .y = y,
             };
-            const terrain = map.get_render_terrain_at(world_pos);
-            draw_world_glyph(world_pos.float(), terrain.glyph(), .{});
+            const payload = map.get_render_terrain_payload_at(world_pos);
+            const terrain = payload.terrain;
+            const color: Color = if (payload.bloody)
+                .red
+            else
+                .white;
+            draw_world_glyph(world_pos.float(), terrain.glyph(), .{ .color = color });
         }
     }
     // The render buffer assumes that all images in the same batch

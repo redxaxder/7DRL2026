@@ -16,6 +16,10 @@ pub fn eval_hermite(
     return (2 * x3 - 3 * x2 + 1) * p.h00 + (x3 - 2 * x2 + x) * p.h10 + (-2 * x3 + 3 * x2) * p.h01 + (x3 - x2) * p.h11;
 }
 
+pub fn noop(_: Time) Exit!void {
+    return error.Exit;
+}
+
 pub const Exit = error{Exit};
 pub const Queue = struct {
     buffer: ringbuffer.RingBuffer(Animation),
@@ -46,14 +50,7 @@ pub const Queue = struct {
 
     pub fn add(
         self: *Queue,
-        options: struct {
-            duration: f32 = 0,
-            speed: f32 = 1,
-            lock: AnimationLock = .EMPTY,
-            on_wake: func.Callback = func.nil,
-            on_finish: func.Callback = func.nil,
-            chain: bool = false,
-        },
+        options: Options,
         f: anytype,
         captures: anytype,
     ) !*Animation {
@@ -61,11 +58,16 @@ pub const Queue = struct {
         errdefer options.on_finish.deinit(self.allocator);
         const closure: Fn = try .closure(self.allocator, f, captures);
         errdefer closure.deinit(self.allocator);
+
+        const lock: AnimationLock = .{
+            .exclusive = options.lock_exclusive,
+            .shared = options.lock_shared,
+        };
         const got = try self.push(.{
             .duration = options.duration,
             .speed = options.speed,
             .func = closure,
-            .lock = options.lock,
+            .lock = lock,
             .on_wake = options.on_wake,
             .on_finish = options.on_finish,
         });
@@ -77,6 +79,11 @@ pub const Queue = struct {
 
     pub fn sync(self: *Queue) !void {
         const a = try self.push(Animation.EMPTY);
+        _ = a.lock_exclusive(.initFull());
+    }
+
+    pub fn force_sync(self: *Queue) void {
+        const a = self.force_push(Animation.EMPTY);
         _ = a.lock_exclusive(.initFull());
     }
 
@@ -133,13 +140,11 @@ pub const Queue = struct {
         return self.buffer.try_push_back(anim) catch unreachable;
     }
 
-    pub fn force_add_empty(self: *Queue, options: ForceAddOptions) *Animation {
-        return self.force_add(options, struct {
-            fn f(_: Time) Exit!void {}
-        }.f, .{});
+    pub fn force_add_empty(self: *Queue, options: Options) *Animation {
+        return self.force_add(options, noop, .{});
     }
 
-    pub const ForceAddOptions = struct {
+    pub const Options = struct {
         duration: f32 = 0,
         speed: f32 = 1,
         lock_exclusive: LockData = .initEmpty(),
@@ -151,7 +156,7 @@ pub const Queue = struct {
 
     pub fn force_add(
         self: *Queue,
-        options: ForceAddOptions,
+        options: Options,
         f: anytype,
         captures: anytype,
     ) *Animation {

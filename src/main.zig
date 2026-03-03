@@ -5,6 +5,7 @@ const keyboard = @import("keyboard.zig");
 const audio = @import("audio.zig");
 const mouse = @import("mouse.zig");
 const func = @import("func.zig");
+const Callback = func.Callback;
 const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
 const map = @import("map.zig");
@@ -29,12 +30,6 @@ pub const animlib = struct {
     pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
         const t = time.progress();
         target.* = x0.scaled(1 - t).plus(x1.scaled(t));
-    }
-
-    pub fn defer_set_render_terrain(pos: IVec2, terrain: Terrain, time: animation.Time) animation.Exit!void {
-        _ = time;
-        map.set_render_terrain_at(pos, terrain);
-        return error.Exit;
     }
 
     pub fn defer_set(comptime T: type) fn (T, *T, animation.Time) animation.Exit!void {
@@ -63,8 +58,8 @@ pub const animlib = struct {
     pub fn lock_position(pos: IVec2) animation.LockData {
         const bx: u4 = @truncate(@as(u16, @bitCast(pos.x)));
         const by: u4 = @truncate(@as(u16, @bitCast(pos.y)));
-        const bit = (@as(u8, @intCast(bx)) << 4) + @as(u8, @intCast(by));
-        return animation.singleton(@intCast(bit));
+        const bit = (@as(usize, @intCast(bx)) << 4) + @as(usize, @intCast(by));
+        return animation.singleton(bit + 256);
     }
 
     pub fn lock_position_sweep(pos: IVec2, dir: Dir4, dist: i16) animation.LockData {
@@ -576,7 +571,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
                     globals.attack_chain_count += 1;
                 }
                 // TBD
-                const damage = 1 + (2 * globals.attack_chain_count);
+                const damage = 1000000 + (2 * globals.attack_chain_count);
                 unit.damage(damage);
                 std.log.info("bang! {}", .{unit.hp});
                 return true;
@@ -614,7 +609,6 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
         player_acted = true;
     }
-
     if (player_acted) {
         resolve_pending(rng);
         const player_end = globals.player().position;
@@ -646,10 +640,11 @@ fn resolve_pending(rng: std.Random) void {
             map.set_terrain_at(pos, terrain);
             // hide it with a fake image
             map.set_render_terrain_at(pos, prev_terrain);
-            _ = globals.animation_queue.force_add(
-                .{ .chain = true },
-                animlib.defer_set_render_terrain,
-                .{ pos, terrain },
+            _ = globals.animation_queue.force_add_empty(
+                .{
+                    .chain = true,
+                    .on_wake = .lambda(map.set_render_terrain_at, .{ pos, terrain }),
+                },
             );
 
             var player: *Unit = globals.player();
@@ -681,7 +676,7 @@ fn new_kaiju(target: IRect, rng: std.Random) !void {
 fn tick_kaiju(rng: std.Random) void {
     // kaiju behavior is based on proximity
     for (globals.units[1..]) |*u| {
-        if (u.tag == .Kaiju and u.alive) {
+        if (u.tag == .Kaiju and u.alive and u.hp > 0) {
             // kaiju sleep if outside of 1 camera radius
             // TODO make more complex?
             const ppos = globals.player().position;
@@ -696,8 +691,10 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
     var prng = std.Random.DefaultPrng.init(seed);
     const rng = prng.random();
     var it = rect.iter();
+    std.log.info("do splatter {}", .{mode});
     while (it.next()) |pos| {
         if (rng.boolean()) {
+            const viscera = rng.boolean();
             switch (mode) {
                 .initial => {
                     // make the real terrain bloody,
@@ -705,6 +702,9 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
                     var tp = map.get_terrain_payload_at(pos);
                     const prev = tp;
                     tp.bloody = true;
+                    if (viscera) {
+                        tp.terrain = .Viscera;
+                    }
                     map.set_terrain_payload_at(pos, tp);
                     map.set_render_terrain_payload_at(pos, prev);
                 },
@@ -712,6 +712,9 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
                     // make the displayed terrain bloody
                     var tp = map.get_render_terrain_payload_at(pos);
                     tp.bloody = true;
+                    if (viscera) {
+                        tp.terrain = .Viscera;
+                    }
                     map.set_render_terrain_payload_at(pos, tp);
                 },
             }
@@ -720,17 +723,17 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
 }
 
 fn units_cleanup(rng: std.Random) void {
-    _ = rng;
     for (globals.units[1..]) |*u| {
         if (u.hp <= 0 and u.alive) {
             u.alive = false;
             unspawn(u);
             switch (u.tag) {
                 .Kaiju => {
-                    // const splatter_zone = u.get_rect().expand(1);
-                    // globals.animation_queue.force_add(.{}, splatter, captures: anytype)
-
-                    // TODO:
+                    const splatter_zone = u.get_rect().expand(1);
+                    const seed = rng.int(u16);
+                    do_splatter(splatter_zone, seed, .initial);
+                    const callback: Callback = .lambda(do_splatter, .{ splatter_zone, seed, .followup });
+                    _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
                     return;
                 },
                 .Motorcycle => {

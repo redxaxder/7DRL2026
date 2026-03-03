@@ -194,6 +194,8 @@ pub const Terrain = enum(u5) {
     Rubble,
     Debris,
     Trinket,
+    Viscera,
+    Money,
     Void,
     _,
 
@@ -204,6 +206,8 @@ pub const Terrain = enum(u5) {
             .Wall => return '#',
             .Door => return '+',
             .Rubble => return '&',
+            .Viscera => return 0x9C,
+            .Money => return 0x9D,
             .Debris => return ';',
             .Trinket => return 0xF0,
             else => return '?',
@@ -212,7 +216,7 @@ pub const Terrain = enum(u5) {
 
     pub fn passable(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Rubble, .Void => false,
+            .Wall, .Rubble, .Viscera, .Void => false,
             else => true,
         };
     }
