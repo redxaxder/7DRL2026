@@ -524,28 +524,30 @@ fn destroy(pos: IVec2, rng: std.Random) void {
 
 fn smack_player(dir: Dir4, rng: std.Random) void {
     const fling_distance: i16 = 10;
+    var player = globals.player();
+    const moto: ?*Unit = if (player.mounted()) player.mount() else null;
     if (globals.player().hp <= 1) {
         die();
     } else {
         harm();
-        const moto_rect: IRect = globals.player().mount().get_rect();
-        var moto_iter = moto_rect.iter();
-        while (moto_iter.next()) |source| {
-            const target: IVec2 = source.plus(dir.ivec().scaled(fling_distance));
-            var iter = source.scan(dir, fling_distance);
+
+        // fling player
+        const fling_rect: IRect = if (moto) |m| m.get_rect() else player.get_rect();
+        var fling_iter = fling_rect.slide(dir, fling_distance);
+        while (fling_iter.next()) |fling_slice| {
+            var iter = fling_slice.iter();
             while (iter.next()) |pos| {
                 if (map.get_terrain_at(pos, &globals.mapdata) == .Wall) {
                     destroy(pos, rng);
                 }
             }
-            if (map.get_terrain_at(target, &globals.mapdata) == .Wall) {
-                destroy(target, rng); // maybe this is unnecessary?
-            }
         }
-        const target: IVec2 = globals.player().position.plus(dir.ivec().scaled(fling_distance));
+        const target: IVec2 = player.position.plus(dir.ivec().scaled(fling_distance));
         globals.player().move_to(target);
-        globals.player().mount().move_to(target);
-        globals.player().mount().speed = 0;
+        if (moto) |m| {
+            m.move_to(target);
+            m.speed = 0;
+        }
     }
 }
 
