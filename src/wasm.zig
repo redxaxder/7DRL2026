@@ -8,6 +8,7 @@ const Sprite = RenderBuffer.Sprite;
 const main = @import("main.zig");
 const map = @import("map.zig");
 const inventory = @import("inventory.zig");
+const RingBuffer = @import("ringbuffer.zig").RingBuffer;
 
 const Vec2 = @import("core.zig").Vec2;
 const IVec2 = @import("core.zig").IVec2;
@@ -63,6 +64,8 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     render_buffer = RenderBuffer.init(allocator, @intCast(buffer_size)) catch return -1;
 
     main.init(prng.random()) catch return -1;
+
+    combat_log.storage = .init(&combat_log.buffer);
 
     std.log.info("hello", .{});
 
@@ -418,11 +421,17 @@ const Layout = struct {
     }
 };
 
+fn draw_log() void {
+    const layout = Layout.init();
+    screen_offset = layout.log.pos();
+    defer screen_offset = .ZERO;
+}
+
 fn draw_inventory() void {
     const layout = Layout.init();
     screen_offset = layout.inventory.pos();
     defer screen_offset = .ZERO;
-    const num_boxen: usize = 1;
+    const num_boxen: usize = 10;
     const iLayout = layout.inventory.irect();
     const box_size: IRect = .{ .x = @divExact(iLayout.w, @as(i16, @intCast(num_boxen))), .y = iLayout.h };
     const margin: i16 = 5;
@@ -431,7 +440,6 @@ fn draw_inventory() void {
         const b: i16 = @intCast(box);
         draw_rect(.{ .x = iLayout.x + box_size.x * b + margin * b, .y = iLayout.y, .w = box_size.x, .h = box_size.y }, .{ .color = Color.white, .size = 1 });
     }
-    // draw_world_rect(.{ .x = 5, .y = 5, .w = 5, .h = 5 }, .{ .color = Color.yellow });
     render_buffer.flush();
 }
 
@@ -542,3 +550,17 @@ fn push(sprite: Sprite) void {
     s.pos = s.pos.plus(screen_offset);
     render_buffer.push(s);
 }
+
+pub const combat_log = struct {
+    var buffer: [100][]const u8 = undefined;
+    var storage: RingBuffer([]const u8) = undefined;
+
+    pub fn log(message: []const u8) void {
+        if (combat_log.storage.try_push_back(message)) |_| {
+            return;
+        } else |_| {
+            combat_log.storage.clear();
+            _ = combat_log.storage.try_push_back(message) catch unreachable;
+        }
+    }
+};

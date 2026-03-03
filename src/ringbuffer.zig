@@ -14,6 +14,10 @@ pub fn RingBuffer(comptime T: type) type {
             };
         }
 
+        pub fn iter(self: *Self) RingIterator(T) {
+            return RingIterator(T).init(self);
+        }
+
         pub fn try_push_back(self: *Self, item: T) !*T {
             if (self.full()) {
                 return error.BufferFull;
@@ -64,6 +68,24 @@ pub fn RingBuffer(comptime T: type) type {
         pub fn clear(self: *Self) void {
             self.read_index = 0;
             self.write_index = 0;
+        }
+    };
+}
+
+pub fn RingIterator(T: type) type {
+    return struct {
+        pos_idx: usize,
+        stop_idx: usize,
+        rb: *RingBuffer(T),
+
+        pub fn init(ring: *RingBuffer(T)) @This() {
+            return .{ .pos_idx = ring.read_index, .stop_idx = ring.write_index, .rb = ring };
+        }
+
+        pub fn next(self: *RingIterator) ?T {
+            if (self.pos_idx == self.stop_idx) {}
+            self.pos_idx = (self.pos_idx + 1) % self.rb.capacity;
+            return self.rb.index(self.pos_idx);
         }
     };
 }
