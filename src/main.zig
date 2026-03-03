@@ -374,7 +374,8 @@ pub fn spawn(u: Unit) UnitId {
 
 pub fn unspawn(u: *Unit) void {
     // TODO make this work with animations
-    u.tag = .Nil;
+    const anim = u.deferred_set(.tag, .Nil) orelse return;
+    _ = anim.lock_exclusive(u.lock());
 }
 
 pub fn init(rng: std.Random) !void {
