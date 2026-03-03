@@ -45,15 +45,65 @@ pub fn roll_next_item(rng: std.Random) void {
 
     switch (t) {
         .Labubu => {
-            next_item.attrs.field(.motorcycle_armor).* +=
-                roll_low(2, 3, 6);
+            next_item.attrs.field(.motorcycle_damage).* +=
+                roll_low(rng, 2, 3, 6);
         },
         .Gamma_Beam => {
             next_item.attrs.field(.radioactive_damage).* +=
-                roll_low(4, 2, 10);
+                roll_low(rng, 4, 2, 10);
         },
-        .Rifle => {},
-        .Rocket_Launcher => {},
+        .Rifle => {
+            next_item.attrs.field(.gun_damage).* +=
+                roll_low(rng, 5, 1, 30);
+            next_item.attrs.field(.gun_combo).* +=
+                roll_low(rng, 3, 1, 10);
+        },
+        .Rocket_Launcher => {
+            next_item.attrs.field(.explosion_damage).* +=
+                roll_low(rng, 5, 1, 30);
+            next_item.attrs.field(.explosion_radius).* +=
+                roll_low(rng, 8, 1, 5);
+        },
+        .Cell_Phone => {
+            next_item.attrs.field(.explosion_radius).* +=
+                roll_low(rng, 12, 1, 5);
+        },
+        .Figurine => {
+            next_item.attrs.field(.top_speed).* +=
+                roll_low(rng, 3, 1, 10);
+        },
+        .Pencil_Case => {
+            next_item.attrs.field(.top_speed).* +=
+                roll_low(rng, 3, 1, 10);
+        },
+        .Talisman => {
+            next_item.attrs.field(.motorcycle_armor).* +=
+                roll_low(rng, 2, 3, 6);
+        },
+        .Hachimaki => {
+            next_item.attrs.field(.gun_damage).* +=
+                roll_low(rng, 8, 1, 30);
+            next_item.attrs.field(.gun_combo).* +=
+                roll_low(rng, 8, 1, 10);
+        },
+        // .Amulet => { },
+        // .Briefcase => {},
+        // .Hair_Clip => {},
+        // .Juzu_Beads => {},
+        // .Credit_Card => {},
+        // .Stamp_Seal => {},
+        .Odd_Odometer => {
+            next_item.attrs.field(.crit3_bonus).* +=
+                roll_low(rng, 3, 2, 10);
+        },
+        .Odder_Odometer => {
+            next_item.attrs.field(.crit4_bonus).* +=
+                roll_low(rng, 4, 4, 15);
+        },
+        .Oddest_Odometer => {
+            next_item.attrs.field(.crit5_bonus).* +=
+                roll_low(rng, 5, 5, 20);
+        },
         .Nil => {
             unreachable;
         },
@@ -89,22 +139,20 @@ pub const ItemTag = enum {
 
     // Trinkets
     Labubu,
-    // Cell_Phone,
-    // Figurine,
-    // Pencil_Case,
-    // Omamori,
-    // Talisman,
+    Cell_Phone,
+    Figurine,
+    Pencil_Case,
+    Talisman,
+    Hachimaki,
     // Amulet,
-    // Sakazuki,
-    // Hachimaki,
     // Briefcase,
     // Hair_Clip,
     // Juzu_Beads,
     // Credit_Card,
     // Stamp_Seal,
-    // Odd_Odometer,
-    // Odder_Odometer,
-    // Oddest_Odometer,
+    Odd_Odometer,
+    Odder_Odometer,
+    Oddest_Odometer,
 
     // Weapons
     Rifle,
@@ -157,8 +205,6 @@ const NUM_ATTRIBUTES: usize = std.enums.values(Attribute).len;
 pub const Attributes = struct {
     data: [NUM_ATTRIBUTES]i16 = .{0} ** NUM_ATTRIBUTES,
 
-    pub const ZERO: Attributes = .{};
-
     pub fn pluseq(self: *Attributes, rhs: *const Attributes) void {
         for (&self.data, rhs.data) |*s, r| {
             s.* += r;
@@ -182,7 +228,7 @@ pub const Attributes = struct {
 
 pub fn bonuses() Attributes {
     const n = inventory_first_free() orelse item_capacity;
-    var accum: Attributes = .ZERO;
+    var accum: Attributes = .{};
     for (0..n) |ix| {
         const item = inventory[ix];
         if (item.tag.is_trinket()) {
@@ -195,7 +241,7 @@ pub fn bonuses() Attributes {
 pub const Item = struct {
     // universal
     tag: ItemTag = .Nil,
-    attrs: Attributes = .ZERO,
+    attrs: Attributes = .{},
 
     pub const DEFAULT: Item = .{};
 
