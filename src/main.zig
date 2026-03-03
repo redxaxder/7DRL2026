@@ -59,7 +59,6 @@ pub const UnitType = enum {
     Motorcycle,
     PendingExplosion,
     PendingRubble,
-    PendingDebris,
 };
 
 pub const UnitId = u16;
@@ -102,9 +101,9 @@ pub const Unit = struct {
         };
     }
 
-    pub fn init_pending_destruction(pos: IVec2, is_debris: bool) Unit {
+    pub fn init_pending_destruction(pos: IVec2) Unit {
         return .{
-            .tag = if (is_debris) .PendingDebris else .PendingRubble,
+            .tag = .PendingRubble,
             .position = pos,
             .render_position = pos.float(),
         };
@@ -213,7 +212,7 @@ pub const Unit = struct {
             .Nil => {
                 return .{};
             },
-            .Player, .PendingRubble, .PendingDebris => {
+            .Player, .PendingRubble => {
                 return core.IRect.singleton(self.position);
             },
             .Kaiju, .PendingExplosion => {
@@ -346,6 +345,11 @@ pub fn spawn(u: Unit) UnitId {
     globals.unit(id).* = u;
     sector.add(id, globals.unit(id));
     return id;
+}
+
+pub fn unspawn(u: *Unit) void {
+    // TODO make this work with animations
+    u.tag = .Nil;
 }
 
 pub fn init(rng: std.Random) !void {
@@ -492,6 +496,8 @@ pub fn handle_player_attack(dir: Dir4) bool {
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
+    // TODO currently we are iterating through all the units
+    // to get at kaiju. This is an optimization opportunity
     var player_acted = false;
 
     if (ux.resolve_input(key)) |action| {
@@ -517,7 +523,33 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     }
 
     if (player_acted) {
+        resolve_pending(rng);
         tick_kaiju(rng);
+    }
+}
+
+fn resolve_pending(rng: std.Random) void {
+    // TODO this could be more efficient
+    for (globals.units[1..]) |*u| {
+        if (u.tag == .PendingRubble) {
+            const terrain: Terrain = if (rng.boolean()) .Debris else .Rubble;
+            const pos = u.position;
+            unspawn(u);
+            map.set_terrain_at(pos, terrain, &globals.mapdata);
+
+            var player: *Unit = globals.player();
+            const moto: ?*Unit = if (player.mounted()) player.mount() else null;
+            // damage player if hit
+            // TODO how much damage?
+            if (pos.eq(player.position)) {
+                player.damage(10);
+            } else if (moto) |m| {
+                // damage moto if hit
+                if (m.get_rect().contains(pos)) {
+                    m.damage(10);
+                }
+            }
+        }
     }
 }
 
@@ -558,7 +590,7 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
         var front_iter = front.iter();
         while (front_iter.next()) |pos| {
             if (rng.float(f32) < rubble_spawn_chance) {
-                const pr: Unit = Unit.init_pending_destruction(pos, rng.boolean());
+                const pr: Unit = Unit.init_pending_destruction(pos);
                 _ = spawn(pr);
             }
         }

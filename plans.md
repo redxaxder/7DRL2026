@@ -40,6 +40,9 @@ v0.1 technically a game
   - kaiju obstruct each other's movement
 + no vision restrictions
 v0.2 core features
+- motorcycle destruction
+  - if the motorcycle is destroyed when the player is on it, it becomes rubble and the player
+    is flung at speed
 - vision (fov, reveal terrain)
 - progression
   - gain inventory limit based on largest kaiju killed
