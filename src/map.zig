@@ -140,6 +140,19 @@ pub fn mapgen(rng: std.Random, map: []Terrain) void {
             }
         }
     }
+    // trinkets — rare items scattered on passable tiles
+    const trinket_factor: f32 = 0.002;
+    for (0..MAP_SIZE - 1) |x| {
+        for (0..MAP_SIZE - 1) |y| {
+            const pos: IVec2 = .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) };
+            if (rng.float(f32) < trinket_factor) {
+                const existing = get_terrain_at(pos, map) orelse continue;
+                if (existing.passable()) {
+                    set_terrain_at(pos, .Trinket, map);
+                }
+            }
+        }
+    }
 }
 
 pub const MAP_SIZE = 2500;
@@ -152,6 +165,7 @@ pub const Terrain = enum(u8) {
     Door,
     Rubble,
     Debris,
+    Trinket,
     Void,
     _,
 
@@ -163,6 +177,7 @@ pub const Terrain = enum(u8) {
             .Door => return '+',
             .Rubble => return '&',
             .Debris => return ';',
+            .Trinket => return 0xF0,
             else => return '?',
         }
     }
