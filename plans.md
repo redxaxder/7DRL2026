@@ -15,7 +15,7 @@ v0.1 technically a game
   + 1 zone (not fully fleshed out)
   + features:
     + rubble
-    - debris
+    + debris
   + terrain:
     + asphalt
     + wall
@@ -23,21 +23,21 @@ v0.1 technically a game
     + door
 + 1 weapon (gun)
 + can attack
-- can be attacked
++ can be attacked
 - enemy behavior:
   + chase player
     + kaiju can take partial steps
     + pathfinding
       + we don't need to be clever if they can smash through walls
       + they get stuck behind eggs (if we even add them)
-  - smack player
-    - if the player has 1 hp, you lose turkey
-    - if the player has >1 hp, go to 1hp and get flung 10 spaces
-    - destroy interveining walls
-  - break obstacles
+  + smack player
+    + if the player has 1 hp, you lose turkey
+    + if the player has >1 hp, go to 1hp and get flung 10 spaces
+    + destroy interveining walls
+  + break obstacles
     + kaiju must spend a turn getting to the wall before tearing it down
   - spawning
-  - kaiju obstruct each other's movement
+  + kaiju obstruct each other's movement
 + no vision restrictions
 v0.2 core features
 - motorcycle destruction
