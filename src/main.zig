@@ -312,9 +312,12 @@ pub const ux = struct {
     }
 };
 
+pub const INVENTORY_SIZE = 10;
+
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
     pub var mapdata: [map.MAPDATA_LEN]Terrain = .{.Floor} ** map.MAPDATA_LEN;
+    pub var inventory: [INVENTORY_SIZE]Terrain = .{.Void} ** INVENTORY_SIZE;
 
     pub var attack_chain_target: ?UnitId = 0;
     pub var attack_chain_count: i64 = 0;
@@ -339,6 +342,28 @@ pub const globals = struct {
 };
 
 pub const PLAYER_ID: UnitId = 1;
+
+pub fn inventory_add(item: Terrain, index: usize) void {
+    globals.inventory[index] = item;
+}
+
+pub fn inventory_destroy(index: usize) void {
+    globals.inventory[index] = .Void;
+}
+
+pub fn inventory_first_free() ?usize {
+    for (globals.inventory, 0..) |slot, i| {
+        if (slot == .Void) return i;
+    }
+    return null;
+}
+
+fn try_pickup(pos: IVec2) void {
+    if (get_terrain_at(pos) != .Trinket) return;
+    const slot = inventory_first_free() orelse return;
+    inventory_add(.Trinket, slot);
+    map.set_terrain_at(pos, .Floor, &globals.mapdata);
+}
 
 pub fn spawn(u: Unit) UnitId {
     const id = globals.free_unit_id() orelse @panic("how did we run out so fast");
@@ -455,6 +480,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 }
             }
             player.move_to(target);
+            try_pickup(target);
         }
     }
     return true;
