@@ -859,13 +859,19 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
         // fling player
         const fling_rect: IRect = if (moto) |m| m.get_rect() else player.get_rect();
         var fling_iter = fling_rect.slide(dir, fling_distance);
-        while (fling_iter.next()) |fling_slice| {
+        var flung: i16 = 0;
+        outer: while (fling_iter.next()) |fling_slice| {
             var iter = fling_slice.iter();
             while (iter.next()) |pos| {
+                const terrain = map.get_terrain_at(pos);
+                if (terrain == .Void) {
+                    break :outer;
+                }
                 destroy(pos, rng);
             }
+            flung += 1;
         }
-        const target: IVec2 = player.position.plus(dir.ivec().scaled(fling_distance));
+        const target: IVec2 = player.position.plus(dir.ivec().scaled(flung));
         globals.player().move_to(target);
         if (moto) |m| {
             m.move_to(target);
@@ -916,7 +922,7 @@ fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
     const dir: Dir4 = k.position.facing(globals.player().position);
     const seen = kaiju_look(k, dir, k.size);
-    const attack_range = (k.size + 1) / 3;
+    const attack_range = k.size / 3;
     if (seen.terrain) |_| {
         if (seen.distance == 0) {
             destroy_wall(k, dir, rng);
