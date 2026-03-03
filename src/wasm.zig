@@ -75,6 +75,13 @@ pub export fn resize(w: f32, h: f32) void {
     screen_h = h;
 }
 
+fn splatWrapString(x: f32, y: f32, text: []const u8, color: Color, size: f32, width: i16) void {
+    for (wrapText(text, width), 0..) |lineText, line| {
+        const vshift = size * @as(f32, @floatFromInt(line));
+        splatString(x, y + vshift, lineText, color, size);
+    }
+}
+
 fn splatString(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
     var cx = x;
     for (text) |ch| {
@@ -86,6 +93,52 @@ fn splatString(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
         });
         cx += size;
     }
+}
+
+const IterSpace = struct {
+    src: []const u8,
+    ix: usize = 0,
+
+    pub fn init(src: []const u8) IterSpace {
+        return .{ .src = src };
+    }
+
+    pub fn next(self: *IterSpace) ?usize {
+        if (self.ix == self.src.len) {
+            return null;
+        }
+        while (self.ix < self.src.len) {
+            self.ix += 1;
+            if (self.src[self.ix] == ' ') {
+                return self.ix;
+            }
+        }
+        return self.ix;
+    }
+};
+
+fn wrapText(text: []const u8, width: i16) [4][]const u8 {
+    const asdf: []const u8 = "";
+    var results: [4][]const u8 = .{asdf} ** 4;
+    var start: usize = 0;
+    var cursor = IterSpace.init(text);
+    var end: usize = start;
+    outer: for (0..4) |i| {
+        while (cursor.next()) |position| {
+            const w = position - start - 1;
+            if (w <= width) {
+                end = position;
+            } else {
+                results[i] = text[start..end];
+                start = end + 1;
+                end = position;
+                continue :outer;
+            }
+        }
+        results[i] = text[start..end];
+        break;
+    }
+    return results;
 }
 
 const SPRITE_SCALE = 16;
@@ -341,7 +394,7 @@ pub fn render_debug(val: anytype) void {
     inline for (fields) |field| {
         const field_val = @field(val, field.name);
         const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
-        splatString(x, y, text, .magenta, size);
+        splatWrapString(x, y, text, .magenta, size, 10);
         render_buffer.flush();
         y += size;
     }
@@ -479,9 +532,7 @@ pub export fn frame(t: f64) void {
 
     draw_inventory();
 
-    // render_debug(.{
-    //     .mode = main.ux.input_mode,
-    // });
+    render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
 
     // render_buffer.flush();
 }

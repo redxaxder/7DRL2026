@@ -460,17 +460,6 @@ pub fn init(rng: std.Random) !void {
     fov.refresh_fov(globals.player().position, FOV_RANGE);
 
     map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.Void);
-
-    const a = IRect{
-        .x = 0,
-        .y = 0,
-        .w = 3,
-        .h = 3,
-    };
-    var foo = a.slide(.Right, 2);
-    while (foo.next()) |r| {
-        std.log.info("r {}", .{r});
-    }
 }
 
 // dir is null when you turn is not an active move, you are maybe just coasting
