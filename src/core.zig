@@ -276,6 +276,32 @@ pub const IRect = struct {
         return self.distance(IRect.singleton(point));
     }
 
+    pub fn slide(self: IRect, dir: Dir4, dist: i16) SlideIterator {
+        const step = dir.ivec();
+        const abs_x: i16 = @intCast(@abs(step.x));
+        const abs_y: i16 = @intCast(@abs(step.y));
+        const edge = IRect{
+            .x = self.x + @max(step.x, 0) * self.w,
+            .y = self.y + @max(step.y, 0) * self.h,
+            .w = abs_x + self.w * abs_y,
+            .h = abs_y + self.h * abs_x,
+        };
+        return .{ .edge = edge, .step = step, .remaining = dist };
+    }
+
+    pub const SlideIterator = struct {
+        edge: IRect,
+        step: IVec2,
+        remaining: i16,
+
+        pub fn next(self: *SlideIterator) ?IRect {
+            if (self.remaining <= 0) return null;
+            self.remaining -= 1;
+            self.edge = self.edge.displace(self.step);
+            return self.edge;
+        }
+    };
+
     pub const LocationIterator = struct {
         rect: IRect,
         ix: i16 = 0,

@@ -334,13 +334,10 @@ pub fn init(rng: std.Random) !void {
         .w = 3,
         .h = 3,
     };
-    const b = IRect{
-        .x = 10,
-        .y = 0,
-        .w = 1,
-        .h = 1,
-    };
-    std.log.info("rdist {}", .{a.distance(b)});
+    var foo = a.slide(.Right, 2);
+    while (foo.next()) |r| {
+        std.log.info("r {}", .{r});
+    }
 }
 
 pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
