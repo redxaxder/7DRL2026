@@ -253,7 +253,7 @@ pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
     const ix = map_index(position) orelse return;
     const tile = &mapdata[ix];
     if (tile.is_masked) {
-        terrain_mask.sim[tile.mask_index()].terrain = terrain;
+        get_mask(position).sim[tile.mask_index()].terrain = terrain;
     } else {
         tile.terrain = terrain;
     }
@@ -262,19 +262,20 @@ pub fn set_terrain_at(position: IVec2, terrain: Terrain) void {
 pub fn set_render_terrain_at(position: IVec2, terrain: Terrain) void {
     const ix = map_index(position) orelse return;
     const tile = &mapdata[ix];
+    const mask = get_mask(position);
     if (tile.is_masked) {
-        if (terrain == terrain_mask.sim[tile.mask_index()].terrain) {
-            terrain_mask.unmask(position);
+        if (terrain == mask.sim[tile.mask_index()].terrain) {
+            mask.unmask(position);
         } else {
-            terrain_mask.render[tile.mask_index()].terrain = terrain;
+            mask.render[tile.mask_index()].terrain = terrain;
         }
     } else {
         if (terrain != tile.terrain) {
-            const mask_ix = terrain_mask.mask(position) catch {
+            const mask_ix = mask.mask(position) catch {
                 std.log.err("mask buffer full. skipping terrain mask at {}", .{position});
                 return;
             };
-            terrain_mask.render[mask_ix].terrain = terrain;
+            mask.render[mask_ix].terrain = terrain;
         }
     }
 }
@@ -283,7 +284,7 @@ pub fn get_terrain_at(position: IVec2) Terrain {
     const ix = map_index(position) orelse return .Void;
     const tile = mapdata[ix];
     if (tile.is_masked) {
-        return terrain_mask.sim[tile.mask_index()].terrain;
+        return get_mask(position).sim[tile.mask_index()].terrain;
     }
     return tile.terrain;
 }
@@ -292,7 +293,7 @@ pub fn get_render_terrain_at(position: IVec2) Terrain {
     const ix = map_index(position) orelse return .Void;
     const tile = mapdata[ix];
     if (tile.is_masked) {
-        return terrain_mask.render[tile.mask_index()].terrain;
+        return get_mask(position).render[tile.mask_index()].terrain;
     }
     return tile.terrain;
 }
@@ -337,7 +338,17 @@ pub const TerrainMask = struct {
     }
 };
 
-pub var terrain_mask: TerrainMask = .{};
+fn mask_bucket(pos: IVec2) u8 {
+    const low_x: u4 = @truncate(@as(u16, @bitCast(@as(i16, @truncate(pos.x)))));
+    const low_y: u4 = @truncate(@as(u16, @bitCast(@as(i16, @truncate(pos.y)))));
+    return @as(u8, low_x) << 4 | @as(u8, low_y);
+}
+
+fn get_mask(pos: IVec2) *TerrainMask {
+    return &terrain_masks[mask_bucket(pos)];
+}
+
+pub var terrain_masks: [256]TerrainMask = .{TerrainMask{}} ** 256;
 
 fn rubblum(radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) !void {
     var buffer: [2 << 16]u8 = undefined;
