@@ -84,18 +84,26 @@ pub const IVec2 = struct {
         return .{ .pos = self, .step = dir.ivec(), .remaining = distance };
     }
 
-    pub fn facing(self: IVec2, other: IVec2) Dir4 {
-        const diff: IVec2 = other.minus(self);
-        // std.log.info("diff x {} y {}", .{ diff.x, diff.y });
-        if (diff.x > 0 and @abs(diff.x) >= @abs(diff.y)) {
-            return .Right;
-        } else if (diff.y < 0 and @abs(diff.y) >= @abs(diff.x)) {
-            return .Up;
-        } else if (diff.x < 0 and @abs(diff.x) >= @abs(diff.x)) {
-            return .Left;
+    pub fn principal_dir(self: IVec2) Dir4 {
+        const ax = @abs(self.x);
+        const ay = @abs(self.y);
+        if (ax >= ay) {
+            if (self.x >= 0) {
+                return .Right;
+            } else {
+                return .Left;
+            }
         } else {
-            return .Down;
+            if (self.y >= 0) {
+                return .Down;
+            } else {
+                return .Up;
+            }
         }
+    }
+
+    pub fn facing(self: IVec2, other: IVec2) Dir4 {
+        return principal_dir(other.minus(self));
     }
 };
 
