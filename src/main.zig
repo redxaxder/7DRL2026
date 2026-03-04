@@ -1344,17 +1344,20 @@ pub fn get_reticle_positions() ?[5]IVec2 {
     if (mount.tag == .Nil) {
         return null;
     }
-    var result: [5]IVec2 = undefined;
-    for (std.enums.values(Dir4), 0..) |d, i| {
-        const projection = resolve_motorcycle_movement(mount, .{ .dir = d });
-        const ppos = projection.position;
-        const handlepos = ppos.plus(projection.orientation.ivec());
-        result[i] = handlepos;
+
+    const prj = resolve_motorcycle_movement(mount, .{});
+    const hpos = prj.position.plus(prj.orientation.ivec());
+    var result: [5]IVec2 = .{hpos} ** 5;
+
+    if (inventory.active_weapon() == null) {
+        for (std.enums.values(Dir4), 0..) |d, i| {
+            const projection = resolve_motorcycle_movement(mount, .{ .dir = d });
+            const ppos = projection.position;
+            const handlepos = ppos.plus(projection.orientation.ivec());
+            result[i] = handlepos;
+        }
     }
-    const projection = resolve_motorcycle_movement(mount, .{});
-    const ppos = projection.position;
-    const handlepos = ppos.plus(projection.orientation.ivec());
-    result[4] = handlepos;
+
     return result;
 }
 
