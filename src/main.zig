@@ -24,6 +24,12 @@ const RingBuffer = @import("ringbuffer.zig").RingBuffer;
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
 
+// given that killing a size 3 kaiju unlocks the 4th slot, and it scales linearly..
+// we get size 9 -> 10th slot
+// size 10 -> victory
+const MOTHER_KAIJU_SIZE = 10;
+const MIN_KAIJU_SIZE = 3;
+
 const FOV_RANGE = 80;
 const DANGER_GROWTH = 90;
 const SPAWN_ROLL = 100000;
@@ -764,6 +770,10 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
     }
 }
 
+pub fn trigger_victory() void {
+    // TBD
+}
+
 fn units_cleanup(rng: std.Random) void {
     for (globals.units[1..]) |*u| {
         if (u.hp <= 0 and u.alive) {
@@ -776,6 +786,11 @@ fn units_cleanup(rng: std.Random) void {
                     do_splatter(splatter_zone, seed, .initial);
                     const callback: Callback = .lambda(do_splatter, .{ splatter_zone, seed, .followup });
                     _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
+
+                    if (u.size == MOTHER_KAIJU_SIZE) {
+                        trigger_victory();
+                    }
+                    inventory.extend_item_capacity(u.size);
                     return;
                 },
                 .Motorcycle => {
@@ -805,12 +820,14 @@ fn roll_new_enemy(rng: std.Random) ?IRect {
     // how much the candidate spawn zone moves in
     // the direction of travel
     const SHIFT: i16 = 60;
-    const rolled_size = @as(i16, @clz(rng.int(u32))) + 3;
+    const size_roll: u8 = @clz(rng.int(u32));
+    const size: i16 = @as(i16, @min(size_roll + MIN_KAIJU_SIZE, MOTHER_KAIJU_SIZE - 1));
+
     var arena: IRect = (IRect{
         .x = player.position.x - RADIUS,
         .y = player.position.y - RADIUS,
-        .w = 2 * RADIUS + 1 - (rolled_size - 1),
-        .h = 2 * RADIUS + 1 - (rolled_size - 1),
+        .w = 2 * RADIUS + 1 - (size - 1),
+        .h = 2 * RADIUS + 1 - (size - 1),
     });
     if (player.mounted()) {
         const mount = player.mount();
@@ -824,7 +841,7 @@ fn roll_new_enemy(rng: std.Random) ?IRect {
     );
     const target_rect = IRect.from(
         rolled_pos,
-        IVec2.ONE.scaled(rolled_size),
+        IVec2.ONE.scaled(size),
     );
     if (target_rect.point_distance(player.position).max_norm() < MIN_RADIUS) {
         return null;
