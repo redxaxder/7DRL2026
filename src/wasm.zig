@@ -559,6 +559,12 @@ pub export fn frame(t: f64) void {
     draw_log();
 
     // render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
+    var weap: ?inventory.ItemTag = null;
+    if (inventory.active_weapon()) |w| {
+        weap = w.tag;
+    }
+
+    render_debug(.{ .active = weap });
 
     // render_buffer.flush();
 }

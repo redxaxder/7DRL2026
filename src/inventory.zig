@@ -8,11 +8,65 @@ const INVENTORY_SIZE: usize = 10;
 
 var pending_pickups: usize = 0;
 pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
+var active_item: ?usize = null;
 var item_count: usize = 0;
 var item_capacity: usize = 3;
 var cash: usize = 0;
 
 var next_item: Item = undefined;
+
+const BASE_WEAPON: Item = blk: {
+    var it: Item = .tagged(ItemTag.Rifle);
+    it.attrs.field(.gun_damage).* = 1;
+    it.attrs.field(.gun_combo).* = 1;
+    break :blk it;
+};
+
+const BASE_GAMMA: Item = blk: {
+    var it: Item = .tagged(ItemTag.Gamma_Beam);
+    it.attrs.field(.radioactive_damage).* = 10;
+    break :blk it;
+};
+
+pub fn init(rng: std.Random) void {
+    inventory[0] = BASE_WEAPON;
+    inventory[1] = BASE_GAMMA;
+    roll_next_item(rng);
+}
+
+pub fn active_weapon() ?*const Item {
+    if (active_item) |ix| {
+        return &inventory[ix];
+    }
+    return null;
+}
+
+pub fn toggle_weapon(id: usize) void {
+    const selected = nth_weapon_index((id + 9) % 10) orelse {
+        return;
+    };
+
+    if (active_item) |active| {
+        if (active == selected) {
+            active_item = null;
+            return;
+        }
+    }
+    active_item = selected;
+}
+
+fn nth_weapon_index(n: usize) ?usize {
+    var seen: usize = 0;
+    for (inventory, 0..) |item, i| {
+        if (item.tag.is_weapon()) {
+            if (seen == n) {
+                return i;
+            }
+            seen += 1;
+        }
+    }
+    return null;
+}
 
 pub fn has_pending_pickups() bool {
     return pending_pickups > 0;
@@ -126,8 +180,10 @@ pub fn handle_pending_pickups(rng: std.Random) void {
 }
 
 pub fn overwrite_slot(rng: std.Random, slot: usize) void {
-    std.log.info("got! {any}", .{next_item});
     if (slot < item_capacity) {
+        if (slot == active_item) {
+            active_item = null;
+        }
         inventory[slot] = next_item;
         roll_next_item(rng);
         pending_pickups -= 1;
@@ -221,8 +277,13 @@ pub const Attributes = struct {
         const ix: usize = @intFromEnum(attr);
         return &self.data[ix];
     }
-    pub fn effective_value(self: *Attributes, attr: Attribute) i16 {
-        return self.field(attr) + bonuses().field(attr);
+
+    pub fn readfield(self: *const Attributes, attr: Attribute) i16 {
+        const ix: usize = @intFromEnum(attr);
+        return self.data[ix];
+    }
+    pub fn effective_value(self: *const Attributes, attr: Attribute) i16 {
+        return self.readfield(attr) + bonuses().readfield(attr);
     }
 };
 
@@ -232,7 +293,7 @@ pub fn bonuses() Attributes {
     for (0..n) |ix| {
         const item = inventory[ix];
         if (item.tag.is_trinket()) {
-            accum.pluseq(item.attrs);
+            accum.pluseq(&item.attrs);
         }
     }
     return accum;

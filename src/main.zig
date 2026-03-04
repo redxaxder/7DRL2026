@@ -305,6 +305,8 @@ pub const Unit = struct {
 
     pub fn damage(self: *Unit, amount: i64) void {
         self.hp -= amount;
+
+        std.log.info("{} damage. {} remaining", .{ amount, self.hp });
     }
 
     pub fn mount(self: *const Unit) *Unit {
@@ -358,18 +360,6 @@ pub const ux = struct {
         move: struct { Dir4, bool },
         attack: Dir4,
     };
-    pub var input_mode: InputMode = .Movement;
-
-    fn toggle_weapon(id: usize) void {
-        // TODO: handle inventory interaction
-        _ = id;
-        if (input_mode == .Movement) {
-            input_mode = .Attack;
-        } else {
-            input_mode = .Movement;
-        }
-    }
-
     pub fn resolve_input(key: keyboard.Code, rng: std.Random) ?Action {
         const dir: ?Dir4 = switch (key) {
             .KeyW, .ArrowUp => .Up,
@@ -396,17 +386,14 @@ pub const ux = struct {
                 inventory.overwrite_slot(rng, slot);
             }
         } else if (dir) |d| {
-            switch (input_mode) {
-                .Movement => {
-                    const shift = keyboard.isShiftDown();
-                    return .{ .move = .{ d, shift } };
-                },
-                .Attack => {
-                    return .{ .attack = d };
-                },
+            if (inventory.active_weapon()) |_| {
+                return .{ .attack = d };
+            } else {
+                const shift = keyboard.isShiftDown();
+                return .{ .move = .{ d, shift } };
             }
         } else if (number) |weapon_id| {
-            toggle_weapon(weapon_id);
+            inventory.toggle_weapon(weapon_id);
         }
 
         return null;
@@ -416,8 +403,9 @@ pub const ux = struct {
 pub const globals = struct {
     pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
 
-    pub var attack_chain_target: ?UnitId = 0;
-    pub var attack_chain_count: i64 = 0;
+    pub var combo_target: ?UnitId = 0;
+    pub var combo_count: i64 = 0;
+
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
     pub var rng: std.Random = undefined;
@@ -465,12 +453,7 @@ pub fn init(rng: std.Random) !void {
 
     const moto_id = spawn(.init_motorcycle(IVec2.ZERO, .Right));
     globals.player().mounted_on = moto_id;
-    inventory.roll_next_item(rng);
-
-    // _ = spawn(.init_kaiju(
-    //     IVec2{ .x = 6, .y = 6 },
-    //     3,
-    // ));
+    inventory.init(rng);
 
     _ = spawn(.init_kaiju(
         IVec2{ .x = 9, .y = 28 },
@@ -562,6 +545,47 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
 
 const SHOT_RANGE: usize = 64;
 
+pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
+    const weapon = inventory.active_weapon() orelse return false;
+
+    const tid: ?UnitId = if (target) |t| t.get_id() else null;
+
+    if (tid != globals.combo_target) {
+        globals.combo_count = 0;
+    }
+    const combo_mul: f64 = std.math.pow(f64, 1.03, @floatFromInt(globals.combo_count));
+    const combo_linear: f64 = @floatFromInt(globals.combo_count);
+
+    switch (weapon.tag) {
+        .Rifle => {
+            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.gun_damage));
+            const combo_gain = weapon.attrs.effective_value(.gun_combo);
+            const damage: f64 = (base_damage + combo_linear) * combo_mul;
+            const idamage: i64 = @intFromFloat(@trunc(damage));
+            globals.combo_target = tid;
+            if (target) |u| {
+                u.damage(idamage);
+                globals.combo_count += combo_gain;
+            }
+        },
+        .Rocket_Launcher => {
+            _ = aim;
+        },
+        .Gamma_Beam => {
+            const u = target orelse return true;
+            const percent: f64 = @floatFromInt(weapon.attrs.effective_value(.radioactive_damage));
+            const hp: f64 = @floatFromInt(u.hp);
+            const damage = percent * (hp / 100);
+            const idamage: i64 = @intFromFloat(@trunc(damage));
+            u.damage(idamage);
+        },
+        else => {
+            return false;
+        },
+    }
+    return true;
+}
+
 pub fn handle_player_attack(dir: Dir4) bool {
     var scan = globals.player().position.scan(dir, SHOT_RANGE);
     while (scan.next()) |aim| {
@@ -576,18 +600,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
         while (aim_occupants.next()) |occupant_id| {
             const unit = globals.unit(occupant_id);
             if (unit.tag == .Kaiju) {
-                // you shoot at the kaiju
-                if (globals.attack_chain_target != occupant_id) {
-                    globals.attack_chain_target = occupant_id;
-                    globals.attack_chain_count = 0;
-                } else {
-                    globals.attack_chain_count += 1;
-                }
-                // TBD
-                const damage = 1000000 + (2 * globals.attack_chain_count);
-                unit.damage(damage);
-                combat_log.log("bang! {}", .{unit.hp});
-                return true;
+                return fire_weapon(aim, unit);
             }
         }
     }
@@ -608,7 +621,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 const d, const shift = movedata;
                 player_acted = handle_player_move(d, shift);
                 if (player_acted) {
-                    globals.attack_chain_target = 0;
+                    globals.combo_target = 0;
                 }
             },
             .attack => |d| {
