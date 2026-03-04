@@ -419,8 +419,8 @@ const Layout = struct {
         var l: Layout = .{};
         const status_h: f32 = 30;
         const margin: f32 = 32;
-        l.inventory = .{ .x = 0, .y = 0, .w = 500, .h = 100 };
-        l.log = .{ .x = l.inventory.w + margin, .y = 0, .w = 100, .h = screen_h };
+        l.inventory = .{ .x = 0, .y = 0, .w = 1000, .h = 100 };
+        l.log = .{ .x = l.inventory.w + margin, .y = 0, .w = 400, .h = screen_h };
         l.gamefield = .{ .x = 0, .y = l.inventory.h + margin, .w = screen_w - l.log.w, .h = screen_h - l.inventory.h - status_h };
         l.status_bar = .{ .x = 0, .y = l.inventory.h + l.gamefield.h + margin, .w = screen_w - l.log.w, .h = status_h };
         return l;
@@ -437,7 +437,7 @@ fn draw_log() void {
     var messages = combat_log.storage.iter();
     while (messages.next()) |message| {
         const size: f32 = 16;
-        const num_drawn: usize = splat_wrap_string(layout.log.x, layout.log.y + vshift, message.*, Color.white, size, 40);
+        const num_drawn: usize = splat_wrap_string(0, vshift, message.*, Color.white, size, 40);
         vshift += @as(f32, @floatFromInt(num_drawn)) * size;
     }
     render_buffer.flush();

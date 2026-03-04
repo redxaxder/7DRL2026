@@ -84,10 +84,10 @@ pub fn RingIterator(T: type) type {
         }
 
         pub fn next(self: *RingIterator(T)) ?*T {
-            if (self.pos_idx == self.stop_idx) {
+            if (self.pos_idx == self.stop_idx - 1) {
                 return null;
             }
-            self.pos_idx = @mod((self.pos_idx + 1), self.rb.capacity());
+            self.pos_idx = self.pos_idx + 1;
             return &self.rb.buffer[@as(usize, @intCast(self.pos_idx))];
         }
     };
