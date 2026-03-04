@@ -461,7 +461,7 @@ pub fn init(rng: std.Random) !void {
 
     _ = spawn(.init_kaiju(
         IVec2{ .x = 9, .y = 28 },
-        5,
+        MOTHER_KAIJU_SIZE,
     ));
     map.mapgen(rng);
     fov.refresh_fov(globals.player().position, FOV_RANGE);
