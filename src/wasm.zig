@@ -6,6 +6,7 @@ const func = @import("func.zig");
 const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
 const main = @import("main.zig");
+const combat_log = main.combat_log;
 const map = @import("map.zig");
 const inventory = @import("inventory.zig");
 const RingBuffer = @import("ringbuffer.zig").RingBuffer;
@@ -78,11 +79,16 @@ pub export fn resize(w: f32, h: f32) void {
     screen_h = h;
 }
 
-fn splat_wrap_string(x: f32, y: f32, text: []const u8, color: Color, size: f32, width: i16) void {
+fn splat_wrap_string(x: f32, y: f32, text: []const u8, color: Color, size: f32, width: i16) usize {
     for (wrapText(text, width), 0..) |lineText, line| {
+        if (lineText.len == 0) {
+            return line;
+        }
         const vshift = size * @as(f32, @floatFromInt(line));
         splat_string(x, y + vshift, lineText, color, size);
     }
+    // we splat at most four lines
+    return 4;
 }
 
 fn splat_string(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
@@ -399,7 +405,7 @@ pub fn render_debug(val: anytype) void {
     inline for (fields) |field| {
         const field_val = @field(val, field.name);
         const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
-        splat_wrap_string(x, y, text, .magenta, size, 10);
+        _ = splat_wrap_string(x, y, text, .magenta, size, 10);
         render_buffer.flush();
         y += size;
     }
@@ -415,7 +421,7 @@ const Layout = struct {
         var l: Layout = .{};
         const status_h: f32 = 30;
         const margin: f32 = 32;
-        l.inventory = .{ .x = 0, .y = 0, .w = 1000, .h = 100 };
+        l.inventory = .{ .x = 0, .y = 0, .w = 500, .h = 100 };
         l.log = .{ .x = l.inventory.w + margin, .y = 0, .w = 100, .h = screen_h };
         l.gamefield = .{ .x = 0, .y = l.inventory.h + margin, .w = screen_w - l.log.w, .h = screen_h - l.inventory.h - status_h };
         l.status_bar = .{ .x = 0, .y = l.inventory.h + l.gamefield.h + margin, .w = screen_w - l.log.w, .h = status_h };
@@ -427,6 +433,15 @@ fn draw_log() void {
     const layout = Layout.init();
     screen_offset = layout.log.pos();
     defer screen_offset = .ZERO;
+    var vshift: f32 = 0;
+
+    var messages = combat_log.storage.iter();
+    while (messages.next()) |message| {
+        const size: f32 = 16;
+        const num_drawn: usize = splat_wrap_string(layout.log.x, layout.log.y + vshift, message.*, Color.white, size, 40);
+        vshift += @as(f32, @floatFromInt(num_drawn)) * size;
+    }
+    render_buffer.flush();
 }
 
 fn draw_inventory() void {
@@ -542,7 +557,9 @@ pub export fn frame(t: f64) void {
 
     draw_inventory();
 
-    render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
+    draw_log();
+
+    // render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
 
     // render_buffer.flush();
 }
@@ -552,17 +569,3 @@ fn push(sprite: Sprite) void {
     s.pos = s.pos.plus(screen_offset);
     render_buffer.push(s);
 }
-
-pub const combat_log = struct {
-    var buffer: [100][]const u8 = undefined;
-    var storage: RingBuffer([]const u8) = undefined;
-
-    pub fn log(message: []const u8) void {
-        if (combat_log.storage.try_push_back(message)) |_| {
-            return;
-        } else |_| {
-            combat_log.storage.clear();
-            _ = combat_log.storage.try_push_back(message) catch unreachable;
-        }
-    }
-};

@@ -83,10 +83,12 @@ pub fn RingIterator(T: type) type {
             return .{ .pos_idx = ring.read_index, .stop_idx = ring.write_index, .rb = ring };
         }
 
-        pub fn next(self: *RingIterator) ?T {
-            if (self.pos_idx == self.stop_idx) {}
-            self.pos_idx = (self.pos_idx + 1) % self.rb.capacity;
-            return self.rb.index(self.pos_idx);
+        pub fn next(self: *RingIterator(T)) ?*T {
+            if (self.pos_idx == self.stop_idx) {
+                return null;
+            }
+            self.pos_idx = @mod((self.pos_idx + 1), self.rb.capacity());
+            return &self.rb.buffer[@as(usize, @intCast(self.pos_idx))];
         }
     };
 }

@@ -19,6 +19,7 @@ const sector = @import("sector.zig");
 const inventory = @import("inventory.zig");
 const fov = @import("fov.zig");
 const Item = inventory.Item;
+const RingBuffer = @import("ringbuffer.zig").RingBuffer;
 
 const get_occupants = sector.get_occupants;
 const IRect = core.IRect;
@@ -28,6 +29,28 @@ const DANGER_GROWTH = 90;
 const SPAWN_ROLL = 100000;
 
 const ANIMATION_QUEUE_LEN = 256;
+
+pub const combat_log = struct {
+    pub var buffer: [20][]const u8 = undefined;
+    pub var storage: RingBuffer([]const u8) = undefined;
+    var printBuffer: [8192]u8 = .{0} ** 8192;
+
+    pub fn log(comptime message: []const u8, args: anytype) void {
+        // format message
+        const slice = std.fmt.bufPrint(printBuffer[0..], message, args) catch {
+            std.log.err("combat log formatting failed", .{});
+            return;
+        };
+        if (combat_log.storage.try_push_back(slice)) |_| {
+            return;
+        } else |_| {
+            for (0..5) |_| {
+                _ = combat_log.storage.pop_front();
+            }
+            _ = combat_log.storage.try_push_back(slice) catch unreachable;
+        }
+    }
+};
 
 pub const animlib = struct {
     pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
@@ -478,8 +501,10 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
         if (motomove.dismount) {
             player.move_to(motomove.position);
             player.*.mounted_on = 0;
+            combat_log.log("You dismount the motorcycle.", .{});
         } else if (crash_check(pmount, motomove)) |crashed| {
             if (crashed.fling) {
+                combat_log.log("CRAAAASH!", .{});
                 const delta = motomove.midpoint.minus(player.position);
                 var landed_at = motomove.midpoint;
                 var scan = landed_at.scan(pmount.orientation, delta.max_norm());
@@ -547,7 +572,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
         if (terrain.blocks_shot()) {
             // you shoot at the terrain
             // consequences TBD
-            std.log.info("plink!", .{});
+            combat_log.log("plink!", .{});
             return true;
         }
         var aim_occupants = get_occupants(aim);
@@ -564,12 +589,12 @@ pub fn handle_player_attack(dir: Dir4) bool {
                 // TBD
                 const damage = 1000000 + (2 * globals.attack_chain_count);
                 unit.damage(damage);
-                std.log.info("bang! {}", .{unit.hp});
+                combat_log.log("bang! {}", .{unit.hp});
                 return true;
             }
         }
     }
-    std.log.info("whiff!", .{});
+    combat_log.log("whiff!", .{});
     return true;
 }
 
@@ -619,7 +644,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
         fov.refresh_fov(globals.player().position, FOV_RANGE);
         inventory.handle_pending_pickups(rng);
-        std.log.info("inventory {any}", .{inventory.inventory});
+        // combat_log.log("inventory {any}", .{inventory.inventory});
     }
 }
 
@@ -699,6 +724,7 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
     const rng = prng.random();
     var it = rect.iter();
     std.log.info("do splatter {}", .{mode});
+    combat_log.log("Bloody kaiju viscera rain down!", .{});
     while (it.next()) |pos| {
         if (rng.boolean()) {
             const viscera = rng.boolean();
@@ -833,14 +859,15 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
             }
         }
     }
+    combat_log.log("The kaiju tears down a wall!", .{});
 }
 
 fn die() void {
-    std.log.info("YOU LOSE TURKEY", .{});
+    combat_log.log("YOU LOSE TURKEY", .{});
 }
 
 fn harm() void {
-    std.log.info("ouchie", .{});
+    combat_log.log("ouchie", .{});
     globals.player().hp = 1;
 }
 
