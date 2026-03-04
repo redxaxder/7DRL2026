@@ -595,7 +595,7 @@ pub export fn frame(t: f64) void {
 pub fn draw_indicator(v: Vec2) void {
     const r = ui.MAIN_VIEW.get("viewport").float().scaled(SPRITE_SCALE);
     const point = edge_point(r.expand(-SPRITE_SCALE / 2), v).minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
-    draw_glyph(point.rounded(SPRITE_SCALE), 0x13, .{ .color = .red });
+    draw_glyph(point, 0x13, .{ .color = .red });
 }
 
 // Casts a ray from the center of `rect` in the given `dir`ection,

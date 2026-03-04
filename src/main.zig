@@ -1254,8 +1254,9 @@ pub fn resolve_motorcycle_movement(
                 if (it.speed > 0) {
                     // slight brake
                     it.speed -= 1;
+                    const amount: i16 = @intCast(it.speed);
                     const drift = moto.orientation.ivec()
-                        .scaled(@intCast(it.speed))
+                        .scaled(@max(amount, 2))
                         .plus(change.ivec());
                     it.position = it.position.plus(drift);
                 } else {
