@@ -53,7 +53,6 @@ var render_buffer: RenderBuffer = undefined;
 var prng: std.Random.DefaultPrng = undefined;
 var camera: Vec2 = .ZERO;
 var camera_target: Vec2 = .ZERO;
-const viewport_interior = ui.MAIN_VIEW.get("viewport").expand(-1);
 const camera_w: f32 = 64;
 const camera_h: f32 = 64;
 var screen_offset: Vec2 = .ZERO;
@@ -168,9 +167,17 @@ const DrawOptions = struct {
     origin: Vec2 = .ZERO,
 };
 
+pub fn fmt_draw_text(screen_pos: Vec2, comptime fmt: []const u8, options: DrawOptions, max_width: f32, args: anytype) f32 {
+    var buffer: [256]u8 = .{0} ** 256;
+    const text = std.fmt.bufPrint(&buffer, fmt, args) catch {
+        return 0;
+    };
+    return draw_text(screen_pos, text, options, max_width);
+}
+
 pub fn draw_text(screen_pos: Vec2, text: []const u8, options: DrawOptions, max_width: f32) f32 {
-    const width: i16 = @intFromFloat(@trunc(max_width / options.size));
     const size = SPRITE_SCALE * options.size;
+    const width: i16 = @intFromFloat(@trunc(max_width / size));
     for (wrapText(text, width), 0..) |lineText, line| {
         const vshift = size * @as(f32, @floatFromInt(line));
         if (lineText.len == 0) {
@@ -179,7 +186,7 @@ pub fn draw_text(screen_pos: Vec2, text: []const u8, options: DrawOptions, max_w
 
         var at = screen_pos;
         at.y += vshift;
-        for (text) |ch| {
+        for (lineText) |ch| {
             draw_glyph(at, ch, options);
             at.x += size;
         }
@@ -423,6 +430,46 @@ pub fn render_debug(val: anytype) void {
     }
 }
 
+pub fn draw_status() !void {
+    const r: IRect = ui.MAIN_VIEW.get("status");
+    const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
+    const w = interior.w;
+
+    const player = main.globals.player();
+
+    const opts = DrawOptions{ .origin = interior.pos() };
+
+    var cursor: Vec2 = .ZERO;
+
+    cursor.y += fmt_draw_text(cursor, "You", opts, w, .{});
+    cursor.y += fmt_draw_text(cursor, "Hp: {}", opts, w, .{player.hp});
+    cursor.y += SPRITE_SCALE;
+
+    if (player.mounted()) {
+        // TODO motorcycle name
+        cursor.y += fmt_draw_text(cursor, "Motorcycle", opts, w, .{});
+        cursor.y += fmt_draw_text(
+            cursor,
+            "Hp: {}",
+            opts,
+            w,
+            .{player.mount().hp},
+        );
+        cursor.y += SPRITE_SCALE;
+    }
+
+    if (main.globals.combo_count > 0) {
+        cursor.y += fmt_draw_text(
+            cursor,
+            "Accuracy: {}",
+            opts,
+            w,
+            .{main.globals.combo_count},
+        );
+        cursor.y += SPRITE_SCALE;
+    }
+}
+
 // todo - figure this out properly
 const Layout = struct {
     inventory: Rect = .{},
@@ -475,10 +522,6 @@ fn draw_inventory() void {
 }
 
 fn draw_gamefield(t: f64) void {
-    // const layout = Layout.init();
-    // screen_offset = layout.gamefield.pos();
-    // defer screen_offset = .ZERO;
-
     // restrict drawing to viewport interior
     const viewport: Rect = ui.MAIN_VIEW.get("viewport").float();
     const margin2 = viewport.w - camera_w;
@@ -581,6 +624,9 @@ pub export fn frame(t: f64) void {
     }
 
     draw_gamefield(t);
+    draw_status() catch |e| {
+        std.log.err("draw status err {}", .{e});
+    };
 
     const kmom = main.globals.kmom();
     const kvec = kmom.get_rect().float().center()

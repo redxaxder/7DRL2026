@@ -312,7 +312,7 @@ pub fn mapgen(rng: std.Random) void {
             const pos: IVec2 = .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) };
             if (rng.float(f32) < trinket_factor) {
                 const existing = get_terrain_at(pos);
-                if (existing.passable()) {
+                if (existing.moto_passable()) {
                     set_terrain_at(pos, .trinket);
                 }
             }
@@ -391,16 +391,30 @@ pub const Terrain = enum(u5) {
     }
 
     pub fn unit_passable(self: Terrain, u: UnitType) bool {
-        switch (u) {
-            .Kaiju => return self.kaiju_passable(),
-            .Player, .Motorcycle => return self.passable(),
-            else => return true,
-        }
+        return switch (u) {
+            .Kaiju => self.kaiju_passable(),
+            .Player => self.player_passable(),
+            .Motorcycle => self.moto_passable(),
+            else => true,
+        };
+    }
+    pub fn player_passable(self: Terrain) bool {
+        return switch (self) {
+            .wall, .void_ => false,
+            else => true,
+        };
     }
 
-    pub fn passable(self: Terrain) bool {
+    pub fn moto_passable(self: Terrain) bool {
         return switch (self) {
             .wall, .rubble, .void_ => false,
+            else => true,
+        };
+    }
+
+    pub fn kaiju_passable(self: Terrain) bool {
+        return switch (self) {
+            .wall, .void_ => false,
             else => true,
         };
     }
@@ -409,13 +423,6 @@ pub const Terrain = enum(u5) {
         return switch (self) {
             .door, .viscera => true,
             else => false,
-        };
-    }
-
-    pub fn kaiju_passable(self: Terrain) bool {
-        return switch (self) {
-            .wall, .void_ => false,
-            else => true,
         };
     }
 

@@ -156,7 +156,8 @@ pub const Unit = struct {
     }
 
     pub fn mounted(self: *const Unit) bool {
-        return self.mount().tag != .Nil;
+        const m = self.mount();
+        return m.tag != .Nil and m.alive;
     }
 
     pub fn init_motorcycle(pos: IVec2, orientation: Dir4) Unit {
@@ -518,7 +519,7 @@ pub fn init(rng: std.Random) !void {
 pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
     const player = globals.player();
     const pmount = player.mount();
-    if (pmount.tag == .Motorcycle) {
+    if (player.mounted()) {
         // mounted movement
         const motomove = resolve_motorcycle_movement(
             pmount,
@@ -566,6 +567,15 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
         if (dir) |d| { // unmounted movement
             const dv = d.ivec();
             const target = player.position.plus(dv);
+            const terrain = map.get_terrain_at(target);
+            if (!terrain.unit_passable(.Player)) {
+                switch (terrain) {
+                    .wall => combat_log.log("The wall rejects your advances.", .{}),
+                    .void_ => combat_log.log("You're not done yet.", .{}),
+                    else => combat_log.log("Can't go there", .{}),
+                }
+                return false;
+            }
 
             var occupants = get_occupants(target);
             while (occupants.next()) |occupant_id| {
@@ -646,6 +656,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
             // you shoot at the terrain
             // consequences TBD
             combat_log.log("You shoot the {s}.", .{terrain.name()});
+            globals.combo_count = 0;
             return true;
         }
         var aim_occupants = get_occupants(aim);
@@ -678,6 +689,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 if (player_acted) {
                     globals.combo_target = 0;
                 }
+                globals.combo_count = 0;
             },
             .attack => |d| {
                 player_acted = handle_player_attack(d);
@@ -792,7 +804,6 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
     var prng = std.Random.DefaultPrng.init(seed);
     const rng = prng.random();
     var it = rect.iter();
-    combat_log.log("Bloody viscera rain down!", .{});
     while (it.next()) |pos| {
         if (rng.boolean()) {
             const viscera = rng.boolean();
@@ -839,6 +850,7 @@ fn units_cleanup(rng: std.Random) void {
                 .Kaiju => {
                     const splatter_zone = u.get_rect().expand(1);
                     const seed = rng.int(u16);
+                    combat_log.log("The monster is slain!", .{});
                     do_splatter(splatter_zone, seed, .initial);
                     const callback: Callback = .lambda(do_splatter, .{ splatter_zone, seed, .followup });
                     _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
