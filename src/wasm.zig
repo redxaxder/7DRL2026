@@ -53,6 +53,7 @@ var render_buffer: RenderBuffer = undefined;
 var prng: std.Random.DefaultPrng = undefined;
 var camera: Vec2 = .ZERO;
 var camera_target: Vec2 = .ZERO;
+const viewport_interior = ui.MAIN_VIEW.get("viewport").expand(-1);
 const camera_w: f32 = 64;
 const camera_h: f32 = 64;
 var screen_offset: Vec2 = .ZERO;
@@ -197,7 +198,7 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
     draw_glyph(screen_pos, src_idx, options);
 }
 
-fn render_kaiju(kaiju: *const main.Unit) void {
+fn render_kaiju(kaiju: *const main.Unit, origin: Vec2) void {
     // Box-drawing layout for a size-N kaiju
     //   ┌─…─┐
     //   │   │
@@ -227,10 +228,7 @@ fn render_kaiju(kaiju: *const main.Unit) void {
                 else if (is_left or is_right) 0xB3 // │
                 else ' ';
 
-            draw_world_glyph(pos, glyph, .{
-                .bgcolor = .black,
-                .color = .green,
-            });
+            draw_world_glyph(pos, glyph, .{ .bgcolor = .black, .color = .green, .origin = origin });
         }
     }
 
@@ -244,6 +242,7 @@ fn render_kaiju(kaiju: *const main.Unit) void {
             .color = .red,
             .size = kaiju.size - 2,
             .pixel_shift = true,
+            .origin = origin,
         },
     );
     render_buffer.flush();
@@ -304,11 +303,11 @@ fn render_unit(unit: *const main.Unit, origin: Vec2) void {
         .Motorcycle => {
             const p0 = unit.render_position;
             const p1 = p0.plus(unit.render_orientation.ivec().float());
-            draw_world_glyph(p0, 'o', .{ .bgcolor = .black });
+            draw_world_glyph(p0, 'o', .{ .bgcolor = .black, .origin = origin });
 
-            draw_world_glyph(p1, '%', .{ .bgcolor = .black });
+            draw_world_glyph(p1, '%', .{ .bgcolor = .black, .origin = origin });
         },
-        .Kaiju => render_kaiju(unit),
+        .Kaiju => render_kaiju(unit, origin),
         .PendingRubble => {
             draw_world_glyph(unit.render_position, 'X', .{
                 .color = .yellow,
@@ -423,6 +422,8 @@ const Layout = struct {
 };
 
 fn draw_log() void {
+    // const bounds = ui.MAIN_VIEW.get("log");
+
     const layout = Layout.init();
     screen_offset = layout.log.pos();
     defer screen_offset = .ZERO;
@@ -460,15 +461,11 @@ fn draw_gamefield(t: f64) void {
     // defer screen_offset = .ZERO;
 
     // restrict drawing to viewport interior
-    const viewport: IRect = ui.MAIN_VIEW.get("viewport");
-    const interior = viewport.expand(-1);
-    RenderBuffer.scissor(Rect{
-        .x = @as(f32, @floatFromInt(interior.x)) * SPRITE_SCALE,
-        .y = @as(f32, @floatFromInt(interior.y)) * SPRITE_SCALE,
-        .w = @as(f32, @floatFromInt(interior.w)) * SPRITE_SCALE,
-        .h = @as(f32, @floatFromInt(interior.h)) * SPRITE_SCALE,
-    });
-    const origin: Vec2 = interior.ivec().float();
+    const viewport: Rect = ui.MAIN_VIEW.get("viewport").float();
+    const margin2 = viewport.w - camera_w;
+    const interior = viewport.expand(-(margin2 / 2)).scaled(SPRITE_SCALE);
+    RenderBuffer.scissor(interior);
+    const origin: Vec2 = interior.pos();
     defer RenderBuffer.unscissor();
 
     // Draw the terrain
@@ -573,13 +570,14 @@ pub export fn frame(t: f64) void {
         draw_indicator(kvec);
     }
 
-    draw_indicator(core.Dir4.Right.ivec().float());
-    draw_indicator(core.Dir4.Left.ivec().float());
-    draw_indicator(core.Dir4.Up.ivec().float());
-    draw_indicator(core.Dir4.Down.ivec().float());
+    // draw_indicator(core.Dir4.Right.ivec().float());
+    // draw_indicator(core.Dir4.Left.ivec().float());
+    // draw_indicator(core.Dir4.Up.ivec().float());
+    // draw_indicator(core.Dir4.Down.ivec().float());
+
     // draw_inventory();
 
-    // draw_log();
+    draw_log();
 
     // render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
     var weap: ?inventory.ItemTag = null;
@@ -594,7 +592,7 @@ pub export fn frame(t: f64) void {
 
 pub fn draw_indicator(v: Vec2) void {
     const r = ui.MAIN_VIEW.get("viewport").float().scaled(SPRITE_SCALE);
-    const point = edge_point(r.expand(-SPRITE_SCALE / 2), v).minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
+    const point = edge_point(r.expand(-SPRITE_SCALE * 2), v).minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
     draw_glyph(point, 0x13, .{ .color = .red });
 }
 
