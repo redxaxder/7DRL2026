@@ -432,8 +432,8 @@ fn draw_log() void {
     screen_offset = layout.log.pos();
     defer screen_offset = .ZERO;
     RenderBuffer.clear_rect(layout.log, Color.black);
-    var vshift: f32 = 0;
 
+    var vshift: f32 = 0;
     var messages = combat_log.storage.iter();
     while (messages.next()) |message| {
         const size: f32 = 16;

@@ -75,20 +75,21 @@ pub fn RingBuffer(comptime T: type) type {
 
 pub fn RingIterator(T: type) type {
     return struct {
-        pos_idx: u64,
-        stop_idx: u64,
+        ix: i32 = -1,
         rb: *RingBuffer(T),
 
         pub fn init(ring: *RingBuffer(T)) @This() {
-            return .{ .pos_idx = ring.read_index, .stop_idx = ring.write_index, .rb = ring };
+            return .{ .rb = ring };
         }
 
         pub fn next(self: *RingIterator(T)) ?*T {
-            if (self.pos_idx == self.stop_idx - 1 or self.rb.empty() or self.pos_idx == self.rb.len()) {
-                return null;
-            }
-            self.pos_idx = self.pos_idx + 1;
-            return &self.rb.buffer[@as(usize, @intCast(self.pos_idx))];
+            self.ix += 1;
+            return self.rb.index(self.ix);
+            // if (self.pos_idx == self.stop_idx - 1 or self.rb.empty() or self.pos_idx == self.rb.len()) {
+            //     return null;
+            // }
+            // self.pos_idx = self.pos_idx + 1;
+            // return &self.rb.buffer[@as(usize, @intCast(self.pos_idx))];
         }
     };
 }

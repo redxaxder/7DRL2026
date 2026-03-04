@@ -31,21 +31,19 @@ const SPAWN_ROLL = 100000;
 const ANIMATION_QUEUE_LEN = 256;
 
 pub const combat_log = struct {
-    pub var buffer: [5][]const u8 = undefined;
+    pub var buffer: [20][]const u8 = undefined;
     pub var storage: RingBuffer([]const u8) = undefined;
     var printBuffer: [8192]u8 = .{0} ** 8192;
 
     pub fn log(comptime message: []const u8, args: anytype) void {
         // format message
         const slice = std.fmt.bufPrint(printBuffer[0..], message, args) catch {
-            std.log.err("combat log formatting failed", .{});
             return;
         };
         if (combat_log.storage.full()) {
             _ = combat_log.storage.pop_front();
         }
         _ = combat_log.storage.try_push_back(slice) catch unreachable;
-        std.log.info("combat log {any}", .{combat_log.storage.buffer});
     }
 };
 
