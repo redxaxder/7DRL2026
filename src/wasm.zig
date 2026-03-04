@@ -161,15 +161,35 @@ const SPRITE_SCALE = 16;
 const SPRITE_DIM = Vec2{ .x = SPRITE_SCALE, .y = SPRITE_SCALE };
 
 const DrawOptions = struct {
-    size: u8 = 1,
+    size: f32 = 1,
     color: Color = .white,
     bgcolor: ?Color = null,
     pixel_shift: bool = false,
     origin: Vec2 = .ZERO,
 };
 
+pub fn draw_text(screen_pos: Vec2, text: []const u8, options: DrawOptions, max_width: f32) f32 {
+    const width: i16 = @intFromFloat(@trunc(max_width / options.size));
+    const size = SPRITE_SCALE * options.size;
+    for (wrapText(text, width), 0..) |lineText, line| {
+        const vshift = size * @as(f32, @floatFromInt(line));
+        if (lineText.len == 0) {
+            return vshift;
+        }
+
+        var at = screen_pos;
+        at.y += vshift;
+        for (text) |ch| {
+            draw_glyph(at, ch, options);
+            at.x += size;
+        }
+    }
+
+    return size * 4;
+}
+
 pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
-    const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
+    const dim = SPRITE_DIM.scaled(options.size);
 
     if (options.bgcolor) |bgcolor| {
         render_buffer.push(.{
@@ -181,7 +201,7 @@ pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     }
 
     const offset: f32 = if (options.pixel_shift)
-        (SPRITE_SCALE / 16.0) * @as(f32, @floatFromInt(options.size))
+        (SPRITE_SCALE / 16.0) * options.size
     else
         0;
 
@@ -240,7 +260,7 @@ fn render_kaiju(kaiju: *const main.Unit, origin: Vec2) void {
         .{
             .bgcolor = .black,
             .color = .red,
-            .size = kaiju.size - 2,
+            .size = @floatFromInt(kaiju.size - 2),
             .pixel_shift = true,
             .origin = origin,
         },
@@ -422,19 +442,18 @@ const Layout = struct {
 };
 
 fn draw_log() void {
-    // const bounds = ui.MAIN_VIEW.get("log");
-
-    const layout = Layout.init();
-    screen_offset = layout.log.pos();
+    const bounds = ui.MAIN_VIEW.get("log").float().scaled(SPRITE_SCALE);
+    screen_offset = bounds.pos();
     defer screen_offset = .ZERO;
-    // RenderBuffer.clear_rect(layout.log, Color.black);
+
+    const options: DrawOptions = .{ .origin = bounds.pos() };
 
     var vshift: f32 = 0;
     var messages = combat_log.storage.iter();
     while (messages.next()) |message| {
-        const size: f32 = 16;
-        const num_drawn: usize = splat_wrap_string(0, vshift, message.*, Color.white, size, 40);
-        vshift += @as(f32, @floatFromInt(num_drawn)) * size;
+        const h = draw_text(.{ .y = vshift, .x = 0 }, message.*, options, bounds.w);
+        vshift += h;
+        vshift += SPRITE_SCALE;
     }
     render_buffer.flush();
 }
@@ -563,7 +582,8 @@ pub export fn frame(t: f64) void {
 
     draw_gamefield(t);
 
-    const kvec = main.globals.kmom().position.float()
+    const kmom = main.globals.kmom();
+    const kvec = kmom.get_rect().float().center()
         .minus(camera.plus(Vec2.ONE.scaled(camera_w / 2)));
     const norm = kvec.max_norm();
     if (norm > 34) {

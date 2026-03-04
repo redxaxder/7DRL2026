@@ -393,6 +393,12 @@ pub const Rect = struct {
     pub fn pos(self: Rect) Vec2 {
         return Vec2{ .x = self.x, .y = self.y };
     }
+    pub fn center(self: Rect) Vec2 {
+        return .{
+            .x = self.x + self.w / 2,
+            .y = self.y + self.h / 2,
+        };
+    }
     pub fn scaled(self: Rect, scale: f32) Rect {
         return .{
             .x = self.x * scale,
