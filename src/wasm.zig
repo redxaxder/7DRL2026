@@ -160,8 +160,6 @@ const DrawOptions = struct {
     pixel_shift: bool = false,
 };
 
-
-
 pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
 
@@ -433,6 +431,7 @@ fn draw_log() void {
     const layout = Layout.init();
     screen_offset = layout.log.pos();
     defer screen_offset = .ZERO;
+    RenderBuffer.clear_rect(layout.log, Color.black);
     var vshift: f32 = 0;
 
     var messages = combat_log.storage.iter();
