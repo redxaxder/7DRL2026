@@ -3,8 +3,8 @@ pub fn RingBuffer(comptime T: type) type {
         const Self = @This();
 
         buffer: []T,
-        write_index: usize,
-        read_index: usize,
+        write_index: u64,
+        read_index: u64,
 
         pub fn init(buffer: []T) Self {
             return Self{
@@ -22,29 +22,30 @@ pub fn RingBuffer(comptime T: type) type {
             if (self.full()) {
                 return error.BufferFull;
             }
-            const ix = self.write_index % self.buffer.len;
+            const ix: usize = @intCast(self.write_index % self.buffer.len);
             self.buffer[ix] = item;
             self.write_index += 1;
             return &self.buffer[ix];
         }
 
         pub fn index(self: *Self, ix: i32) ?*T {
-            const len32: i32 = @intCast(self.len());
-            if (ix + len32 < 0) {
+            const len64: i64 = @intCast(self.len());
+            if (ix + len64 < 0) {
                 return null;
             }
-            const i: usize = if (ix < 0) @intCast(ix + len32) else @intCast(ix);
+            const i: u64 = if (ix < 0) @intCast(ix + len64) else @intCast(ix);
             if (i >= self.len()) {
                 return null;
             }
-            return &self.buffer[(self.read_index + i) % self.buffer.len];
+            const buf_ix: usize = @intCast((self.read_index + i) % self.buffer.len);
+            return &self.buffer[buf_ix];
         }
 
         pub fn pop_front(self: *Self) ?T {
             if (self.empty()) {
                 return null;
             }
-            const item = self.buffer[self.read_index % self.buffer.len];
+            const item = self.buffer[@as(usize, @intCast(self.read_index % self.buffer.len))];
             self.read_index += 1;
             return item;
         }
@@ -58,7 +59,7 @@ pub fn RingBuffer(comptime T: type) type {
         }
 
         pub fn len(self: *const Self) usize {
-            return self.write_index - self.read_index;
+            return @intCast(self.write_index - self.read_index);
         }
 
         pub fn capacity(self: *const Self) usize {
@@ -74,8 +75,8 @@ pub fn RingBuffer(comptime T: type) type {
 
 pub fn RingIterator(T: type) type {
     return struct {
-        pos_idx: usize,
-        stop_idx: usize,
+        pos_idx: u64,
+        stop_idx: u64,
         rb: *RingBuffer(T),
 
         pub fn init(ring: *RingBuffer(T)) @This() {
