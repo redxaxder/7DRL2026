@@ -40,14 +40,18 @@ pub const combat_log = struct {
     pub var buffer: [20][]const u8 = undefined;
     pub var storage: RingBuffer([]const u8) = undefined;
     var printBuffer: [8192]u8 = .{0} ** 8192;
+    var fba: std.heap.FixedBufferAllocator = .init(&printBuffer);
+    const allocator = fba.allocator();
 
     pub fn log(comptime message: []const u8, args: anytype) void {
         // format message
-        const slice = std.fmt.bufPrint(printBuffer[0..], message, args) catch {
+        const slice = std.fmt.allocPrint(allocator, message, args) catch {
             return;
         };
         if (combat_log.storage.full()) {
-            _ = combat_log.storage.pop_front();
+            if (combat_log.storage.pop_front()) |m| {
+                allocator.free(m);
+            }
         }
         _ = combat_log.storage.try_push_back(slice) catch unreachable;
     }
