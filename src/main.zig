@@ -796,7 +796,7 @@ fn roll_new_enemy(rng: std.Random) ?IRect {
         return null;
     }
 
-    if (!map.BOUNDS.contains(target_rect)) {
+    if (!map.BOUNDS.contains_rect(target_rect)) {
         return null;
     }
 

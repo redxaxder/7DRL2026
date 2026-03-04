@@ -239,6 +239,11 @@ pub const IRect = struct {
             p.y >= self.y and p.y < self.y + self.h;
     }
 
+    pub fn contains_rect(self: IRect, r: IRect) bool {
+        return r.x >= self.x and r.x + r.w <= self.x + self.w and
+            r.y >= self.y and r.y + r.h <= self.y + self.h;
+    }
+
     pub fn iter(self: IRect) LocationIterator {
         return .{ .rect = self };
     }
