@@ -15,10 +15,15 @@ pub const js = struct {
     pub extern "render" fn clear() void;
     pub extern "render" fn draw(dstPtr: i32, srcPtr: i32, colorPtr: i32, count: i32, srcW: i32, srcH: i32, dstW: f32, dstH: f32) void;
     pub extern "render" fn clearRect(x: f32, y: f32, w: f32, h: f32, colorIdx: u8) void;
+    pub extern "render" fn scissor(x: f32, y: f32, w: f32, h: f32) void;
+    pub extern "render" fn unscissor() void;
 };
 
-pub fn clear() void {
-    js.clear();
+pub const clear = js.clear;
+pub const unscissor = js.unscissor;
+
+pub fn scissor(r: Rect) void {
+    js.scissor(r.x, r.y, r.w, r.h);
 }
 
 pub fn clear_rect(r: Rect, color: Color) void {

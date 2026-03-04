@@ -28,8 +28,8 @@ const IRect = core.IRect;
 // given that killing a size 3 kaiju unlocks the 4th slot, and it scales linearly..
 // we get size 9 -> 10th slot
 // size 10 -> victory
-const MOTHER_KAIJU_SIZE = 10;
-const MIN_KAIJU_SIZE = 3;
+pub const MOTHER_KAIJU_SIZE = 10;
+pub const MIN_KAIJU_SIZE = 3;
 
 const FOV_RANGE = 80;
 const DANGER_GROWTH = 90;
@@ -230,6 +230,8 @@ pub const Unit = struct {
                             inventory.add_pending_pickup();
                         }
                     }
+
+                    fov.refresh_fov(p, FOV_RANGE);
                 }
             }
             // kaiju crush motorcycles and smashable terrain
@@ -248,6 +250,7 @@ pub const Unit = struct {
         sector.remove(id, self);
         self.position = pos;
         sector.add(id, self);
+
         const dist = to.distance(from);
         _ = globals.animation_queue.force_add(
             .{
@@ -404,6 +407,10 @@ pub const globals = struct {
         return globals.unit(PLAYER_ID);
     }
 
+    pub fn kmom() *Unit {
+        return globals.unit(KMOM_ID);
+    }
+
     pub fn free_unit_id() ?UnitId {
         for (units[1..], 1..) |u, i| {
             if (u.tag == .Nil) {
@@ -415,6 +422,9 @@ pub const globals = struct {
 };
 
 pub const PLAYER_ID: UnitId = 1;
+pub const KMOM_ID: UnitId = 2;
+pub const PLAYER_START: IVec2 = .{ .x = 200, .y = 2300 };
+pub const KMOM_START: IVec2 = .{ .x = 2300, .y = 200 };
 
 pub fn spawn(u: Unit) UnitId {
     const id = globals.free_unit_id() orelse @panic("how did we run out so fast");
@@ -434,18 +444,25 @@ pub fn init(rng: std.Random) !void {
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
     globals.rng = rng;
 
-    globals.units[PLAYER_ID] = .init_player(IVec2.ZERO);
-    sector.add(PLAYER_ID, globals.player());
-
-    const moto_id = spawn(.init_motorcycle(IVec2.ZERO, .Right));
-    globals.player().mounted_on = moto_id;
-    inventory.init(rng);
-
-    _ = spawn(.init_kaiju(
-        IVec2{ .x = 9, .y = 28 },
-        MOTHER_KAIJU_SIZE,
-    ));
     map.mapgen(rng);
+
+    globals.units[PLAYER_ID] = .init_player(PLAYER_START);
+    sector.add(PLAYER_ID, globals.player());
+    {
+        var it = globals.player().get_rect().expand(3).iter();
+        while (it.next()) |pos| {
+            map.set_terrain_at(pos, .floor);
+        }
+    }
+
+    globals.units[KMOM_ID] = .init_kaiju(KMOM_START, MOTHER_KAIJU_SIZE);
+    sector.add(KMOM_ID, globals.kmom());
+    _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
+
+    const moto_id = spawn(.init_motorcycle(PLAYER_START, .Right));
+    globals.player().mounted_on = moto_id;
+
+    inventory.init(rng);
     fov.refresh_fov(globals.player().position, FOV_RANGE);
 
     map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.void_);
@@ -564,7 +581,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
             const percent: f64 = @floatFromInt(weapon.attrs.effective_value(.radioactive_damage));
             const hp: f64 = @floatFromInt(u.hp);
             const damage = percent * (hp / 100);
-            const idamage: i64 = @intFromFloat(@trunc(damage));
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage))) + 1;
             u.damage(idamage);
             combat_log.log("The gamma ray deals {} damage.", .{idamage});
         },
@@ -695,13 +712,19 @@ fn resolve_pending(rng: std.Random) void {
     }
 }
 
+fn destroy_area(target: IRect, rng: std.Random) bool {
+    var any = false;
+    var it = target.iter();
+    while (it.next()) |pos| {
+        any = any or destroy(pos, rng);
+    }
+    return any;
+}
+
 fn new_kaiju(target: IRect, rng: std.Random) !void {
     const size = target.w;
     const id = globals.free_unit_id() orelse return error.OutOfUnitSlots;
-    var to_clear = target.expand(@divTrunc(size, 2)).iter();
-    while (to_clear.next()) |pos| {
-        _ = destroy(pos, rng);
-    }
+    _ = destroy_area(target.expand(@divTrunc(size, 2)), rng);
     globals.units[id] = .init_kaiju(target.ivec(), @intCast(size));
 }
 

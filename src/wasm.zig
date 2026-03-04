@@ -13,10 +13,11 @@ const RingBuffer = @import("ringbuffer.zig").RingBuffer;
 
 const ui = @import("ui.zig");
 
-const Vec2 = @import("core.zig").Vec2;
-const IVec2 = @import("core.zig").IVec2;
-const Rect = @import("core.zig").Rect;
-const IRect = @import("core.zig").IRect;
+const core = @import("core.zig");
+const Vec2 = core.Vec2;
+const IVec2 = core.IVec2;
+const Rect = core.Rect;
+const IRect = core.IRect;
 
 pub const std_options: std.Options = .{
     .logFn = log,
@@ -70,7 +71,10 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
 
     combat_log.storage = .init(&combat_log.buffer);
 
-    std.log.info("hello {}", .{ui.MAIN_VIEW.get("viewport")});
+    camera = main.globals.player().position.float();
+    camera.x -= camera_w / 2;
+    camera.y -= camera_h / 2;
+    camera_target = camera;
 
     return 0;
 }
@@ -96,7 +100,7 @@ fn splat_wrap_string(x: f32, y: f32, text: []const u8, color: Color, size: f32, 
 fn splat_string(x: f32, y: f32, text: []const u8, color: Color, size: f32) void {
     var cx = x;
     for (text) |ch| {
-        push(.{
+        render_buffer.push(.{
             .pos = .{ .x = cx, .y = y },
             .size = .{ .x = size, .y = size },
             .src_idx = ch,
@@ -160,39 +164,15 @@ const DrawOptions = struct {
     color: Color = .white,
     bgcolor: ?Color = null,
     pixel_shift: bool = false,
+    origin: Vec2 = .ZERO,
 };
 
 pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
 
     if (options.bgcolor) |bgcolor| {
-        push(.{
-            .pos = screen_pos,
-            .size = dim,
-            .color = bgcolor,
-            .src_idx = 0xDB,
-        });
-    }
-
-    push(.{
-        .pos = screen_pos,
-        .size = dim,
-        .color = options.color,
-        .src_idx = src_idx,
-    });
-}
-
-pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
-    const rcamera = Vec2{
-        .x = std.math.round(camera.x * 8) / 8,
-        .y = std.math.round(camera.y * 8) / 8,
-    };
-    const screen_pos = world_pos.minus(rcamera).scaled(SPRITE_SCALE);
-    const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
-
-    if (options.bgcolor) |bgcolor| {
-        push(.{
-            .pos = screen_pos,
+        render_buffer.push(.{
+            .pos = screen_pos.plus(options.origin),
             .size = dim,
             .color = bgcolor,
             .src_idx = 0xDB,
@@ -204,12 +184,17 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
     else
         0;
 
-    push(.{
-        .pos = screen_pos.plus(Vec2.ONE.scaled(offset)),
+    render_buffer.push(.{
+        .pos = screen_pos.plus(Vec2.ONE.scaled(offset)).plus(options.origin),
         .size = dim,
         .color = options.color,
         .src_idx = src_idx,
     });
+}
+
+pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void {
+    const screen_pos = world_pos.minus(camera.rounded(SPRITE_SCALE)).scaled(SPRITE_SCALE);
+    draw_glyph(screen_pos, src_idx, options);
 }
 
 fn render_kaiju(kaiju: *const main.Unit) void {
@@ -251,12 +236,16 @@ fn render_kaiju(kaiju: *const main.Unit) void {
 
     // Flush before K so it doesn't resize the border batch
     render_buffer.flush();
-    draw_world_glyph(kaiju.render_position.plus(Vec2.ONE), 'K', .{
-        .bgcolor = .black,
-        .color = .red,
-        .size = kaiju.size - 2,
-        .pixel_shift = true,
-    });
+    draw_world_glyph(
+        kaiju.render_position.plus(Vec2.ONE),
+        "ABCDEFGHIJKLMNOPQRS"[kaiju.size - main.MIN_KAIJU_SIZE],
+        .{
+            .bgcolor = .black,
+            .color = .red,
+            .size = kaiju.size - 2,
+            .pixel_shift = true,
+        },
+    );
     render_buffer.flush();
 }
 
@@ -297,21 +286,19 @@ fn animate_camera_to(target: Vec2) void {
         main.animlib.linear_slide,
         .{ camera_target, target, &camera },
     ).lock_exclusive(main.animlib.lock_camera);
-
-    // _ = (try main.globals.animation_queue.push(.EMPTY))
-    //     .chain()
-    // .lock_exclusive(main.animlib.lock_unit_id(main.PLAYER_ID))
-    // .lock_exclusive(main.animlib.lock_unit_id(main.globals.player().mounted_on));
     camera_target = target;
 }
 
-fn render_unit(unit: *const main.Unit) void {
+fn render_unit(unit: *const main.Unit, origin: Vec2) void {
     switch (unit.tag) {
         .Player => {
             draw_world_glyph(
                 unit.render_position,
                 '@',
-                .{ .bgcolor = .black },
+                .{
+                    .bgcolor = .black,
+                    .origin = origin,
+                },
             );
         },
         .Motorcycle => {
@@ -326,6 +313,7 @@ fn render_unit(unit: *const main.Unit) void {
             draw_world_glyph(unit.render_position, 'X', .{
                 .color = .yellow,
                 .bgcolor = .black,
+                .origin = origin,
             });
         },
         else => {
@@ -398,14 +386,19 @@ pub fn draw_world_rect(rect: IRect, draw_options: DrawOptions) void {
 pub fn render_debug(val: anytype) void {
     const T = @TypeOf(val);
     const fields = @typeInfo(T).@"struct".fields;
-    const x: f32 = 10;
-    const size: f32 = 32;
+    const size: f32 = 12;
+    const width = 30;
+    const height = 10;
+
+    const x = 10;
     var y: f32 = 10;
 
+    const rect: Rect = .{ .x = x, .y = y, .w = size * width, .h = size * height };
+    RenderBuffer.clear_rect(rect, .blue);
     inline for (fields) |field| {
         const field_val = @field(val, field.name);
         const text = std.fmt.bufPrint(&printBuffer, "{s}: {any}", .{ field.name, field_val }) catch "...";
-        _ = splat_wrap_string(x, y, text, .magenta, size, 10);
+        _ = splat_wrap_string(x, y, text, .magenta, size, width);
         render_buffer.flush();
         y += size;
     }
@@ -433,7 +426,7 @@ fn draw_log() void {
     const layout = Layout.init();
     screen_offset = layout.log.pos();
     defer screen_offset = .ZERO;
-    RenderBuffer.clear_rect(layout.log, Color.black);
+    // RenderBuffer.clear_rect(layout.log, Color.black);
 
     var vshift: f32 = 0;
     var messages = combat_log.storage.iter();
@@ -462,9 +455,22 @@ fn draw_inventory() void {
 }
 
 fn draw_gamefield(t: f64) void {
-    const layout = Layout.init();
-    screen_offset = layout.gamefield.pos();
-    defer screen_offset = .ZERO;
+    // const layout = Layout.init();
+    // screen_offset = layout.gamefield.pos();
+    // defer screen_offset = .ZERO;
+
+    // restrict drawing to viewport interior
+    const viewport: IRect = ui.MAIN_VIEW.get("viewport");
+    const interior = viewport.expand(-1);
+    RenderBuffer.scissor(Rect{
+        .x = @as(f32, @floatFromInt(interior.x)) * SPRITE_SCALE,
+        .y = @as(f32, @floatFromInt(interior.y)) * SPRITE_SCALE,
+        .w = @as(f32, @floatFromInt(interior.w)) * SPRITE_SCALE,
+        .h = @as(f32, @floatFromInt(interior.h)) * SPRITE_SCALE,
+    });
+    const origin: Vec2 = interior.ivec().float();
+    defer RenderBuffer.unscissor();
+
     // Draw the terrain
     const imin = IVec2{
         .x = @intFromFloat(@floor(camera.x)),
@@ -487,7 +493,11 @@ fn draw_gamefield(t: f64) void {
                 .red
             else
                 .white;
-            draw_world_glyph(world_pos.float(), terrain.glyph(), .{ .color = color });
+            draw_world_glyph(
+                world_pos.float(),
+                terrain.glyph(),
+                .{ .color = color, .origin = origin },
+            );
         }
     }
     // The render buffer assumes that all images in the same batch
@@ -508,7 +518,7 @@ fn draw_gamefield(t: f64) void {
             if (u.mounted()) {
                 u.render_position = u.mount().render_position;
             }
-            render_unit(u);
+            render_unit(u, origin);
         }
     }
 
@@ -529,11 +539,11 @@ fn draw_gamefield(t: f64) void {
                 }
                 draw_world_glyph(pos.float(), 0x09, .{
                     .color = .blue,
+                    .origin = origin,
                 });
             }
         }
     }
-
     render_buffer.flush();
 }
 
@@ -556,9 +566,20 @@ pub export fn frame(t: f64) void {
 
     draw_gamefield(t);
 
-    draw_inventory();
+    const kvec = main.globals.kmom().position.float()
+        .minus(camera.plus(Vec2.ONE.scaled(camera_w / 2)));
+    const norm = kvec.max_norm();
+    if (norm > 34) {
+        draw_indicator(kvec);
+    }
 
-    draw_log();
+    draw_indicator(core.Dir4.Right.ivec().float());
+    draw_indicator(core.Dir4.Left.ivec().float());
+    draw_indicator(core.Dir4.Up.ivec().float());
+    draw_indicator(core.Dir4.Down.ivec().float());
+    // draw_inventory();
+
+    // draw_log();
 
     // render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
     var weap: ?inventory.ItemTag = null;
@@ -566,13 +587,33 @@ pub export fn frame(t: f64) void {
         weap = w.tag;
     }
 
-    render_debug(.{ .active = weap });
+    // render_debug(.{ .active = weap });
 
-    // render_buffer.flush();
+    render_buffer.flush();
 }
 
-fn push(sprite: Sprite) void {
-    var s: Sprite = sprite;
-    s.pos = s.pos.plus(screen_offset);
-    render_buffer.push(s);
+pub fn draw_indicator(v: Vec2) void {
+    const r = ui.MAIN_VIEW.get("viewport").float().scaled(SPRITE_SCALE);
+    const point = edge_point(r.expand(-SPRITE_SCALE / 2), v).minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
+    draw_glyph(point.rounded(SPRITE_SCALE), 0x13, .{ .color = .red });
+}
+
+// Casts a ray from the center of `rect` in the given `dir`ection,
+// returning the point where it exits the rectangle boundary.
+fn edge_point(rect: Rect, dir: Vec2) Vec2 {
+    const cx = rect.x + rect.w * 0.5;
+    const cy = rect.y + rect.h * 0.5;
+    const hw = rect.w * 0.5;
+    const hh = rect.h * 0.5;
+
+    // Scale factor needed to reach each edge
+    const tx: f32 = if (dir.x > 0) hw / dir.x else if (dir.x < 0) -hw / dir.x else std.math.inf(f32);
+    const ty: f32 = if (dir.y > 0) hh / dir.y else if (dir.y < 0) -hh / dir.y else std.math.inf(f32);
+
+    const t = @min(tx, ty);
+
+    return .{
+        .x = cx + dir.x * t,
+        .y = cy + dir.y * t,
+    };
 }

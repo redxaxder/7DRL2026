@@ -240,6 +240,15 @@ export async function createRenderer(canvas, atlasUrl, maxSprites, colorTable, s
         gl.disable(gl.SCISSOR_TEST);
     }
 
+    function scissor(x,y,w,h) {
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(x, canvas.height - y - h, w, h);
+    }
+
+    function unscissor() {
+        gl.disable(gl.SCISSOR_TEST);
+    }
+
     function draw(buffers, spriteCount, srcW, srcH, dstW, dstH) {
         if (spriteCount === 0) return;
 
@@ -276,6 +285,8 @@ export async function createRenderer(canvas, atlasUrl, maxSprites, colorTable, s
         resize,
         clear,
         clearRect,
+        scissor,
+        unscissor,
         draw,
         gl,
         canvas,

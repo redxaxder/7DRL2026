@@ -35,7 +35,7 @@ export async function initWasm(path, renderer, audio) {
 
   const imports = {
     util: { log, time },
-    render: { clear, draw, clearRect },
+    render: { clear, draw, clearRect, scissor: renderer.scissor, unscissor: renderer.unscissor },
     audio: { playSound }
   }
 

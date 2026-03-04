@@ -175,6 +175,13 @@ pub const Vec2 = extern struct {
         .y = -3200,
     };
 
+    pub fn rounded(self: Vec2, precision: f32) Vec2 {
+        return .{
+            .x = std.math.round(self.x * precision) / precision,
+            .y = std.math.round(self.y * precision) / precision,
+        };
+    }
+
     pub fn plus(self: Vec2, rhs: Vec2) Vec2 {
         return .{
             .x = self.x + rhs.x,
@@ -222,6 +229,12 @@ pub const Vec2 = extern struct {
         const ssq = dx * dx + dy * dy;
         return std.math.sqrt(ssq);
     }
+
+    pub fn max_norm(self: Vec2) f32 {
+        const ax = @abs(self.x);
+        const ay = @abs(self.y);
+        return @max(ax, ay);
+    }
 };
 
 pub const Interval = struct {
@@ -238,6 +251,15 @@ pub const IRect = struct {
     y: i16 = -3200,
     w: i16 = 0,
     h: i16 = 0,
+
+    pub fn float(self: IRect) Rect {
+        return .{
+            .x = @floatFromInt(self.x),
+            .y = @floatFromInt(self.y),
+            .w = @floatFromInt(self.w),
+            .h = @floatFromInt(self.h),
+        };
+    }
 
     pub fn ivec(self: IRect) IVec2 {
         return .{ .x = self.x, .y = self.y };
@@ -370,6 +392,23 @@ pub const Rect = struct {
 
     pub fn pos(self: Rect) Vec2 {
         return Vec2{ .x = self.x, .y = self.y };
+    }
+    pub fn scaled(self: Rect, scale: f32) Rect {
+        return .{
+            .x = self.x * scale,
+            .y = self.y * scale,
+            .w = self.w * scale,
+            .h = self.h * scale,
+        };
+    }
+
+    pub fn expand(self: Rect, amount: f32) Rect {
+        return .{
+            .x = self.x - amount,
+            .y = self.y - amount,
+            .w = self.w + 2 * amount,
+            .h = self.h + 2 * amount,
+        };
     }
 
     pub fn xmax(self: Rect) f32 {

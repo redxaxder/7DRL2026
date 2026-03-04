@@ -92,8 +92,7 @@ pub fn roll_low(rng: std.Random, rounds: usize, min: i16, max: i16) i16 {
 
 pub fn roll_next_item(rng: std.Random) void {
     const t: ItemTag = blk: while (true) {
-        const c = rng.int(usize) % std.enums.values(ItemTag).len;
-        const x: ItemTag = @enumFromInt(c);
+        const x: ItemTag = rng.enumValue(ItemTag);
         if (x != .Nil) {
             break :blk x;
         }

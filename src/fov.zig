@@ -181,6 +181,7 @@ fn is_blocked(pos: IVec2) bool {
 }
 
 pub fn refresh_fov(center: IVec2, distance: u8) void {
+    std.log.info("fov: {}", .{center});
     // mark the center tile
     map.mark_seen(center);
 
