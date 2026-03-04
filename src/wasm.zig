@@ -11,6 +11,8 @@ const map = @import("map.zig");
 const inventory = @import("inventory.zig");
 const RingBuffer = @import("ringbuffer.zig").RingBuffer;
 
+const ui = @import("ui.zig");
+
 const Vec2 = @import("core.zig").Vec2;
 const IVec2 = @import("core.zig").IVec2;
 const Rect = @import("core.zig").Rect;
@@ -68,7 +70,7 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
 
     combat_log.storage = .init(&combat_log.buffer);
 
-    std.log.info("hello", .{});
+    std.log.info("hello {}", .{ui.MAIN_VIEW.get("viewport")});
 
     return 0;
 }

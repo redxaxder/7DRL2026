@@ -1039,6 +1039,14 @@ pub fn player_passable(pos: IVec2) bool {
     if (!t.passable()) {
         return false;
     }
+    var occupants = sector.get_occupants(pos);
+    while (occupants.next()) |uid| {
+        const u = globals.unit(uid);
+        switch (u.tag) {
+            .Kaiju => return false,
+            else => {},
+        }
+    }
     //TODO: kaiju obstruction
     return true;
 }
