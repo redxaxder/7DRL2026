@@ -44,25 +44,25 @@ v0.2 core features
   - if the motorcycle is destroyed when the player is on it, it becomes debris/rubble and the player
     is flung at speed
 + vision (fov, reveal terrain)
-- progression
-  - gain inventory limit based on largest kaiju killed
++ progression
+  + gain inventory limit based on largest kaiju killed
 - ui
   - death
   - title screen
-  - combat log
+  + combat log
   - legend
   - inventory
-    - pick up item
+    + pick up item
     - replace item (item in inventory slot is destroyed to accomodate new item)
       - if several items are picked up in the same turn, accumulate them and ask one at a time
         to replace
-  - select weapon
-    - indicate selected weapon
+  + select weapon
+  - indicate selected weapon
   - projectile indicator
 - trinkets
   - damage bonuses
   - motorcycle bonuses
-  - crit clocks
+  + crit clocks
   - autoconsumable heal
 + animation
 - audio
@@ -94,7 +94,7 @@ v0.2 core features
     - sidewalks
 - more sizes/kinds of kaiju
   - kauji density map
-  - big mama kaiju
+  + big mama kaiju
   - kaiju spawn limit
 - ability to win
 - falling obstacles
