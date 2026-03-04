@@ -239,14 +239,14 @@ pub const Unit = struct {
             while (positions.next()) |p| {
                 if (map.get_terrain_at(p).halting()) {
                     halt = true;
-                    _ = animate_terrain_to(p, .Floor).chain();
+                    _ = animate_terrain_to(p, .floor).chain();
                 }
                 if (self.tag == .Player) {
                     const r = IRect.singleton(p);
                     var iter = if (self.mounted()) r.expand(1).iter() else r.iter();
                     while (iter.next()) |q| {
-                        if (map.get_terrain_at(q) == .Trinket) {
-                            _ = animate_terrain_to(q, .Floor).chain();
+                        if (map.get_terrain_at(q) == .trinket) {
+                            _ = animate_terrain_to(q, .floor).chain();
                             inventory.add_pending_pickup();
                         }
                     }
@@ -286,7 +286,7 @@ pub const Unit = struct {
         while (landed.next()) |p| {
             if (map.get_terrain_at(p).halting()) {
                 halt = true;
-                _ = animate_terrain_to(p, .Floor).chain();
+                _ = animate_terrain_to(p, .floor).chain();
             }
         }
         if (halt) {
@@ -470,7 +470,7 @@ pub fn init(rng: std.Random) !void {
     map.mapgen(rng);
     fov.refresh_fov(globals.player().position, FOV_RANGE);
 
-    map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.Void);
+    map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.void_);
 }
 
 // dir is null when you turn is not an active move, you are maybe just coasting
@@ -489,10 +489,8 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
         if (motomove.dismount) {
             player.move_to(motomove.position);
             player.*.mounted_on = 0;
-            combat_log.log("You dismount the motorcycle.", .{});
         } else if (crash_check(pmount, motomove)) |crashed| {
             if (crashed.fling) {
-                combat_log.log("CRAAAASH!", .{});
                 const delta = motomove.midpoint.minus(player.position);
                 var landed_at = motomove.midpoint;
                 var scan = landed_at.scan(pmount.orientation, delta.max_norm());
@@ -513,6 +511,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 player.*.move_to(pmount.position);
             } else {
                 player.*.mounted_on = 0;
+                combat_log.log("You leap off the motorcycle.", .{});
             }
         } else {
             pmount.*.speed = motomove.speed;
@@ -534,10 +533,12 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                     .Motorcycle => { // Mount it
                         player.move_to(occupant.position);
                         player.*.mounted_on = occupant_id;
+                        combat_log.log("You start the motorcycle.", .{});
                         return true;
                     },
                     .Kaiju => {
                         // move into kaiju?
+                        combat_log.log("You don't like your prospects.", .{});
                         return false;
                     },
                     else => {
@@ -574,6 +575,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
             if (target) |u| {
                 u.damage(idamage);
                 globals.combo_count += combo_gain;
+                combat_log.log("The rifle round deals {} damage. You dial in your next shot.", .{idamage});
             }
         },
         .Rocket_Launcher => {
@@ -586,6 +588,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
             const damage = percent * (hp / 100);
             const idamage: i64 = @intFromFloat(@trunc(damage));
             u.damage(idamage);
+            combat_log.log("The gamma ray deals {} damage.", .{idamage});
         },
         else => {
             return false;
@@ -601,7 +604,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
         if (terrain.blocks_shot()) {
             // you shoot at the terrain
             // consequences TBD
-            combat_log.log("plink!", .{});
+            combat_log.log("You shoot the {s}.", .{terrain.name()});
             return true;
         }
         var aim_occupants = get_occupants(aim);
@@ -612,7 +615,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
             }
         }
     }
-    combat_log.log("whiff!", .{});
+    combat_log.log("You fire off into the distance.", .{});
     return true;
 }
 
@@ -692,7 +695,7 @@ fn resolve_pending(rng: std.Random) void {
     // TODO this could be more efficient
     for (globals.units[1..]) |*u| {
         if (u.tag == .PendingRubble) {
-            const terrain: Terrain = if (rng.boolean()) .Debris else .Rubble;
+            const terrain: Terrain = if (rng.boolean()) .debris else .rubble;
             const pos = u.position;
             unspawn(u);
             _ = animate_terrain_to(pos, terrain).chain();
@@ -718,7 +721,7 @@ fn new_kaiju(target: IRect, rng: std.Random) !void {
     const id = globals.free_unit_id() orelse return error.OutOfUnitSlots;
     var to_clear = target.expand(@divTrunc(size, 2)).iter();
     while (to_clear.next()) |pos| {
-        destroy(pos, rng);
+        _ = destroy(pos, rng);
     }
     globals.units[id] = .init_kaiju(target.ivec(), @intCast(size));
 }
@@ -741,8 +744,7 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
     var prng = std.Random.DefaultPrng.init(seed);
     const rng = prng.random();
     var it = rect.iter();
-    std.log.info("do splatter {}", .{mode});
-    combat_log.log("Bloody kaiju viscera rain down!", .{});
+    combat_log.log("Bloody viscera rain down!", .{});
     while (it.next()) |pos| {
         if (rng.boolean()) {
             const viscera = rng.boolean();
@@ -754,7 +756,7 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
                     const prev = tp;
                     tp.bloody = true;
                     if (viscera) {
-                        tp.terrain = .Viscera;
+                        tp.terrain = .viscera;
                     }
 
                     map.set_terrain_payload_at(pos, tp);
@@ -765,7 +767,7 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
                     var tp = map.get_render_terrain_payload_at(pos);
                     tp.bloody = true;
                     if (viscera) {
-                        tp.terrain = .Viscera;
+                        tp.terrain = .viscera;
                     }
                     map.set_render_terrain_payload_at(pos, tp);
                 },
@@ -775,7 +777,9 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
 }
 
 pub fn trigger_victory() void {
+    combat_log.log("You have finally put down the menace.", .{});
     // TBD
+    //
 }
 
 fn units_cleanup(rng: std.Random) void {
@@ -794,7 +798,11 @@ fn units_cleanup(rng: std.Random) void {
                     if (u.size == MOTHER_KAIJU_SIZE) {
                         trigger_victory();
                     }
-                    inventory.extend_item_capacity(u.size);
+                    const leveled_up = inventory.extend_item_capacity(u.size);
+                    if (leveled_up) {
+                        combat_log.log("You feel stronger after felling a powerful foe.", .{});
+                        combat_log.log("Inventory size increased to {}.", .{inventory.item_capacity});
+                    }
                     return;
                 },
                 .Motorcycle => {
@@ -868,8 +876,8 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     while (wall_iter.next()) |wall| {
         var boom_iter = wall.iter();
         while (boom_iter.next()) |boom_coord| {
-            if (map.get_terrain_at(boom_coord) == .Wall) {
-                const terrain: Terrain = if (rng.boolean()) .Rubble else .Debris;
+            if (map.get_terrain_at(boom_coord) == .wall) {
+                const terrain: Terrain = if (rng.boolean()) .rubble else .debris;
                 _ = animate_terrain_to(boom_coord, terrain).chain();
             }
         }
@@ -888,7 +896,6 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
             }
         }
     }
-    combat_log.log("The kaiju tears down a wall!", .{});
 }
 
 fn die() void {
@@ -896,15 +903,16 @@ fn die() void {
 }
 
 fn harm() void {
-    combat_log.log("ouchie", .{});
     globals.player().hp = 1;
 }
 
-fn destroy(pos: IVec2, rng: std.Random) void {
+fn destroy(pos: IVec2, rng: std.Random) bool {
     if (map.get_terrain_at(pos).smashable()) {
-        const rubble_type: Terrain = if (rng.boolean()) .Debris else .Rubble;
+        const rubble_type: Terrain = if (rng.boolean()) .debris else .rubble;
         _ = set_terrain(pos, rubble_type);
+        return true;
     }
+    return false;
 }
 
 fn smack_player(dir: Dir4, rng: std.Random) void {
@@ -917,19 +925,24 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
         harm();
 
         // fling player
+        combat_log.log("You are sent flying!", .{});
         const fling_rect: IRect = if (moto) |m| m.get_rect() else player.get_rect();
         var fling_iter = fling_rect.slide(dir, fling_distance);
         var flung: i16 = 0;
+        var destroyed = false;
         outer: while (fling_iter.next()) |fling_slice| {
             var iter = fling_slice.iter();
             while (iter.next()) |pos| {
                 const terrain = map.get_terrain_at(pos);
-                if (terrain == .Void) {
+                if (terrain == .void_) {
                     break :outer;
                 }
-                destroy(pos, rng);
+                destroyed = destroyed or destroy(pos, rng);
             }
             flung += 1;
+        }
+        if (destroyed) {
+            combat_log.log("Smash!!", .{});
         }
         const target: IVec2 = player.position.plus(dir.ivec().scaled(flung));
         globals.player().move_to(target);
@@ -1183,6 +1196,7 @@ pub fn resolve_motorcycle_movement(
                 it.position = it.position.plus(drift);
                 if (moto.speed == 0) {
                     it.dismount = true;
+                    combat_log.log("You dismount the motorcycle.", .{});
                 }
             } else { // turn!
                 const turned_speed = blk: {
@@ -1211,8 +1225,9 @@ pub fn resolve_motorcycle_movement(
                         .plus(change.ivec());
                     it.position = it.position.plus(drift);
                 } else {
-                    // //dismount
+                    // dismount
                     it.dismount = true;
+                    combat_log.log("You dismount the motorcycle.", .{});
                     it.position = it.position.plus(change.ivec());
                 }
             } else { // full brake

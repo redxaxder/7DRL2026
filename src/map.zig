@@ -63,17 +63,17 @@ fn mapgen_city_block(zone_size: IVec2, zone: IVec2, block_size: IVec2, block: IV
             const world_x: i16 = (zone.x * zone_size.x) + (block.x * block_size.x) - block_offset.x + x;
             const world_y: i16 = (zone.y * zone_size.y) + (block.y * block_size.y) - block_offset.y + y;
             const world_pos: IVec2 = .{ .x = world_x, .y = world_y };
-            var terrain: Terrain = .Floor;
+            var terrain: Terrain = .floor;
             if (is_street(local_pos, street_size, block_size)) {
-                terrain = .Asphalt;
+                terrain = .asphalt;
             }
             // buildings
             if (is_wall_x(local_pos, street_size, block_size) or is_wall_y(local_pos, street_size, block_size)) {
-                terrain = .Wall;
+                terrain = .wall;
             }
             // doors
             if (is_door(local_pos, street_size, block_size, doors)) {
-                terrain = .Door;
+                terrain = .door;
             }
             set_terrain_at(world_pos, terrain);
         }
@@ -121,14 +121,14 @@ pub fn mapgen(rng: std.Random) void {
     for (0..MAP_SIZE - 1) |x| {
         for (0..MAP_SIZE - 1) |y| {
             if (rng.float(f32) < destruction_factor) {
-                const terrain: Terrain = if (rng.float(f32) < 0.5) .Rubble else .Debris;
+                const terrain: Terrain = if (rng.float(f32) < 0.5) .rubble else .debris;
                 switch (terrain) {
-                    .Rubble => {
+                    .rubble => {
                         const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
                         const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
                         rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng) catch continue;
                     },
-                    .Debris => {
+                    .debris => {
                         const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
                         const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
                         rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng) catch continue;
@@ -148,7 +148,7 @@ pub fn mapgen(rng: std.Random) void {
             if (rng.float(f32) < trinket_factor) {
                 const existing = get_terrain_at(pos);
                 if (existing.passable()) {
-                    set_terrain_at(pos, .Trinket);
+                    set_terrain_at(pos, .trinket);
                 }
             }
         }
@@ -160,7 +160,7 @@ pub const MAP_SIZE = 2500;
 pub const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
 pub const BOUNDS: core.IRect = .{ .x = 0, .y = 0, .w = MAP_SIZE, .h = MAP_SIZE };
 
-pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.Floor)} ** MAPDATA_LEN;
+pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.floor)} ** MAPDATA_LEN;
 
 pub const FullTerrain = packed struct(u8) {
     terrain: Terrain,
@@ -189,72 +189,76 @@ pub const FullTerrain = packed struct(u8) {
 };
 
 pub const Terrain = enum(u5) {
-    Floor,
-    Asphalt,
-    Wall,
-    Door,
-    Rubble,
-    Debris,
-    Trinket,
-    Viscera,
-    Money,
-    Void,
+    floor,
+    asphalt,
+    wall,
+    door,
+    rubble,
+    debris,
+    trinket,
+    viscera,
+    money,
+    void_,
     _,
+
+    pub fn name(self: Terrain) []const u8 {
+        return std.enums.tagName(Terrain, self) orelse "";
+    }
 
     pub fn glyph(self: Terrain) u8 {
         switch (self) {
-            .Asphalt => return 0,
-            // .Asphalt => return '\\',
-            .Floor => return '.',
-            .Wall => return '#',
-            .Door => return '+',
-            .Rubble => return '&',
-            .Viscera => return 0x9C,
-            .Money => return 0x9D,
-            .Debris => return ';',
-            .Trinket => return 0xF0,
+            .asphalt => return 0,
+            // .asphalt => return '\\',
+            .floor => return '.',
+            .wall => return '#',
+            .door => return '+',
+            .rubble => return '&',
+            .viscera => return 0x9C,
+            .money => return 0x9D,
+            .debris => return ';',
+            .trinket => return 0xF0,
             else => return '/',
         }
     }
 
     pub fn passable(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Rubble, .Void => false,
+            .wall, .rubble, .void_ => false,
             else => true,
         };
     }
 
     pub fn halting(self: Terrain) bool {
         return switch (self) {
-            .Door, .Viscera => true,
+            .door, .viscera => true,
             else => false,
         };
     }
 
     pub fn kaiju_passable(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Void => false,
+            .wall, .void_ => false,
             else => true,
         };
     }
 
     pub fn smashable(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Door, .Rubble, .Viscera => true,
+            .wall, .door, .rubble, .viscera => true,
             else => false,
         };
     }
 
     pub fn blocks_fov(self: Terrain) bool {
         return switch (self) {
-            .Void, .Wall, .Door => true,
+            .void_, .wall, .door => true,
             else => false,
         };
     }
 
     pub fn blocks_shot(self: Terrain) bool {
         return switch (self) {
-            .Wall, .Door, .Void => true,
+            .wall, .door, .void_ => true,
             else => false,
         };
     }
@@ -287,7 +291,7 @@ pub fn mark_bloody(pos: IVec2) void {
 }
 
 pub fn get_terrain_payload_at(position: IVec2) FullTerrain.Payload {
-    const ix = map_index(position) orelse return .{ .terrain = .Void };
+    const ix = map_index(position) orelse return .{ .terrain = .void_ };
     const tile = mapdata[ix];
     if (tile.is_masked) {
         return @bitCast(get_mask(position).sim[tile.mask_index()].mask_index());
@@ -296,7 +300,7 @@ pub fn get_terrain_payload_at(position: IVec2) FullTerrain.Payload {
 }
 
 pub fn get_render_terrain_payload_at(position: IVec2) FullTerrain.Payload {
-    const ix = map_index(position) orelse return .{ .terrain = .Void };
+    const ix = map_index(position) orelse return .{ .terrain = .void_ };
     const tile = mapdata[ix];
     if (tile.is_masked) {
         return @bitCast(get_mask(position).render[tile.mask_index()].mask_index());
@@ -372,8 +376,8 @@ pub fn get_render_terrain_at(position: IVec2) Terrain {
 }
 
 pub const TerrainMask = struct {
-    sim: [128]FullTerrain = .{FullTerrain.from(.Void)} ** 128,
-    render: [128]FullTerrain = .{FullTerrain.from(.Void)} ** 128,
+    sim: [128]FullTerrain = .{FullTerrain.from(.void_)} ** 128,
+    render: [128]FullTerrain = .{FullTerrain.from(.void_)} ** 128,
     free: [128]u7 = init_free_list(),
     free_count: u8 = 128,
 

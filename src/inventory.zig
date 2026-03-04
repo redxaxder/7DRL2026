@@ -10,7 +10,7 @@ var pending_pickups: usize = 0;
 pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
 var active_item: ?usize = null;
 var item_count: usize = 0;
-var item_capacity: usize = 3;
+pub var item_capacity: usize = 3;
 var cash: usize = 0;
 
 var next_item: Item = undefined;
@@ -72,11 +72,13 @@ pub fn has_pending_pickups() bool {
     return pending_pickups > 0;
 }
 
-pub fn extend_item_capacity(ksize: u8) void {
+pub fn extend_item_capacity(ksize: u8) bool {
     const sz: usize = @intCast(ksize);
     const bonus = sz - 2;
+    const prev_capacity = item_capacity;
     item_capacity = @max(item_capacity, BASE_ITEM_CAPACITY + bonus);
     item_capacity = @min(item_capacity, INVENTORY_SIZE);
+    return item_capacity > prev_capacity;
 }
 
 pub fn roll_low(rng: std.Random, rounds: usize, min: i16, max: i16) i16 {

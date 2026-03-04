@@ -480,7 +480,7 @@ fn draw_gamefield(t: f64) void {
             const terrain = if (payload.seen)
                 payload.terrain
             else
-                .Void;
+                .void_;
             const color: Color = if (payload.bloody)
                 .red
             else
