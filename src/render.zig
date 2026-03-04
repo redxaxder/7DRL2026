@@ -1,5 +1,6 @@
 const std = @import("std");
 const Vec2 = @import("core.zig").Vec2;
+const Rect = @import("core.zig").Rect;
 
 const Self = @This();
 
@@ -13,10 +14,15 @@ last_seen_size: Vec2 = .ZERO,
 pub const js = struct {
     pub extern "render" fn clear() void;
     pub extern "render" fn draw(dstPtr: i32, srcPtr: i32, colorPtr: i32, count: i32, srcW: i32, srcH: i32, dstW: f32, dstH: f32) void;
+    pub extern "render" fn clearRect(x: f32, y: f32, w: f32, h: f32, colorIdx: u8) void;
 };
 
 pub fn clear() void {
     js.clear();
+}
+
+pub fn clear_rect(r: Rect, color: Color) void {
+    js.clearRect(r.x, r.y, r.w, r.h, @intFromEnum(color));
 }
 
 pub const Color = enum(u8) {

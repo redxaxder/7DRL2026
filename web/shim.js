@@ -2,6 +2,9 @@ export async function initWasm(path, renderer, audio) {
   let instance;
 
   function clear() { renderer.clear(0,0,0,1) }
+  function clearRect(x, y, w, h, colorIdx) {
+    renderer.clearRect(x, y, w, h, colorIdx);
+  }
   function draw(dstPtr, srcPtr, colorPtr, count, srcW, srcH, dstW, dstH) {
     const mem = instance.exports.memory.buffer;
     const buffers = [
@@ -32,7 +35,7 @@ export async function initWasm(path, renderer, audio) {
 
   const imports = {
     util: { log, time },
-    render: { clear, draw },
+    render: { clear, draw, clearRect },
     audio: { playSound }
   }
 

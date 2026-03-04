@@ -154,6 +154,8 @@ const DrawOptions = struct {
     pixel_shift: bool = false,
 };
 
+
+
 pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     const dim = SPRITE_DIM.scaled(@floatFromInt(options.size));
 

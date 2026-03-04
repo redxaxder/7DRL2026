@@ -231,6 +231,15 @@ export async function createRenderer(canvas, atlasUrl, maxSprites, colorTable, s
         gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
+    function clearRect(x, y, w, h, colorIdx) {
+        const c = colorTable[colorIdx];
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(x, canvas.height - y - h, w, h);
+        gl.clearColor(c[0], c[1], c[2], c[3]);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.disable(gl.SCISSOR_TEST);
+    }
+
     function draw(buffers, spriteCount, srcW, srcH, dstW, dstH) {
         if (spriteCount === 0) return;
 
@@ -266,6 +275,7 @@ export async function createRenderer(canvas, atlasUrl, maxSprites, colorTable, s
         loadAtlas,
         resize,
         clear,
+        clearRect,
         draw,
         gl,
         canvas,
