@@ -3,6 +3,7 @@ const core = @import("core.zig");
 const IVec2 = core.IVec2;
 const IRect = core.IRect;
 const Interval = core.Interval;
+const UnitType = @import("main.zig").UnitType;
 
 const DirFlags = packed struct(u4) {
     north: bool = false,
@@ -386,6 +387,14 @@ pub const Terrain = enum(u5) {
             .sidewalk => return 0xB0,
             .road_paint => return 0xB1,
             else => return '/',
+        }
+    }
+
+    pub fn unit_passable(self: Terrain, u: UnitType) bool {
+        switch (u) {
+            .Kaiju => return self.kaiju_passable(),
+            .Player, .Motorcycle => return self.passable(),
+            else => return true,
         }
     }
 

@@ -252,6 +252,24 @@ pub const IRect = struct {
     w: i16 = 0,
     h: i16 = 0,
 
+    pub fn bounding_box(positions: []const IVec2) IRect {
+        var min_x = positions[0].x;
+        var min_y = positions[0].y;
+        var max_x = positions[0].x;
+        var max_y = positions[0].y;
+        for (positions[1..]) |p| {
+            min_x = @min(min_x, p.x);
+            min_y = @min(min_y, p.y);
+            max_x = @max(max_x, p.x);
+            max_y = @max(max_y, p.y);
+        }
+        return .{
+            .x = min_x,
+            .y = min_y,
+            .w = max_x - min_x,
+            .h = max_y - min_y,
+        };
+    }
     pub fn float(self: IRect) Rect {
         return .{
             .x = @floatFromInt(self.x),

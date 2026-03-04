@@ -205,6 +205,50 @@ pub const Unit = struct {
     pub fn get_id(self: *const Unit) UnitId {
         return @intCast((@intFromPtr(self) - @intFromPtr(&globals.units)) / @sizeOf(Unit));
     }
+    pub fn check_passable(
+        self: *const Unit,
+        where: struct {
+            pos: IVec2 = .ZERO,
+            orientation: Dir4 = .Right,
+        },
+    ) bool {
+        const rect = blk: {
+            var u: Unit = self.*;
+            u.position = where.pos;
+            u.orientation = where.orientation;
+            break :blk u.get_rect();
+        };
+
+        var occupants = sector.get_occupants_rect(rect);
+        const id = self.get_id();
+        while (occupants.next()) |uid| {
+            if (uid == id) {
+                continue;
+            }
+
+            const u = globals.unit(uid);
+            switch (u.tag) {
+                .Kaiju, .Player => {
+                    return false;
+                },
+                .Motorcycle => {
+                    switch (self.tag) {
+                        .Motorcycle => return false,
+                        else => continue,
+                    }
+                },
+                else => continue,
+            }
+        }
+        var it = rect.iter();
+        while (it.next()) |pos| {
+            const terrain = map.get_terrain_at(pos);
+            if (!terrain.unit_passable(self.tag)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     pub fn move_to(self: *Unit, pos: IVec2) void {
         const from = self.position.float();
@@ -492,7 +536,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 var landed_at = motomove.midpoint;
                 var scan = landed_at.scan(pmount.orientation, delta.max_norm());
                 while (scan.next()) |path| {
-                    if (player_passable(path)) {
+                    if (player.check_passable(.{ .pos = path })) {
                         landed_at = path;
                     } else {
                         break;
@@ -810,6 +854,10 @@ fn units_cleanup(rng: std.Random) void {
                     return;
                 },
                 .Motorcycle => {
+                    var it = u.get_rect().iter();
+                    while (it.next()) |pos| {
+                        _ = animate_terrain_to(pos, .debris);
+                    }
                     return;
                 },
                 .Player => {
@@ -1059,30 +1107,6 @@ pub const MotoResult = struct {
     dismount: bool,
 };
 
-pub fn player_passable(pos: IVec2) bool {
-    const t = map.get_terrain_at(pos);
-    if (!t.passable()) {
-        return false;
-    }
-    var occupants = sector.get_occupants(pos);
-    while (occupants.next()) |uid| {
-        const u = globals.unit(uid);
-        switch (u.tag) {
-            .Kaiju => return false,
-            else => {},
-        }
-    }
-    //TODO: kaiju obstruction
-    return true;
-}
-
-pub fn moto_passable(pos: IVec2, orientation: Dir4) bool {
-    const t = map.get_terrain_at(pos);
-    const p2 = pos.plus(orientation.ivec());
-    const t2 = map.get_terrain_at(p2);
-    return t.passable() and t2.passable();
-}
-
 pub const CrashInfo = struct {
     position: IVec2,
     orientation: Dir4,
@@ -1108,7 +1132,7 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         };
         if (move.slide) {
             const p = moto.handlepos().minus(move.orientation.ivec());
-            if (!moto_passable(p, move.orientation)) {
+            if (!moto.check_passable(.{ .pos = p, .orientation = move.orientation })) {
                 // we shouldnt end up here
                 std.log.err("unhandled movement case", .{});
             }
@@ -1118,7 +1142,7 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         const steps: usize = @intCast(delta.max_norm());
         for (0..steps) |_| {
             const next = cursor.position.plus(v);
-            if (!moto_passable(next, cursor.orientation)) {
+            if (!moto.check_passable(.{ .pos = next, .orientation = cursor.orientation })) {
                 return cursor;
             }
             cursor.position = next;
@@ -1140,18 +1164,18 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
 
         for (0..@intCast(n)) |_| {
             var next = cursor.position.plus(principal_vector);
-            if (!shifted and !moto_passable(next, moto.orientation)) {
+            if (!shifted and !moto.check_passable(.{ .pos = next, .orientation = moto.orientation })) {
                 next = next.plus(secondary_vector);
                 shifted = true;
             }
-            if (!moto_passable(next, moto.orientation)) {
+            if (!moto.check_passable(.{ .pos = next, .orientation = moto.orientation })) {
                 return cursor;
             }
             cursor.position = next;
         }
         if (!shifted) {
             const final = cursor.position.plus(secondary_vector);
-            if (!moto_passable(final, moto.orientation)) {
+            if (!moto.check_passable(.{ .pos = final, .orientation = moto.orientation })) {
                 return cursor;
             }
         }
@@ -1170,7 +1194,7 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
             moto.orientation
         else
             move.orientation;
-        if (!moto_passable(next, o)) {
+        if (!moto.check_passable(.{ .pos = next, .orientation = o })) {
             return cursor;
         }
         cursor.position = next;
@@ -1181,7 +1205,7 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         const steps2 = delta.projection(move.orientation).max_norm();
         for (0..@intCast(steps2)) |_| {
             const next = cursor.position.plus(move.orientation.ivec());
-            if (!moto_passable(next, move.orientation)) {
+            if (!moto.check_passable(.{ .pos = next, .orientation = move.orientation })) {
                 return cursor;
             }
             cursor.position = next;
@@ -1277,11 +1301,12 @@ pub fn resolve_motorcycle_movement(
                 // if speed is high enough, brake via akira slide.
                 // we hold the handlebar position constant,
                 // rotate the player's position around them
-                const slidestart = moto.handlepos().plus(moto.orientation.turn(.Right).ivec());
-                if (slide_dist >= 2 and player_passable(slidestart)) {
+                const slideface = moto.orientation.turn(.Left);
+                const slidestart = moto.handlepos().minus(slideface.ivec());
+                if (slide_dist >= 2 and moto.check_passable(.{ .pos = slidestart, .orientation = slideface })) {
                     it.slide = true;
                     it.position = it.position.plus(it.orientation.ivec());
-                    it.orientation = moto.orientation.turn(.Left);
+                    it.orientation = slideface;
                     it.position = it.position.minus(it.orientation.ivec());
                 }
             }

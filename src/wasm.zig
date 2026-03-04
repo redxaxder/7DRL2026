@@ -201,7 +201,7 @@ pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     }
 
     const offset: f32 = if (options.pixel_shift)
-        (SPRITE_SCALE / 16.0) * options.size
+        (SPRITE_SCALE / 8.0) * options.size
     else
         0;
 
@@ -612,8 +612,9 @@ pub export fn frame(t: f64) void {
 
 pub fn draw_indicator(v: Vec2) void {
     const r = ui.MAIN_VIEW.get("viewport").float().scaled(SPRITE_SCALE);
-    const point = edge_point(r.expand(-SPRITE_SCALE * 2), v).minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
-    draw_glyph(point, 0x13, .{ .color = .red });
+    const center = edge_point(r.expand(-SPRITE_SCALE * 2), v);
+    const corner = center.minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
+    draw_glyph(corner, 0x13, .{ .color = .red });
 }
 
 // Casts a ray from the center of `rect` in the given `dir`ection,
