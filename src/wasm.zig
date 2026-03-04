@@ -208,7 +208,7 @@ pub fn draw_glyph(screen_pos: Vec2, src_idx: u8, options: DrawOptions) void {
     }
 
     const offset: f32 = if (options.pixel_shift)
-        (SPRITE_SCALE / 8.0) * options.size
+        (SPRITE_SCALE / 16.0) * options.size
     else
         0;
 

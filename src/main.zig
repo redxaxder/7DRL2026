@@ -390,11 +390,19 @@ pub const Unit = struct {
 
 pub const ux = struct {
     pub const InputMode = enum { Movement, Attack };
-    pub const Action = union(enum) {
-        move: struct { Dir4, bool },
-        attack: Dir4,
-    };
+    pub const Action = union(enum) { move: struct { Dir4, bool }, attack: Dir4, pass: void };
     pub fn resolve_input(key: keyboard.Code, rng: std.Random) ?Action {
+        switch (key) {
+            .Tab, .ControlRight, .ControlLeft, .AltLeft, .AltRight => {
+                globals.animation_queue.hurry(3);
+                return null;
+            },
+            .Space, .Period => {
+                return .pass;
+            },
+            else => {},
+        }
+
         const dir: ?Dir4 = switch (key) {
             .KeyW, .ArrowUp => .Up,
             .KeyA, .ArrowLeft => .Left,
@@ -683,6 +691,10 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     if (ux.resolve_input(key, rng)) |action| {
         globals.animation_queue.hurry(1.5);
         switch (action) {
+            .pass => {
+                player_acted = true;
+                _ = handle_player_move(null, false);
+            },
             .move => |movedata| {
                 const d, const shift = movedata;
                 player_acted = handle_player_move(d, shift);
