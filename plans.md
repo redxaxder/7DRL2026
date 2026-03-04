@@ -52,9 +52,10 @@ v0.2 core features
   + combat log
   - legend
   - inventory
+    - ui screen
     + pick up item
-    - replace item (item in inventory slot is destroyed to accomodate new item)
-      - if several items are picked up in the same turn, accumulate them and ask one at a time
+    + replace item (item in inventory slot is destroyed to accomodate new item)
+      + if several items are picked up in the same turn, accumulate them and ask one at a time
         to replace
   + select weapon
   - indicate selected weapon
@@ -73,7 +74,7 @@ v0.2 core features
 + dismounting/mounting motorcycles
 - weapons
   - motorcycle
-  - radioactive
+  + radioactive
   - explosive
 - mapgen:
   - varying street sizes
@@ -84,8 +85,7 @@ v0.2 core features
     - nest
   - mechanical map features
     - vending machines
-    - items
-    - eggs
+    + items
     - money
     - alternate motorcycles
   - terrain types
@@ -98,7 +98,7 @@ v0.2 core features
   - kaiju spawn limit
 - ability to win
 - falling obstacles
-  - warnings
+  + warnings
   - animation
 v0.3 stretch
 - trinkets

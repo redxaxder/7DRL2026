@@ -2,6 +2,7 @@ const IVec2 = @import("core.zig").IVec2;
 const Dir4 = @import("core.zig").Dir4;
 const map = @import("map.zig");
 const std = @import("std");
+const combat_log = @import("combat_log.zig");
 
 const BASE_ITEM_CAPACITY: usize = 3;
 const INVENTORY_SIZE: usize = 10;
@@ -186,6 +187,7 @@ pub fn overwrite_slot(rng: std.Random, slot: usize) void {
         if (slot == active_item) {
             active_item = null;
         }
+        combat_log.log("You equip the {s}.", .{next_item.tag.name()});
         inventory[slot] = next_item;
         roll_next_item(rng);
         pending_pickups -= 1;
@@ -229,18 +231,20 @@ pub const ItemTag = enum {
     }
 
     pub fn name(self: ItemTag) []const u8 {
-        if (self == .nil) {
-            return "";
-        }
-        const tag_name = @tagName(self);
-        const result = comptime blk: {
-            var buf: [tag_name.len]u8 = undefined;
-            for (&buf, tag_name) |*b, c| {
-                b.* = if (c == '_') ' ' else c;
-            }
-            break :blk buf;
+        if (self == .Nil) return "";
+        return switch (self) {
+            inline else => |tag| {
+                const tag_name = @tagName(tag);
+                const result = comptime blk: {
+                    var buf: [tag_name.len]u8 = undefined;
+                    for (&buf, tag_name) |*b, c| {
+                        b.* = if (c == '_') ' ' else std.ascii.toLower(c);
+                    }
+                    break :blk buf;
+                };
+                return &result;
+            },
         };
-        return &result;
     }
 };
 

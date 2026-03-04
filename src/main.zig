@@ -5,6 +5,7 @@ const keyboard = @import("keyboard.zig");
 const audio = @import("audio.zig");
 const mouse = @import("mouse.zig");
 const func = @import("func.zig");
+const combat_log = @import("combat_log.zig");
 const Callback = func.Callback;
 const RenderBuffer = @import("render.zig");
 const Sprite = RenderBuffer.Sprite;
@@ -35,27 +36,6 @@ const DANGER_GROWTH = 90;
 const SPAWN_ROLL = 100000;
 
 const ANIMATION_QUEUE_LEN = 256;
-
-pub const combat_log = struct {
-    pub var buffer: [20][]const u8 = undefined;
-    pub var storage: RingBuffer([]const u8) = undefined;
-    var printBuffer: [8192]u8 = .{0} ** 8192;
-    var fba: std.heap.FixedBufferAllocator = .init(&printBuffer);
-    const allocator = fba.allocator();
-
-    pub fn log(comptime message: []const u8, args: anytype) void {
-        // format message
-        const slice = std.fmt.allocPrint(allocator, message, args) catch {
-            return;
-        };
-        if (combat_log.storage.full()) {
-            if (combat_log.storage.pop_front()) |m| {
-                allocator.free(m);
-            }
-        }
-        _ = combat_log.storage.try_push_back(slice) catch unreachable;
-    }
-};
 
 pub const animlib = struct {
     pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
@@ -313,8 +293,6 @@ pub const Unit = struct {
 
     pub fn damage(self: *Unit, amount: i64) void {
         self.hp -= amount;
-
-        std.log.info("{} damage. {} remaining", .{ amount, self.hp });
     }
 
     pub fn mount(self: *const Unit) *Unit {
@@ -391,7 +369,7 @@ pub const ux = struct {
 
         if (inventory.has_pending_pickups()) {
             if (number) |slot| {
-                inventory.overwrite_slot(rng, slot);
+                inventory.overwrite_slot(rng, (slot + 9) % 10);
             }
         } else if (dir) |d| {
             if (inventory.active_weapon()) |_| {
@@ -624,6 +602,9 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     // to get at kaiju. This is an optimization opportunity
     var player_acted = false;
     const player_start = globals.player().position;
+    if (globals.player().hp <= 0) {
+        return;
+    }
 
     if (ux.resolve_input(key, rng)) |action| {
         globals.animation_queue.hurry(1.5);
@@ -643,8 +624,6 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
                 }
             },
         }
-
-        player_acted = true;
     }
     if (player_acted) {
         resolve_pending(rng);
@@ -899,7 +878,7 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
 }
 
 fn die() void {
-    combat_log.log("YOU LOSE TURKEY", .{});
+    combat_log.log("You have been killed.", .{});
 }
 
 fn harm() void {
@@ -920,6 +899,7 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
     var player = globals.player();
     const moto: ?*Unit = if (player.mounted()) player.mount() else null;
     if (globals.player().hp <= 1) {
+        globals.player().hp = 0;
         die();
     } else {
         harm();
@@ -993,7 +973,30 @@ fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
 }
 
 fn kaiju_logic(k: *Unit, rng: std.Random) void {
-    const dir: Dir4 = k.position.facing(globals.player().position);
+    const r = k.get_rect();
+    const player = globals.player();
+
+    const prect = if (player.mounted()) player.mount().get_rect() else player.get_rect();
+    const halign = r.vertical().overlap(prect.vertical());
+    const valign = r.horizontal().overlap(prect.horizontal());
+
+    const dir = blk: {
+        const dx: Dir4 = if (r.x < prect.x) .Right else .Left;
+        const dy: Dir4 = if (r.y < prect.y) .Down else .Up;
+        if (halign) {
+            break :blk dx;
+        }
+        if (valign) {
+            break :blk dy;
+        }
+        if (rng.boolean()) {
+            break :blk dx;
+        } else {
+            break :blk dy;
+        }
+    };
+
+    // const dir: Dir4 = k.position.facing(globals.player().position);
     const seen = kaiju_look(k, dir, k.size);
     const attack_range = k.size / 3;
     if (seen.terrain) |_| {

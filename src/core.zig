@@ -224,6 +224,15 @@ pub const Vec2 = extern struct {
     }
 };
 
+pub const Interval = struct {
+    origin: i16,
+    len: i16,
+
+    pub fn overlap(self: Interval, rhs: Interval) bool {
+        return self.origin < rhs.origin + rhs.len and rhs.origin < self.origin + self.len;
+    }
+};
+
 pub const IRect = struct {
     x: i16 = -3200,
     y: i16 = -3200,
@@ -232,6 +241,13 @@ pub const IRect = struct {
 
     pub fn ivec(self: IRect) IVec2 {
         return .{ .x = self.x, .y = self.y };
+    }
+
+    pub fn vertical(self: IRect) Interval {
+        return .{ .origin = self.y, .len = self.h };
+    }
+    pub fn horizontal(self: IRect) Interval {
+        return .{ .origin = self.x, .len = self.w };
     }
 
     pub fn contains(self: IRect, p: IVec2) bool {
