@@ -335,8 +335,10 @@ pub const Unit = struct {
         while (slide.next()) |edge| {
             var positions = edge.iter();
             while (positions.next()) |p| {
-                if (map.get_terrain_at(p).halting()) {
+                const tt = map.get_terrain_at(p);
+                if (tt.halting()) {
                     halt = true;
+                    combat_log.log("You drive through the {}.", .{tt});
                     _ = animate_terrain_to(p, .floor).chain();
                 }
                 if (self.tag == .Player) {
@@ -623,7 +625,7 @@ pub fn init(rng: std.Random) !void {
     var motoplaced: u32 = 0;
     { // place motorcycles
         const placement_attempts = 10;
-        const SECTION_COUNT: i16 = 50;
+        const SECTION_COUNT: i16 = 40;
         const SECTION_SIZE: i16 = map.BOUNDS.w / SECTION_COUNT;
         var sections = (IRect{
             .x = 0,

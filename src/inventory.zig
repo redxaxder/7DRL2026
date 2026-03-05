@@ -194,7 +194,9 @@ pub fn overwrite_slot(rng: std.Random, slot: usize) void {
         if (slot == active_index) {
             active_index = null;
         }
-        combat_log.log("You throw away your {s}.", .{inventory[slot].tag.name()});
+        if (inventory[slot].tag != .Nil) {
+            combat_log.log("You throw away your {s}.", .{inventory[slot].tag.name()});
+        }
         combat_log.log("You equip the {s}.", .{next_item.tag.name()});
         inventory[slot] = next_item;
         roll_next_item(rng);

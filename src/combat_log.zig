@@ -1,23 +1,28 @@
 const std = @import("std");
 const RingBuffer = @import("ringbuffer.zig").RingBuffer;
+const main = @import("main.zig");
 
-pub var buffer: [20][]const u8 = undefined;
-pub var storage: RingBuffer([]const u8) = undefined;
-var printBuffer: [8192]u8 = .{0} ** 8192;
-var fba: std.heap.FixedBufferAllocator = .init(&printBuffer);
-const allocator = fba.allocator();
+pub const Entry = struct {
+    text: []const u8,
+    turn: i64,
+};
+
+pub var buffer: [20]Entry = undefined;
+pub var storage: RingBuffer(Entry) = undefined;
+var printBuffers: [2][8192]u8 = .{.{0} ** 8192} ** 2;
+var fbas: [2]std.heap.FixedBufferAllocator = .{ .init(&printBuffers[0]), .init(&printBuffers[1]) };
+var active: u1 = 0;
 
 pub fn log(comptime message: []const u8, args: anytype) void {
-    // format message
-    const slice = std.fmt.allocPrint(allocator, message, args) catch {
-        return;
+    const slice = std.fmt.allocPrint(fbas[active].allocator(), message, args) catch blk: {
+        active +%= 1;
+        fbas[active].reset();
+        break :blk std.fmt.allocPrint(fbas[active].allocator(), message, args) catch return;
     };
     if (storage.full()) {
-        if (storage.pop_front()) |m| {
-            allocator.free(m);
-        }
+        _ = storage.pop_front();
     }
-    _ = storage.try_push_back(slice) catch {
+    _ = storage.try_push_back(.{ .text = slice, .turn = main.globals.turn }) catch {
         std.log.err("out of storage", .{});
         unreachable;
     };

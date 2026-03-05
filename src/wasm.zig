@@ -517,36 +517,20 @@ pub fn draw_status() !void {
     }
 }
 
-// todo - figure this out properly
-const Layout = struct {
-    inventory: Rect = .{},
-    log: Rect = .{},
-    gamefield: Rect = .{},
-    status_bar: Rect = .{},
-    pub fn init() Layout {
-        var l: Layout = .{};
-        const status_h: f32 = 30;
-        const margin: f32 = 32;
-        l.inventory = .{ .x = 0, .y = 0, .w = 1000, .h = 100 };
-        l.log = .{ .x = l.inventory.w + margin, .y = 0, .w = 400, .h = screen_h };
-        l.gamefield = .{ .x = 0, .y = l.inventory.h + margin, .w = screen_w - l.log.w, .h = screen_h - l.inventory.h - status_h };
-        l.status_bar = .{ .x = 0, .y = l.inventory.h + l.gamefield.h + margin, .w = screen_w - l.log.w, .h = status_h };
-        return l;
-    }
-};
-
 fn draw_log() void {
     const bounds = ui.MAIN_VIEW.get("log").float().scaled(SPRITE_SCALE);
     screen_offset = bounds.pos();
     defer screen_offset = .ZERO;
 
-    const options: DrawOptions = .{ .origin = bounds.pos() };
-
     var vshift: f32 = 0;
     var ix: i32 = @as(i32, @intCast(combat_log.storage.len())) - 1;
     while (ix >= 0) : (ix -= 1) {
-        const message = combat_log.storage.index(ix) orelse continue;
-        const h = draw_text(.{ .y = vshift, .x = 0 }, message.*, options, bounds.w);
+        const entry = combat_log.storage.index(ix) orelse continue;
+        const options: DrawOptions = .{
+            .origin = bounds.pos(),
+            .color = if (entry.turn + 1 >= main.globals.turn) .white else .gray,
+        };
+        const h = draw_text(.{ .y = vshift, .x = 0 }, entry.text, options, bounds.w);
         vshift += h;
         vshift += SPRITE_SCALE;
         if (vshift >= bounds.h) break;
@@ -609,6 +593,8 @@ fn draw_inventory() void {
     for (0..inventory.item_capacity) |i| {
         const item = inventory.inventory[i];
         if (item.tag == .Nil) {
+            _ = fmt_draw_text(cursor, "- free", .{ .origin = interior.pos() }, w, .{});
+            cursor.y += 3 * SPRITE_SCALE;
             continue;
         }
 

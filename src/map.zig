@@ -508,6 +508,7 @@ pub const Terrain = enum(u5) {
             .trinket => .yellow,
             .vending_machine => .teal,
             .sidewalk => .gray,
+            .debris => .dark_gray,
             .money => .dark_green,
             .door => .brown,
             .void_ => .dark_blue,
