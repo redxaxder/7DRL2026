@@ -488,6 +488,53 @@ pub const IRect = struct {
         }
     };
 
+    pub fn perimeter(self: IRect, buf: []?IVec2) PerimeterIterator {
+        var i: usize = 0;
+        // top
+        for (0..@intCast(self.w)) |j| {
+            const jj = @as(i16, @intCast(j));
+            const pos: IVec2 = .{ .x = self.x + jj, .y = self.y };
+            buf[i] = pos;
+            i += 1;
+        }
+        // right
+        for (0..@intCast(self.h)) |j| {
+            const jj = @as(i16, @intCast(j));
+            const pos: IVec2 = .{ .x = self.x + self.w - 1, .y = self.y + jj };
+            buf[i] = pos;
+            i += 1;
+        }
+        // bottom
+        for (0..@intCast(self.w)) |j| {
+            const jj = @as(i16, @intCast(j));
+            const pos: IVec2 = .{ .x = self.x + self.w - 1 - jj, .y = self.y + self.h - 1 };
+            buf[i] = pos;
+            i += 1;
+        }
+        // left
+        for (0..@intCast(self.h)) |j| {
+            const jj = @as(i16, @intCast(j));
+            const pos: IVec2 = .{ .x = self.x, .y = self.y + self.h - 1 - jj };
+            buf[i] = pos;
+            i += 1;
+        }
+        return .{ .peri = buf, .len = i };
+    }
+
+    pub const PerimeterIterator = struct {
+        peri: []?IVec2,
+        len: usize,
+        i: usize = 0,
+
+        pub fn next(self: *PerimeterIterator) ?IVec2 {
+            if (self.peri[self.i]) |pos| {
+                self.i += 1;
+                return pos;
+            }
+            return null;
+        }
+    };
+
     pub const LocationIterator = struct {
         rect: IRect,
         ix: i16 = 0,

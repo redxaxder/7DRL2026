@@ -152,7 +152,6 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
     // can't have 0 lanes
     lanes = @max(1, lanes);
     // bias lanes
-    std.log.info("lanes going into bias {}", .{lanes});
     const commercial_options: [3]i16 = .{ 2, 4, lanes };
     const industrial_options: [3]i16 = .{ 4, 6, lanes };
     const bias: [3]f32 = .{ 0.5, 0.4, 0.1 };
@@ -161,7 +160,6 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
         .Industrial => @max(2, industrial_options[rng.weightedIndex(f32, &bias)]),
         else => lanes,
     };
-    std.log.info("lanes after bias {}", .{lanes});
     const len = lanes * 4 + 1;
 
     const min_origin = interval.origin + @divFloor(interval.len - len, 3);
@@ -179,6 +177,49 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
     return got;
 }
 
+fn gen_industrial(rect: IRect, rng: std.Random) void {
+    // fill with grass
+    fill_terrain(rect, .grass);
+
+    var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
+    var perimeter = rect.perimeter(&buffer);
+    var gap_size: u8 = 0;
+    while (perimeter.next()) |pos| {
+        if (gap_size == 0 and rng.float(f32) < 0.3) {
+            gap_size = rng.intRangeAtMost(u8, 3, 7);
+        }
+        if (gap_size > 0) {
+            set_terrain_at(pos, .asphalt);
+            gap_size -= 1;
+        } else {
+            set_terrain_at(pos, .wall);
+        }
+    }
+}
+
+fn gen_commercial(rect: IRect, rng: std.Random) void {
+    // fill with grass
+    fill_terrain(rect, .floor);
+
+    var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
+    var perimeter = rect.perimeter(&buffer);
+    var gap_size: u8 = 0;
+    var num_doors: u8 = 0;
+    const max_doors: u8 = 2;
+    while (perimeter.next()) |pos| {
+        if (gap_size == 0 and rng.float(f32) < 0.3 and num_doors < max_doors) {
+            gap_size = rng.intRangeAtMost(u8, 2, 4);
+            num_doors += 1;
+        }
+        if (gap_size > 0) {
+            set_terrain_at(pos, .door);
+            gap_size -= 1;
+        } else {
+            set_terrain_at(pos, .wall);
+        }
+    }
+}
+
 pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_width: i16) void {
     // scheme:
     // recursively -
@@ -186,13 +227,11 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     //   the areas between the roads into new rects. Recursively
     //   call new mapgen on those rects, with some thresholding logic.
     //
-    // Zones are decided at threshold area 20k and are nil before that.
+    // Zones are decided at threshold
     //
     // Road width ranges from 6 lanes (3 each direction) to 2 lanes in
     // pre-zone gen and 4 lanes (2 each direction) to 1 lane in post-zone gen.
     // Commercial and industrial are biased to bigger roads.
-    // A road is
-    // 1 tile sidewalk, 3 * lanes/2 tiles lane (lanes are 3 wide because cars are 3x3), 1 tile painted, then mirrored on the other side
     //
     // Once the rects are small enough, stop subdividing and do individual blocks
     // "small enough" being based on Zone.
@@ -211,9 +250,19 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     };
     if (rect.w < block_threshold or rect.h < block_threshold) {
         // TODO real logic
-        fill_terrain(rect, .wall);
-        if (rect.w > 3 and rect.h > 3) {
-            fill_terrain(rect.expand(-1), .floor);
+        switch (zone) {
+            .Industrial => {
+                gen_industrial(rect, rng);
+            },
+            .Commercial => {
+                gen_commercial(rect, rng);
+            },
+            else => {
+                fill_terrain(rect, .wall);
+                if (rect.w > 3 and rect.h > 3) {
+                    fill_terrain(rect.expand(-1), .floor);
+                }
+            },
         }
         return;
     }
@@ -254,7 +303,6 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
     };
 
     const lanes = @divFloor(interval.len, 4);
-    std.log.info("num lanes {}", .{lanes});
     const pattern = switch (lanes) {
         1 => "10001",
         2 => "100020001",
@@ -272,7 +320,6 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
             .len = 1,
         };
         const to_pave = rect.slice(orientation, slice)[1];
-        std.log.info("paving {}", .{kind});
         switch (kind) {
             '0' => fill_terrain(to_pave, .asphalt),
             '1' => fill_terrain(to_pave, .sidewalk),
