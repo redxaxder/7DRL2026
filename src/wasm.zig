@@ -10,6 +10,7 @@ const combat_log = @import("combat_log.zig");
 const map = @import("map.zig");
 const inventory = @import("inventory.zig");
 const RingBuffer = @import("ringbuffer.zig").RingBuffer;
+const sector = @import("sector.zig");
 
 const ui = @import("ui.zig");
 
@@ -614,35 +615,33 @@ fn draw_gamefield(t: f64) void {
     const origin: Vec2 = interior.pos();
     defer RenderBuffer.unscissor();
 
-    // Draw the terrain
-    const imin = IVec2{
+    const seen_rect = IRect{
         .x = @intFromFloat(@floor(camera.x)),
         .y = @intFromFloat(@floor(camera.y)),
+        .w = @intFromFloat(camera_w + 1),
+        .h = @intFromFloat(camera_h + 1),
     };
-    for (0..@intFromFloat(camera_w + 1)) |dx| {
-        for (0..@intFromFloat(camera_h + 1)) |dy| {
-            const x = imin.x + @as(i16, @intCast(dx));
-            const y = imin.y + @as(i16, @intCast(dy));
-            const world_pos = IVec2{
-                .x = x,
-                .y = y,
-            };
-            const payload = map.get_render_terrain_payload_at(world_pos);
-            const terrain = if (payload.seen)
-                payload.terrain
-            else
-                .void_;
-            const color: Color = if (payload.bloody)
-                .red
-            else
-                .white;
-            draw_world_glyph(
-                world_pos.float(),
-                terrain.glyph(),
-                .{ .color = color, .origin = origin },
-            );
-        }
+
+    // Draw the terrain
+
+    var terrain_iter = seen_rect.iter();
+    while (terrain_iter.next()) |world_pos| {
+        const payload = map.get_render_terrain_payload_at(world_pos);
+        const terrain = if (payload.seen)
+            payload.terrain
+        else
+            .void_;
+        const color: Color = if (payload.bloody)
+            .red
+        else
+            .white;
+        draw_world_glyph(
+            world_pos.float(),
+            terrain.glyph(),
+            .{ .color = color, .origin = origin },
+        );
     }
+
     // The render buffer assumes that all images in the same batch
     // are the same size. So we flush before drawing anything at
     // a different size. (If we don't, that will resize the previous
@@ -651,18 +650,26 @@ fn draw_gamefield(t: f64) void {
 
     // Draw units over the terrain
     {
-        var i: u16 = @intCast(main.globals.units.len);
-        while (i > 1) {
-            i -= 1;
-            const u = main.globals.unit(i);
-            if (u.tag == .Nil) {
-                continue;
+        // motorcycles
+        var iter = sector.get_occupants_rect(seen_rect);
+        while (iter.next()) |uid| {
+            const u = main.globals.unit(uid);
+            if (u.tag == .Motorcycle) {
+                render_unit(u, origin);
             }
-            if (u.mounted()) {
-                u.render_position = u.mount().render_position;
-            }
-            render_unit(u, origin);
         }
+
+        // kaiju
+        iter = sector.get_occupants_rect(seen_rect);
+        while (iter.next()) |uid| {
+            const u = main.globals.unit(uid);
+            if (u.tag == .Kaiju) {
+                render_unit(u, origin);
+            }
+        }
+
+        // player
+        render_unit(main.globals.player(), origin);
     }
 
     // Draw movement preview reticles
