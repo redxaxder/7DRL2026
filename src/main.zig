@@ -533,6 +533,8 @@ pub const ux = struct {
             }
         } else if (number) |weapon_id| {
             inventory.toggle_weapon(weapon_id);
+        } else if (pass) {
+            return .pass;
         }
 
         return null;
