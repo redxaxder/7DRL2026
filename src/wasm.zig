@@ -467,6 +467,7 @@ pub fn draw_status() !void {
 
     cursor.y += fmt_draw_text(cursor, "You", opts, w, .{});
     cursor.y += fmt_draw_text(cursor, "Hp: {}", opts, w, .{player.hp});
+    cursor.y += fmt_draw_text(cursor, "\x9D: {}", opts, w, .{main.globals.money});
     cursor.y += SPRITE_SCALE;
 
     if (player.mounted()) {

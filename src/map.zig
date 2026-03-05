@@ -274,36 +274,38 @@ const Option = enum {
     Rubble,
     Debris,
     Money,
+    Vending,
     Wall,
     Ground,
 };
 
-fn prob_table(entries: []const f32) [6]f32 {
+fn prob_table(entries: []const f32, comptime size: usize) [size]f32 {
     var sum: f32 = 0;
-    var result: [6]f32 = .{0} ** 6;
+    var result: [size]f32 = .{0} ** size;
     for (entries, 0..) |e, i| {
         sum += e;
         result[i] = entries[i];
     }
-    result[5] = 1.0 - sum;
+    result[size - 1] = 1.0 - sum;
     return result;
 }
 
 pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
-    const options: [6]Option = .{
+    const options: [7]Option = .{
         .Item,
         .Rubble,
         .Debris,
         .Money,
+        .Vending,
         .Wall,
         .Ground,
     };
-    const roll_table: [5]f32 = switch (zone) {
-        .Residential => .{ 0.05, 0.02, 0.05, 0.01, 0 },
-        .Commercial => .{ 0.0025, 0.005, 0.0075, 0.005, 0.0015 },
-        .Industrial => .{ 0, 0.004, 0.010, 0, 0.002 },
+    const roll_table: [6]f32 = switch (zone) {
+        .Residential => .{ 0.01, 0.02, 0.05, 0.01, 0, 0 },
+        .Commercial => .{ 0.0025, 0.005, 0.0075, 0.005, 0.001, 0.0015 },
+        .Industrial => .{ 0, 0.004, 0.010, 0, 0, 0.002 },
     };
-    const probs: [6]f32 = prob_table(&roll_table);
+    const probs: [7]f32 = prob_table(&roll_table, 7);
     var iter = rect.iter();
     while (iter.next()) |pos| {
         const thing: Option = options[rng.weightedIndex(f32, &probs)];
@@ -313,6 +315,7 @@ pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
             .Debris => .debris,
             .Money => .money,
             .Wall => .wall,
+            .Vending => .vending,
             .Ground => switch (zone) {
                 .Residential => .floor,
                 .Commercial => .floor,
@@ -384,18 +387,18 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     // now actually pave the roads
     // v road
     {
-        pave_road(v1, .v);
-        pave_road(v2, .v);
+        pave_road(v1, .v, rng);
+        pave_road(v2, .v, rng);
     }
     // h road
     {
-        pave_road(h1, .h);
-        pave_road(h2, .h);
+        pave_road(h1, .h, rng);
+        pave_road(h2, .h, rng);
     }
     fill_terrain(c, .asphalt);
 }
 
-pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
+pub fn pave_road(rect: IRect, orientation: core.Orientation, rng: std.Random) void {
     const v_interval, const h_interval = rect.intervals();
     const interval = switch (orientation) {
         .v => v_interval,
@@ -422,7 +425,7 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
         const to_pave = rect.slice(orientation, slice)[1];
         switch (kind) {
             '0' => fill_terrain(to_pave, .asphalt),
-            '1' => fill_terrain(to_pave, .sidewalk),
+            '1' => fill_sidewalk(to_pave, rng),
             '2' => fill_terrain(to_pave, .road_paint),
             '3' => fill_hatched(to_pave, .road_paint, .asphalt),
             else => {
@@ -430,6 +433,15 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
                 unreachable;
             },
         }
+    }
+}
+
+fn fill_sidewalk(rect: IRect, rng: std.Random) void {
+    const vending_chance: f32 = 0.01;
+    var iter = rect.iter();
+    while (iter.next()) |pos| {
+        const t: Terrain = if (rng.float(f32) < vending_chance) .vending else .sidewalk;
+        set_terrain_at(pos, t);
     }
 }
 
@@ -585,6 +597,7 @@ pub const Terrain = enum(u5) {
     sidewalk,
     road_paint,
     grass,
+    vending,
     void_,
     _,
 
@@ -606,10 +619,11 @@ pub const Terrain = enum(u5) {
             .viscera => return 0x9C,
             .money => return 0x9D,
             .debris => return ';',
-            .trinket => return 0xF0,
+            .trinket => return 0x0F,
             .sidewalk => return 0xB0,
             .road_paint => return 0xB1,
             .grass => return ',',
+            .vending => return 0xF0,
             else => return '/',
         }
     }

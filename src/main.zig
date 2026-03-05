@@ -345,7 +345,8 @@ pub const Unit = struct {
 
                         if (map.get_terrain_at(q) == .money) {
                             _ = animate_terrain_to(q, .floor).chain();
-                            globals.money += 1000;
+                            combat_log.log("You pick up a shiny coin", .{});
+                            globals.money += 100;
                         }
                     }
                 }
@@ -533,7 +534,7 @@ pub const globals = struct {
     pub var combo_target: ?UnitId = 0;
     pub var combo_count: i64 = 0;
     pub var turn: i64 = 0;
-    pub var money = 0;
+    pub var money: i64 = 0;
 
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
