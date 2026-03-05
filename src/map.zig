@@ -196,20 +196,62 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
     new_mapgen(lr, new_zone, rng, depth + 1);
 
     // now actually pave the roads
-    fill_terrain(intersection, .asphalt);
     // v road
     {
         const road_start: IVec2 = .{ .x = road_start_v, .y = rect.y };
         const road_size: IVec2 = .{ .x = road_width_v, .y = rect.h };
         const rr: IRect = IRect.from(road_start, road_size);
-        fill_terrain(rr, .asphalt);
+        pave_road(rr, true, num_lanes_v);
     }
     // h road
     {
         const road_start: IVec2 = .{ .x = rect.x, .y = road_start_h };
         const road_size: IVec2 = .{ .x = rect.w, .y = road_width_h };
         const rr: IRect = IRect.from(road_start, road_size);
-        fill_terrain(rr, .asphalt);
+        pave_road(rr, false, num_lanes_h);
+    }
+    fill_terrain(intersection, .asphalt);
+}
+
+pub fn pave_road(rect: IRect, is_vertical: bool, n_lanes: i16) void {
+    _ = n_lanes;
+    var paving: IRect = rect;
+    // first fill with sidewalk
+    fill_terrain(paving, .sidewalk);
+    if (is_vertical and rect.w > 3) {
+        paving = paving.expand_horizontally(-1);
+
+        // now the asphalt
+        fill_terrain(paving, .asphalt);
+
+        while (paving.w > 2) {
+            paving = paving.expand_horizontally(-1);
+        }
+
+        // now the paint
+        fill_terrain(paving, .road_paint);
+    } else if (is_vertical and rect.w == 3) {
+        paving = paving.expand_horizontally(-1);
+
+        // now the asphalt
+        fill_terrain(paving, .asphalt);
+    } else if (!is_vertical and rect.h > 3) {
+        paving = paving.expand_vertically(-1);
+
+        // now the asphalt
+        fill_terrain(paving, .asphalt);
+
+        while (paving.h > 2) {
+            paving = paving.expand_vertically(-1);
+        }
+
+        // now the paint
+        fill_terrain(paving, .road_paint);
+    } else if (!is_vertical and rect.h == 3) {
+        paving = paving.expand_vertically(-1);
+
+        // now the asphalt
+        fill_terrain(paving, .asphalt);
     }
 }
 
@@ -281,7 +323,7 @@ pub const MAP_SIZE = 2500;
 pub const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
 pub const BOUNDS: core.IRect = .{ .x = 0, .y = 0, .w = MAP_SIZE, .h = MAP_SIZE };
 
-pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.asphalt)} ** MAPDATA_LEN;
+pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.grass)} ** MAPDATA_LEN;
 
 pub const FullTerrain = packed struct(u8) {
     terrain: Terrain,
@@ -321,6 +363,7 @@ pub const Terrain = enum(u5) {
     money,
     sidewalk,
     road_paint,
+    grass,
     void_,
     _,
 
@@ -342,6 +385,7 @@ pub const Terrain = enum(u5) {
             .trinket => return 0xF0,
             .sidewalk => return 0xB0,
             .road_paint => return 0xB1,
+            .grass => return '\"',
             else => return '/',
         }
     }

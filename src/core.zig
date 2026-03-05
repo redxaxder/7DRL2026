@@ -400,6 +400,24 @@ pub const IRect = struct {
             return result;
         }
     };
+
+    pub fn expand_vertically(self: IRect, n: i16) IRect {
+        return .{
+            .x = self.x,
+            .y = self.y - n,
+            .w = self.w,
+            .h = self.h + 2 * n,
+        };
+    }
+
+    pub fn expand_horizontally(self: IRect, n: i16) IRect {
+        return .{
+            .x = self.x - n,
+            .y = self.y,
+            .w = self.w + 2 * n,
+            .h = self.h,
+        };
+    }
 };
 
 pub const Rect = struct {

@@ -138,3 +138,4 @@ v0.3 stretch
     - fire
     - leap
 - consolidate orthogonal raycasting
+- crosswalks

@@ -498,18 +498,17 @@ pub fn init(rng: std.Random) !void {
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
     globals.rng = rng;
 
-    const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
-    map.new_mapgen(map_rect, .Nil, rng, 0);
-    // map.mapgen(rng);
-
     globals.units[PLAYER_ID] = .init_player(PLAYER_START);
     sector.add(PLAYER_ID, globals.player());
     {
         var it = globals.player().get_rect().expand(3).iter();
         while (it.next()) |pos| {
-            map.set_terrain_at(pos, .asphalt);
+            map.set_terrain_at(pos, .grass);
         }
     }
+    const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
+    map.new_mapgen(map_rect, .Nil, rng, 0);
+    // map.mapgen(rng);
 
     globals.units[KMOM_ID] = .init_kaiju(KMOM_START, MOTHER_KAIJU_SIZE);
     sector.add(KMOM_ID, globals.kmom());
