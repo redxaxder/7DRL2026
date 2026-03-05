@@ -181,6 +181,7 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
 fn gen_industrial(rect: IRect, rng: std.Random) void {
     // fill with grass
     fill_terrain(rect, .grass);
+    roll_interesting_terrain(rect, .Industrial, rng);
 
     var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
     var perimeter = rect.perimeter(&buffer);
@@ -199,8 +200,10 @@ fn gen_industrial(rect: IRect, rng: std.Random) void {
 }
 
 fn gen_commercial(rect: IRect, rng: std.Random) void {
-    // fill with grass
+    // TODO interior walls
+    // fill with floor
     fill_terrain(rect, .floor);
+    roll_interesting_terrain(rect, .Commercial, rng);
 
     var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
     var perimeter = rect.perimeter(&buffer);
@@ -224,6 +227,7 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
 pub fn gen_residential_building(rect: IRect, rng: std.Random) void {
     // fill with floor
     fill_terrain(rect, .floor);
+    roll_interesting_terrain(rect, .Residential, rng);
     var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
     var perimeter = rect.perimeter(&buffer);
     var gap_size: u8 = 0;
@@ -263,6 +267,60 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
 
     gen_residential_building(first, rng);
     gen_residential_building(second, rng);
+}
+
+const Option = enum {
+    Item,
+    Rubble,
+    Debris,
+    Money,
+    Wall,
+    Ground,
+};
+
+fn prob_table(entries: []const f32) [6]f32 {
+    var sum: f32 = 0;
+    var result: [6]f32 = .{0} ** 6;
+    for (entries, 0..) |e, i| {
+        sum += e;
+        result[i] = entries[i];
+    }
+    result[5] = 1.0 - sum;
+    return result;
+}
+
+pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
+    const options: [6]Option = .{
+        .Item,
+        .Rubble,
+        .Debris,
+        .Money,
+        .Wall,
+        .Ground,
+    };
+    const roll_table: [5]f32 = switch (zone) {
+        .Residential => .{ 0.05, 0.02, 0.05, 0.01, 0 },
+        .Commercial => .{ 0.0025, 0.005, 0.0075, 0.005, 0.0015 },
+        .Industrial => .{ 0, 0.004, 0.010, 0, 0.002 },
+    };
+    const probs: [6]f32 = prob_table(&roll_table);
+    var iter = rect.iter();
+    while (iter.next()) |pos| {
+        const thing: Option = options[rng.weightedIndex(f32, &probs)];
+        const terrain: Terrain = switch (thing) {
+            .Item => .trinket,
+            .Rubble => .rubble,
+            .Debris => .debris,
+            .Money => .money,
+            .Wall => .wall,
+            .Ground => switch (zone) {
+                .Residential => .floor,
+                .Commercial => .floor,
+                .Industrial => .grass,
+            },
+        };
+        set_terrain_at(pos, terrain);
+    }
 }
 
 pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_width: i16) void {
