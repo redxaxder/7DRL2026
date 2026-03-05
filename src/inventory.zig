@@ -14,7 +14,7 @@ var item_count: usize = 0;
 pub var item_capacity: usize = 3;
 var cash: usize = 0;
 
-var next_item: Item = undefined;
+pub var next_item: Item = undefined;
 
 const BASE_WEAPON: Item = blk: {
     var it: Item = .tagged(ItemTag.Rifle);
@@ -31,7 +31,6 @@ const BASE_GAMMA: Item = blk: {
 
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
-    inventory[1] = BASE_GAMMA;
     roll_next_item(rng);
 }
 
@@ -40,6 +39,10 @@ pub fn active_weapon() ?*const Item {
         return &inventory[ix];
     }
     return null;
+}
+
+pub fn active_weapon_slot() ?usize {
+    return active_item;
 }
 
 pub fn toggle_weapon(id: usize) void {
@@ -188,9 +191,13 @@ pub fn overwrite_slot(rng: std.Random, slot: usize) void {
         }
         combat_log.log("You equip the {s}.", .{next_item.tag.name()});
         inventory[slot] = next_item;
-        roll_next_item(rng);
-        pending_pickups -= 1;
+        discard_pending(rng);
     }
+}
+
+pub fn discard_pending(rng: std.Random) void {
+    roll_next_item(rng);
+    pending_pickups -= 1;
 }
 
 pub const ItemTag = enum {
@@ -260,6 +267,22 @@ pub const Attribute = enum {
     motorcycle_armor,
     top_speed,
     acceleration,
+
+    pub fn name(self: Attribute) []const u8 {
+        return switch (self) {
+            inline else => |tag| {
+                const tag_name = @tagName(tag);
+                const result = comptime blk: {
+                    var buf: [tag_name.len]u8 = undefined;
+                    for (&buf, tag_name) |*b, c| {
+                        b.* = if (c == '_') ' ' else std.ascii.toLower(c);
+                    }
+                    break :blk buf;
+                };
+                return &result;
+            },
+        };
+    }
 };
 
 const NUM_ATTRIBUTES: usize = std.enums.values(Attribute).len;

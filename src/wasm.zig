@@ -505,19 +505,85 @@ fn draw_log() void {
     render_buffer.flush();
 }
 
-fn draw_inventory() void {
-    const layout = Layout.init();
-    screen_offset = layout.inventory.pos();
-    defer screen_offset = .ZERO;
-    const num_boxen: usize = 10;
-    const iLayout = layout.inventory.irect();
-    const box_size: IRect = .{ .x = @divExact(iLayout.w, @as(i16, @intCast(num_boxen))), .y = iLayout.h };
-    const margin: i16 = 5;
+fn draw_item_desc(pos: Vec2, item: *const inventory.Item, opts: DrawOptions, w: f32) f32 {
+    var cursor: Vec2 = pos;
 
-    for (0..num_boxen) |box| {
-        const b: i16 = @intCast(box);
-        draw_rect(.{ .x = iLayout.x + box_size.x * b + margin * b, .y = iLayout.y, .w = box_size.x, .h = box_size.y }, .{ .color = Color.white, .size = 1 });
+    if (item.tag == .Nil) {
+        return 0;
     }
+
+    cursor.y += fmt_draw_text(cursor, "{s}", opts, w, .{item.tag.name()});
+
+    const attrs = &item.attrs;
+    for (std.enums.values(inventory.Attribute)) |attr| {
+        const val = attrs.readfield(attr);
+        if (val != 0) {
+            if (item.tag.is_weapon()) {
+                cursor.y += fmt_draw_text(
+                    cursor,
+                    "{s} {}",
+                    opts,
+                    w,
+                    .{ attr.name(), val },
+                );
+            } else {
+                cursor.y += fmt_draw_text(
+                    cursor,
+                    "{s} +{}",
+                    opts,
+                    w,
+                    .{ attr.name(), val },
+                );
+            }
+        }
+    }
+    return cursor.y - pos.y;
+}
+
+fn draw_inventory() void {
+    const r: IRect = ui.MAIN_VIEW.get("inventory");
+    const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
+    const w = interior.w;
+    const active_slot = inventory.active_weapon_slot();
+
+    var cursor: Vec2 = .ZERO;
+    const indent = SPRITE_SCALE * 2;
+
+    // Pending pickups prompt
+    if (inventory.has_pending_pickups()) {
+        const opts = DrawOptions{ .origin = interior.pos(), .color = .orange };
+        cursor.y += fmt_draw_text(cursor, "Replace an item?", opts, w, .{});
+        cursor.y += draw_item_desc(
+            .{ .x = indent, .y = cursor.y },
+            &inventory.next_item,
+            opts,
+            w - indent,
+        );
+        cursor.y += SPRITE_SCALE;
+    }
+
+    for (0..inventory.item_capacity) |i| {
+        const item = inventory.inventory[i];
+        if (item.tag == .Nil) {
+            continue;
+        }
+
+        const is_active = if (active_slot) |s| s == i else false;
+
+        const color: Color = if (is_active) .green else .white;
+        const opts = DrawOptions{ .origin = interior.pos(), .color = color };
+
+        const slot_number = (i + 1) % 10;
+        _ = fmt_draw_text(cursor, "{}", opts, w, .{slot_number});
+        cursor.y += draw_item_desc(
+            .{ .x = SPRITE_SCALE * 2, .y = cursor.y },
+            &item,
+            opts,
+            w,
+        );
+        cursor.y += SPRITE_SCALE;
+    }
+
     render_buffer.flush();
 }
 
@@ -641,7 +707,7 @@ pub export fn frame(t: f64) void {
     // draw_indicator(core.Dir4.Up.ivec().float());
     // draw_indicator(core.Dir4.Down.ivec().float());
 
-    // draw_inventory();
+    draw_inventory();
 
     draw_log();
 

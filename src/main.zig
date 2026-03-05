@@ -392,17 +392,6 @@ pub const ux = struct {
     pub const InputMode = enum { Movement, Attack };
     pub const Action = union(enum) { move: struct { Dir4, bool }, attack: Dir4, pass: void };
     pub fn resolve_input(key: keyboard.Code, rng: std.Random) ?Action {
-        switch (key) {
-            .Tab, .ControlRight, .ControlLeft, .AltLeft, .AltRight => {
-                globals.animation_queue.hurry(3);
-                return null;
-            },
-            .Space, .Period => {
-                return .pass;
-            },
-            else => {},
-        }
-
         const dir: ?Dir4 = switch (key) {
             .KeyW, .ArrowUp => .Up,
             .KeyA, .ArrowLeft => .Left,
@@ -415,6 +404,7 @@ pub const ux = struct {
             .Digit2, .Numpad2 => 2,
             .Digit3, .Numpad3 => 3,
             .Digit4, .Numpad4 => 4,
+            .Digit5, .Numpad5 => 5,
             .Digit6, .Numpad6 => 6,
             .Digit7, .Numpad7 => 7,
             .Digit8, .Numpad8 => 8,
@@ -422,10 +412,21 @@ pub const ux = struct {
             .Digit0, .Numpad0 => 0,
             else => null,
         };
+        const pass: bool = switch (key) {
+            .Tab, .ControlRight, .ControlLeft, .AltLeft, .AltRight => {
+                globals.animation_queue.hurry(3);
+                return null;
+            },
+            .Space, .Period => true,
+            else => false,
+        };
 
         if (inventory.has_pending_pickups()) {
             if (number) |slot| {
                 inventory.overwrite_slot(rng, (slot + 9) % 10);
+            }
+            if (pass) {
+                inventory.discard_pending(rng);
             }
         } else if (dir) |d| {
             if (inventory.active_weapon()) |_| {
