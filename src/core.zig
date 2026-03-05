@@ -244,6 +244,28 @@ pub const Interval = struct {
     pub fn overlap(self: Interval, rhs: Interval) bool {
         return self.origin < rhs.origin + rhs.len and rhs.origin < self.origin + self.len;
     }
+
+    pub fn slice(self: Interval, interval: Interval) [3]Interval {
+        // 34567890
+        //   567
+        //
+        // parent: 34567890
+        // slice: 567
+        //
+        // parent: 3, 8   [11 - 8]
+        // slice:  5, 3
+        // A: 34 - (3,2)
+        // B: 567  (5,3)
+        // C: 890  (8,3)
+        //
+
+        return .{
+            .{ .origin = self.origin, .len = interval.origin - self.origin }, interval, .{
+                .origin = interval.origin + interval.len,
+                .len = self.origin + self.len - (interval.origin + interval.len),
+            },
+        };
+    }
 };
 
 pub const IRect = struct {
@@ -251,6 +273,39 @@ pub const IRect = struct {
     y: i16 = -3200,
     w: i16 = 0,
     h: i16 = 0,
+
+    pub fn intervals(self: IRect) [2]Interval {
+        return .{
+            .{ .origin = self.x, .len = self.w },
+            .{ .origin = self.y, .len = self.h },
+        };
+    }
+    pub fn from_intervals(xyintervals: [2]Interval) IRect {
+        return .{
+            .x = xyintervals[0].origin,
+            .y = xyintervals[1].origin,
+            .w = xyintervals[0].len,
+            .h = xyintervals[1].len,
+        };
+    }
+
+    pub fn slice(self: IRect, orientation: enum { v, h }, interval: Interval) [3]IRect {
+        const h, const v = self.intervals();
+        var result: [3]IRect = undefined;
+        switch (orientation) {
+            .v => {
+                for (h.slice(interval), &result) |hslice, *out| {
+                    out.* = from_intervals(.{ hslice, v });
+                }
+            },
+            .h => {
+                for (v.slice(interval), &result) |vslice, *out| {
+                    out.* = from_intervals(.{ h, vslice });
+                }
+            },
+        }
+        return result;
+    }
 
     pub fn bounding_box(positions: []const IVec2) IRect {
         var min_x = positions[0].x;

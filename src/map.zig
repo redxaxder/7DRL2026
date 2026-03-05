@@ -143,10 +143,10 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
     };
     if (rect.w < block_threshold or rect.h < block_threshold) {
         // TODO real logic
+        fill_terrain(rect, .wall);
         if (rect.w > 3 and rect.h > 3) {
             fill_terrain(rect.expand(-1), .floor);
         }
-        fill_terrain(rect, .wall);
         return;
     }
 
@@ -171,24 +171,15 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
     const h_i: i16 = @divFloor(rect.h, 3) + rect.y;
     const h_j: i16 = 2 * @divFloor(rect.h, 3) + rect.y;
     const road_start_h: i16 = rng.intRangeAtMost(i16, h_i, h_j);
-    const intersection: IRect = .{ .x = road_start_v, .y = road_start_h, .w = road_width_v, .h = road_width_h };
 
     //blocks, delimited by roads
-    const ul_coords: IVec2 = .{ .x = rect.x, .y = rect.y };
-    const ul_size: IVec2 = .{ .x = road_start_v - rect.x, .y = road_start_h - rect.y };
-    const ul: IRect = IRect.from(ul_coords, ul_size);
 
-    const ur_coords: IVec2 = .{ .x = rect.x + road_start_v + road_width_v, .y = rect.y };
-    const ur_size: IVec2 = .{ .x = rect.w - ul.w - road_width_v, .y = ul.h };
-    const ur: IRect = IRect.from(ur_coords, ur_size);
-
-    const ll_coords: IVec2 = .{ .x = rect.x, .y = rect.y + ul.h + road_width_h };
-    const ll_size: IVec2 = .{ .x = ul.w, .y = rect.h - ul.h - road_width_h };
-    const ll: IRect = IRect.from(ll_coords, ll_size);
-
-    const lr_coords: IVec2 = .{ .x = ur.x, .y = ll.y };
-    const lr_size: IVec2 = .{ .x = rect.w - ll.w - road_width_v, .y = ur.w };
-    const lr: IRect = IRect.from(lr_coords, lr_size);
+    const road_v: Interval = .{ .origin = road_start_v, .len = road_width_v };
+    const road_h: Interval = .{ .origin = road_start_h, .len = road_width_h };
+    const l, const v, const r = rect.slice(.v, road_v);
+    const ur, const h1, const lr = r.slice(.h, road_h);
+    const ul, const h2, const ll = l.slice(.h, road_h);
+    const v1, const c, const v2 = v.slice(.h, road_h);
 
     new_mapgen(ul, new_zone, rng, depth + 1);
     new_mapgen(ur, new_zone, rng, depth + 1);
@@ -198,23 +189,18 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
     // now actually pave the roads
     // v road
     {
-        const road_start: IVec2 = .{ .x = road_start_v, .y = rect.y };
-        const road_size: IVec2 = .{ .x = road_width_v, .y = rect.h };
-        const rr: IRect = IRect.from(road_start, road_size);
-        pave_road(rr, true, num_lanes_v);
+        pave_road(v1, true);
+        pave_road(v2, true);
     }
     // h road
     {
-        const road_start: IVec2 = .{ .x = rect.x, .y = road_start_h };
-        const road_size: IVec2 = .{ .x = rect.w, .y = road_width_h };
-        const rr: IRect = IRect.from(road_start, road_size);
-        pave_road(rr, false, num_lanes_h);
+        pave_road(h1, false);
+        pave_road(h2, false);
     }
-    fill_terrain(intersection, .asphalt);
+    fill_terrain(c, .asphalt);
 }
 
-pub fn pave_road(rect: IRect, is_vertical: bool, n_lanes: i16) void {
-    _ = n_lanes;
+pub fn pave_road(rect: IRect, is_vertical: bool) void {
     var paving: IRect = rect;
     // first fill with sidewalk
     fill_terrain(paving, .sidewalk);
