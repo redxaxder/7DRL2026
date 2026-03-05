@@ -1,6 +1,6 @@
 
-- crit
-- motorcycle survival
++ crit
++ motorcycle survival
 + rubble collision
 - rockets
 
@@ -9,6 +9,7 @@
   + mode
   + combo
   + motorcycle hp
+
 
 
 - blink anim for kaiju smash
@@ -23,6 +24,7 @@
 - camera leads movement
 - fling ONTO a motorcycle?
 - indicate areas threatened by monster reach
+- dead motorcycles explode?
 
 
 + item attributes:

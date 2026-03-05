@@ -25,21 +25,28 @@ const BASE_WEAPON: Item = blk: {
 
 const EXAMPLE_TRINKET: Item = blk: {
     var it: Item = .tagged(ItemTag.Hachimaki);
-    it.attrs.field(.crit4_bonus).* = 4;
+    it.attrs.field(.explosion_radius).* = 4;
     it.attrs.field(.crit3_bonus).* = 2;
     break :blk it;
 };
 
-const BASE_GAMMA: Item = blk: {
+const EXAMPLE_GAMMA: Item = blk: {
     var it: Item = .tagged(ItemTag.Gamma_Beam);
     it.attrs.field(.radioactive_damage).* = 10;
+    break :blk it;
+};
+
+const EXAMPLE_ROCKET: Item = blk: {
+    var it: Item = .tagged(ItemTag.Rocket_Launcher);
+    it.attrs.field(.explosion_radius).* = 1;
+    it.attrs.field(.explosion_damage).* = 10;
     break :blk it;
 };
 
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
     inventory[1] = EXAMPLE_TRINKET;
-    inventory[2] = BASE_GAMMA;
+    inventory[2] = EXAMPLE_ROCKET;
     roll_next_item(rng);
 }
 

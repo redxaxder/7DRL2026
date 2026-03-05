@@ -201,6 +201,17 @@ pub const Unit = struct {
         };
     }
 
+    pub fn init_pending_explosion(pos: IVec2, size: u8, dmg: i64) Unit {
+        return .{
+            .tag = .PendingExplosion,
+            .position = pos,
+            .render_position = pos.float(),
+            .size = size,
+            .hp = dmg,
+            .alive = true,
+        };
+    }
+
     pub fn mounted(self: *const Unit) bool {
         const m = self.mount();
         return m.tag != .Nil and m.alive;
@@ -412,7 +423,7 @@ pub const Unit = struct {
             .Player, .PendingRubble => {
                 return core.IRect.singleton(self.position);
             },
-            .Kaiju, .PendingExplosion => {
+            .Kaiju => {
                 return core.IRect{
                     .x = self.position.x,
                     .y = self.position.y,
@@ -430,6 +441,15 @@ pub const Unit = struct {
                     .y = @min(p1.y, p2.y),
                     .w = w,
                     .h = h,
+                };
+            },
+            .PendingExplosion => {
+                const r: i16 = @intCast(self.size);
+                return core.IRect{
+                    .x = self.position.x - r,
+                    .y = self.position.y - r,
+                    .w = 2 * r + 1,
+                    .h = 2 * r + 1,
                 };
             },
         }
@@ -523,13 +543,13 @@ pub const globals = struct {
         return globals.unit(KMOM_ID);
     }
 
-    pub fn free_unit_id() ?UnitId {
+    pub fn free_unit_id() !UnitId {
         for (units[1..], 1..) |u, i| {
             if (u.tag == .Nil) {
                 return @intCast(i);
             }
         }
-        return null;
+        return error.OutOfUnitSlots;
     }
 };
 
@@ -538,14 +558,18 @@ pub const KMOM_ID: UnitId = 2;
 pub const PLAYER_START: IVec2 = .{ .x = 200, .y = 2300 };
 pub const KMOM_START: IVec2 = .{ .x = 2300, .y = 200 };
 
-pub fn spawn(u: Unit) UnitId {
-    const id = globals.free_unit_id() orelse @panic("how did we run out so fast");
+pub fn spawn(u: Unit) !UnitId {
+    const id = try globals.free_unit_id();
     globals.unit(id).* = u;
     sector.add(id, globals.unit(id));
+
+    std.log.info("spawn {}", .{u.tag});
     return id;
 }
 
 pub fn unspawn(u: *Unit) void {
+    std.log.info("unspawn {}", .{u.tag});
+
     const anim = u.deferred_set(.tag, .Nil);
     _ = anim.lock_exclusive(u.lock())
         .lock_exclusive(animlib.lock_rect(u.get_rect()));
@@ -556,6 +580,10 @@ pub fn init(rng: std.Random) !void {
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
     globals.rng = rng;
 
+    const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
+    map.new_mapgen(map_rect, .Residential, rng, 0, 25);
+    // map.mapgen(rng);
+
     globals.units[PLAYER_ID] = .init_player(PLAYER_START);
     sector.add(PLAYER_ID, globals.player());
     {
@@ -564,15 +592,11 @@ pub fn init(rng: std.Random) !void {
             map.set_terrain_at(pos, .grass);
         }
     }
-    const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
-    map.new_mapgen(map_rect, .Residential, rng, 0, 25);
-    // map.mapgen(rng);
-
     globals.units[KMOM_ID] = .init_kaiju(KMOM_START, MOTHER_KAIJU_SIZE);
     sector.add(KMOM_ID, globals.kmom());
     _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
 
-    const moto_id = spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Kawamura_ZX));
+    const moto_id = try spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Kawamura_ZX));
     globals.player().mounted_on = moto_id;
 
     inventory.init(rng);
@@ -726,6 +750,9 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
     const combo_linear: f64 = @floatFromInt(globals.combo_count);
     const crit = crit_bonus();
 
+    // combat_log.log("You shoot the {s}.", .{terrain.name()});
+
+    const terrain = map.get_terrain_at(aim);
     switch (weapon.tag) {
         .Rifle => {
             const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.gun_damage));
@@ -737,13 +764,26 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
                 u.damage(idamage);
                 globals.combo_count += combo_gain;
                 combat_log.log("The rifle round deals {} damage. You dial in your next shot.", .{idamage});
+            } else {
+                combat_log.log("You shoot the {s}.", .{terrain.name()});
             }
         },
         .Rocket_Launcher => {
-            _ = aim;
+            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.explosion_damage));
+            const radius: u8 = @intCast(weapon.attrs.effective_value(.explosion_radius));
+            const damage: f64 = (base_damage + combo_linear) * combo_mul;
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage))) * crit;
+            _ = spawn(.init_pending_explosion(aim, radius, idamage)) catch {
+                std.log.err("out of unit slots? cant fire missiles!", .{});
+                return true;
+            };
+            combat_log.log("You fire a rocket.", .{});
         },
         .Gamma_Beam => {
-            const u = target orelse return true;
+            const u = target orelse {
+                combat_log.log("You shoot the {s}.", .{terrain.name()});
+                return true;
+            };
             const percent: f64 = @floatFromInt(weapon.attrs.effective_value(.radioactive_damage));
             const hp: f64 = @floatFromInt(u.hp);
             const damage = percent * (hp / 100);
@@ -765,9 +805,8 @@ pub fn handle_player_attack(dir: Dir4) bool {
         if (terrain.blocks_shot()) {
             // you shoot at the terrain
             // consequences TBD
-            combat_log.log("You shoot the {s}.", .{terrain.name()});
             globals.combo_count = 0;
-            return true;
+            return fire_weapon(aim, null);
         }
         var aim_occupants = get_occupants(aim);
         while (aim_occupants.next()) |occupant_id| {
@@ -879,24 +918,37 @@ fn animate_terrain_to(pos: IVec2, terrain: Terrain) *animation.Animation {
 fn resolve_pending(rng: std.Random) void {
     // TODO this could be more efficient
     for (globals.units[1..]) |*u| {
-        if (u.tag == .PendingRubble) {
-            const terrain: Terrain = if (rng.boolean()) .debris else .rubble;
-            const pos = u.position;
-            unspawn(u);
-            _ = animate_terrain_to(pos, terrain).chain();
+        switch (u.tag) {
+            .PendingRubble => {
+                const terrain: Terrain = if (rng.boolean()) .debris else .rubble;
+                const pos = u.position;
+                unspawn(u);
+                _ = animate_terrain_to(pos, terrain).chain();
 
-            var player: *Unit = globals.player();
-            const moto: ?*Unit = if (player.mounted()) player.mount() else null;
-            // damage player if hit
-            // TODO how much damage?
-            if (pos.eq(player.position)) {
-                player.damage(10);
-            } else if (moto) |m| {
-                // damage moto if hit
-                if (m.get_rect().contains(pos)) {
-                    m.damage(10);
+                var player: *Unit = globals.player();
+                const moto: ?*Unit = if (player.mounted()) player.mount() else null;
+                // damage player if hit
+                // TODO how much damage?
+                if (pos.eq(player.position)) {
+                    player.damage(10);
+                } else if (moto) |m| {
+                    // damage moto if hit
+                    if (m.get_rect().contains(pos)) {
+                        m.damage(10);
+                    }
                 }
-            }
+            },
+            .PendingExplosion => {
+                if (u.alive) {
+                    u.alive = false;
+                } else {
+                    std.log.info("{any}", .{u});
+
+                    // TODO resolve explosion
+                    unspawn(u);
+                }
+            },
+            else => {},
         }
     }
 }
@@ -912,9 +964,8 @@ fn destroy_area(target: IRect, rng: std.Random) bool {
 
 fn new_kaiju(target: IRect, rng: std.Random) !void {
     const size = target.w;
-    const id = globals.free_unit_id() orelse return error.OutOfUnitSlots;
     _ = destroy_area(target.expand(@divTrunc(size, 2)), rng);
-    globals.units[id] = .init_kaiju(target.ivec(), @intCast(size));
+    _ = try spawn(.init_kaiju(target.ivec(), @intCast(size)));
 }
 
 fn tick_kaiju(rng: std.Random) void {
@@ -1087,7 +1138,9 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
         while (front_iter.next()) |pos| {
             if (rng.float(f32) < rubble_spawn_chance) {
                 const pr: Unit = Unit.init_pending_destruction(pos);
-                _ = spawn(pr);
+                _ = spawn(pr) catch {
+                    std.log.err("no room for rubble", .{});
+                };
             }
         }
     }

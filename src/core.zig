@@ -74,6 +74,13 @@ pub const IVec2 = struct {
         return self.minus(other).max_norm();
     }
 
+    pub fn manhattan_norm(self: IVec2) i16 {
+        return @intCast(@abs(self.x) + @abs(self.y));
+    }
+    pub fn manhattan_distance(self: IVec2, other: IVec2) i16 {
+        return self.minus(other).manhattan_norm();
+    }
+
     pub fn projection(self: IVec2, dir: Dir4) IVec2 {
         return self.times(dir.ivec());
     }
@@ -237,6 +244,13 @@ pub const Vec2 = extern struct {
         const ax = @abs(self.x);
         const ay = @abs(self.y);
         return @max(ax, ay);
+    }
+
+    pub fn manhattan_norm(self: Vec2) f32 {
+        return @abs(self.x) + @abs(self.y);
+    }
+    pub fn manhattan_distance(self: Vec2, other: Vec2) f32 {
+        return self.minus(other).manhattan_norm();
     }
 };
 
@@ -436,6 +450,16 @@ pub const IRect = struct {
 
     pub fn point_distance(self: IRect, point: IVec2) IVec2 {
         return self.distance(IRect.singleton(point));
+    }
+
+    // Counts positions in this rect within Manhattan distance n of target.
+    pub fn count_overlap(self: IRect, target: IVec2, n: i16) u32 {
+        var count: u32 = 0;
+        var it = self.iter();
+        while (it.next()) |pos| {
+            if (pos.manhattan_distance(target) <= n) count += 1;
+        }
+        return count;
     }
 
     pub fn slide(self: IRect, dir: Dir4, dist: i16) SlideIterator {

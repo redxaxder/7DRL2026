@@ -317,7 +317,7 @@ fn animate_camera_to(target: Vec2) void {
     camera_target = target;
 }
 
-fn render_unit(unit: *const main.Unit, origin: Vec2) void {
+fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
     switch (unit.tag) {
         .Player => {
             draw_world_glyph(
@@ -337,11 +337,35 @@ fn render_unit(unit: *const main.Unit, origin: Vec2) void {
         },
         .Kaiju => render_kaiju(unit, origin),
         .PendingRubble => {
-            draw_world_glyph(unit.render_position, 'X', .{
-                .color = .yellow,
-                .bgcolor = .black,
-                .origin = origin,
-            });
+            const pos = unit.render_position;
+            const period = 600;
+            const phase = @mod(pos.x + 3 * pos.y, 5) * period / 5;
+            const blink = @mod(t + phase, period) < period / 2;
+            if (blink) {
+                draw_world_glyph(unit.render_position, 'X', .{
+                    .color = .yellow,
+                    .bgcolor = .black,
+                    .origin = origin,
+                });
+            }
+        },
+        .PendingExplosion => {
+            const r: f32 = @floatFromInt(unit.size);
+            var iter = unit.get_rect().iter();
+            while (iter.next()) |pos| {
+                if (pos.float().manhattan_distance(unit.render_position) <= r) {
+                    const period = 700;
+                    const phase = @mod(pos.float().x + 3 * pos.float().y, 5) * period / 5;
+                    const blink = @mod(t + phase, period) < period / 2;
+                    if (blink) {
+                        draw_world_glyph(pos.float(), 'X', .{
+                            .color = .red,
+                            .bgcolor = .black,
+                            .origin = origin,
+                        });
+                    }
+                }
+            }
         },
         else => {
             return;
@@ -655,7 +679,7 @@ fn draw_gamefield(t: f64) void {
         while (iter.next()) |uid| {
             const u = main.globals.unit(uid);
             if (u.tag == .Motorcycle) {
-                render_unit(u, origin);
+                render_unit(u, origin, t);
             }
         }
 
@@ -664,12 +688,21 @@ fn draw_gamefield(t: f64) void {
         while (iter.next()) |uid| {
             const u = main.globals.unit(uid);
             if (u.tag == .Kaiju) {
-                render_unit(u, origin);
+                render_unit(u, origin, t);
             }
         }
 
         // player
-        render_unit(main.globals.player(), origin);
+        render_unit(main.globals.player(), origin, t);
+
+        // booms
+        iter = sector.get_occupants_rect(seen_rect);
+        while (iter.next()) |uid| {
+            const u = main.globals.unit(uid);
+            if (u.tag == .PendingExplosion or u.tag == .PendingRubble) {
+                render_unit(u, origin, t);
+            }
+        }
     }
 
     // Draw movement preview reticles

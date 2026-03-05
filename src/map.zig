@@ -416,7 +416,7 @@ pub const Terrain = enum(u5) {
             .trinket => return 0xF0,
             .sidewalk => return 0xB0,
             .road_paint => return 0xB1,
-            .grass => return '\"',
+            .grass => return ',',
             else => return '/',
         }
     }
