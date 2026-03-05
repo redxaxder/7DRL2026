@@ -358,7 +358,7 @@ pub const Unit = struct {
                 }
                 var posit = edge.iter();
                 while (posit.next()) |p| {
-                    destroy1(p);
+                    _ = destroy1(p);
                 }
             }
         }

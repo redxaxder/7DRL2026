@@ -4,6 +4,7 @@ const IVec2 = core.IVec2;
 const IRect = core.IRect;
 const Interval = core.Interval;
 const UnitType = @import("main.zig").UnitType;
+const Color = @import("render.zig").Color;
 
 const DirFlags = packed struct(u4) {
     north: bool = false,
@@ -426,6 +427,22 @@ pub const FullTerrain = packed struct(u8) {
     }
 };
 
+const DrawInfo = struct {
+    glyph: u8,
+    color: Color,
+};
+pub fn rendered_glyph(pos: IVec2) DrawInfo {
+    const payload: FullTerrain.Payload = get_render_terrain_payload_at(pos);
+    const terrain = if (payload.seen)
+        payload.terrain
+    else
+        .void_;
+    return .{
+        .glyph = terrain.glyph(),
+        .color = if (payload.bloody) .red else .white,
+    };
+}
+
 pub const Terrain = enum(u5) {
     floor,
     asphalt,
@@ -449,7 +466,7 @@ pub const Terrain = enum(u5) {
         };
     }
 
-    pub fn glyph(self: Terrain) u8 {
+    fn glyph(self: Terrain) u8 {
         switch (self) {
             .asphalt => return 0,
             // .asphalt => return '\\',

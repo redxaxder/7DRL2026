@@ -11,6 +11,7 @@ const map = @import("map.zig");
 const inventory = @import("inventory.zig");
 const RingBuffer = @import("ringbuffer.zig").RingBuffer;
 const sector = @import("sector.zig");
+const Color = RenderBuffer.Color;
 
 const ui = @import("ui.zig");
 
@@ -373,8 +374,6 @@ fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
     }
 }
 
-const Color = RenderBuffer.Color;
-
 pub fn bounding_box(positions: []const Vec2) Rect {
     var min_x = positions[0].x;
     var min_y = positions[0].y;
@@ -650,19 +649,11 @@ fn draw_gamefield(t: f64) void {
 
     var terrain_iter = seen_rect.iter();
     while (terrain_iter.next()) |world_pos| {
-        const payload = map.get_render_terrain_payload_at(world_pos);
-        const terrain = if (payload.seen)
-            payload.terrain
-        else
-            .void_;
-        const color: Color = if (payload.bloody)
-            .red
-        else
-            .white;
+        const to_draw = map.rendered_glyph(world_pos);
         draw_world_glyph(
             world_pos.float(),
-            terrain.glyph(),
-            .{ .color = color, .origin = origin },
+            to_draw.glyph,
+            .{ .color = to_draw.color, .origin = origin },
         );
     }
 
