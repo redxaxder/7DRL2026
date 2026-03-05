@@ -105,6 +105,51 @@ pub const UnitType = enum {
     PendingRubble,
 };
 
+pub const Motorcycle = enum {
+    Nil,
+    Nova_Glide,
+    Cinder_Wolf_Pro,
+    Kawamura_ZX,
+
+    pub fn stats(self: Motorcycle) inventory.Attributes {
+        var attrs: inventory.Attributes = .{};
+        const fields: [4]inventory.Attribute = .{
+            .top_speed,
+            .acceleration,
+            .armor,
+            .impact_damage,
+        };
+
+        const got: [4]i16 = switch (self) {
+            .Nova_Glide => .{ 10, 0, 8, 2 },
+            .Cinder_Wolf_Pro => .{ 5, 8, 14, 10 },
+            .Kawamura_ZX => .{ 7, 3, 6, 6 },
+            .Nil => .{0} ** 4,
+        };
+        for (fields, 0..) |field, i| {
+            attrs.field(field).* += got[i];
+        }
+        return attrs;
+    }
+
+    pub fn name(self: Motorcycle) []const u8 {
+        if (self == .Nil) return "";
+        return switch (self) {
+            inline else => |tag| {
+                const tag_name = @tagName(tag);
+                const result = comptime blk: {
+                    var buf: [tag_name.len]u8 = undefined;
+                    for (&buf, tag_name) |*b, c| {
+                        b.* = if (c == '_') ' ' else c;
+                    }
+                    break :blk buf;
+                };
+                return &result;
+            },
+        };
+    }
+};
+
 pub const UnitId = u16;
 pub const Unit = struct {
     // Universal
@@ -123,7 +168,7 @@ pub const Unit = struct {
     orientation: Dir4 = .Right,
     render_orientation: Dir4 = .Right,
     speed: u8 = 0,
-    //TODO: model
+    model: Motorcycle = .Nil,
 
     mounted_on: UnitId = 0,
 
@@ -160,7 +205,7 @@ pub const Unit = struct {
         return m.tag != .Nil and m.alive;
     }
 
-    pub fn init_motorcycle(pos: IVec2, orientation: Dir4) Unit {
+    pub fn init_motorcycle(pos: IVec2, orientation: Dir4, model: Motorcycle) Unit {
         return Unit{
             .tag = .Motorcycle,
             .position = pos,
@@ -169,6 +214,7 @@ pub const Unit = struct {
             .render_orientation = orientation,
             .hp = 80,
             .alive = true,
+            .model = model,
         };
     }
 
@@ -514,7 +560,7 @@ pub fn init(rng: std.Random) !void {
     sector.add(KMOM_ID, globals.kmom());
     _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
 
-    const moto_id = spawn(.init_motorcycle(PLAYER_START, .Right));
+    const moto_id = spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Kawamura_ZX));
     globals.player().mounted_on = moto_id;
 
     inventory.init(rng);
@@ -627,7 +673,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
     switch (weapon.tag) {
         .Rifle => {
             const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.gun_damage));
-            const combo_gain = weapon.attrs.effective_value(.gun_combo);
+            const combo_gain = weapon.attrs.effective_value(.accuracy);
             const damage: f64 = (base_damage + combo_linear) * combo_mul;
             const idamage: i64 = @intFromFloat(@trunc(damage));
             globals.combo_target = tid;
@@ -676,6 +722,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
         }
     }
     combat_log.log("You fire off into the distance.", .{});
+    globals.combo_count = 0;
     return true;
 }
 
@@ -1115,8 +1162,6 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
     k.move(dir, seen.distance);
 }
 
-pub const MAX_SPEED = 20;
-
 pub const MotoMove = struct {
     dir: ?Dir4 = null,
     shift: bool = false,
@@ -1259,10 +1304,16 @@ pub fn resolve_motorcycle_movement(
     };
     const slide_dist = @max(moto.speed / 2, 1);
 
+    const stats = globals.player().mount().model.stats();
+    const acc: u8 = @intCast(stats.effective_value(.acceleration));
+    const maxspd: u8 = @intCast(stats.effective_value(.top_speed));
+
     switch (core.RelativeDir.from(change, moto.orientation)) {
         .Forward => {
             // accelerate!
-            it.speed = @min(it.speed + 1, MAX_SPEED);
+
+            const more_accel: u8 = if (it.speed < acc) 1 else 0;
+            it.speed = @min(it.speed + 1 + more_accel, maxspd);
             const drift = moto.orientation.ivec().scaled(@intCast(it.speed));
             it.position = it.position.plus(drift);
 
@@ -1290,11 +1341,12 @@ pub fn resolve_motorcycle_movement(
                         break :blk 0;
                     }
                 };
+                const more_accel: u8 = if (turned_speed < (acc / 2)) 1 else 0;
                 const pre_drift = moto.orientation.ivec().scaled(@intCast(slide_dist));
                 it.midpoint = it.position.plus(pre_drift);
                 const post_drift = change.ivec().scaled(@intCast(turned_speed));
                 it.position = it.midpoint.plus(post_drift);
-                it.speed = @max(1, turned_speed);
+                it.speed = @max(1, turned_speed + more_accel);
                 it.orientation = change;
             }
         },

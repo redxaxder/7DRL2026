@@ -331,7 +331,6 @@ fn render_unit(unit: *const main.Unit, origin: Vec2) void {
             const p0 = unit.render_position;
             const p1 = p0.plus(unit.render_orientation.ivec().float());
             draw_world_glyph(p0, 'o', .{ .bgcolor = .black, .origin = origin });
-
             draw_world_glyph(p1, '%', .{ .bgcolor = .black, .origin = origin });
         },
         .Kaiju => render_kaiju(unit, origin),
@@ -446,22 +445,30 @@ pub fn draw_status() !void {
     cursor.y += SPRITE_SCALE;
 
     if (player.mounted()) {
-        // TODO motorcycle name
-        cursor.y += fmt_draw_text(cursor, "Motorcycle", opts, w, .{});
+        const mount = player.mount();
+        cursor.y += fmt_draw_text(cursor, "{s}", opts, w, .{mount.model.name()});
         cursor.y += fmt_draw_text(
             cursor,
             "Hp: {}",
             opts,
             w,
-            .{player.mount().hp},
+            .{mount.hp},
         );
+        cursor.y += draw_attrs(
+            cursor.plus(.{ .x = SPRITE_SCALE * 2 }),
+            false,
+            &mount.model.stats(),
+            opts,
+            w,
+        );
+
         cursor.y += SPRITE_SCALE;
     }
 
     if (main.globals.combo_count > 0) {
         cursor.y += fmt_draw_text(
             cursor,
-            "Accuracy: {}",
+            "Precision: {}",
             opts,
             w,
             .{main.globals.combo_count},
@@ -507,33 +514,29 @@ fn draw_log() void {
 
 fn draw_item_desc(pos: Vec2, item: *const inventory.Item, opts: DrawOptions, w: f32) f32 {
     var cursor: Vec2 = pos;
-
     if (item.tag == .Nil) {
         return 0;
     }
-
     cursor.y += fmt_draw_text(cursor, "{s}", opts, w, .{item.tag.name()});
+    cursor.y += draw_attrs(cursor, item.tag.is_trinket(), &item.attrs, opts, w);
+    return cursor.y - pos.y;
+}
 
-    const attrs = &item.attrs;
+fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, opts: DrawOptions, w: f32) f32 {
+    var cursor: Vec2 = pos;
+    const bonuses = inventory.bonuses();
     for (std.enums.values(inventory.Attribute)) |attr| {
         const val = attrs.readfield(attr);
+        const extra = bonuses.readfield(attr);
         if (val != 0) {
-            if (item.tag.is_weapon()) {
-                cursor.y += fmt_draw_text(
-                    cursor,
-                    "{s} {}",
-                    opts,
-                    w,
-                    .{ attr.name(), val },
-                );
+            if (is_bonus) {
+                cursor.y += fmt_draw_text(cursor, "{s} +{}", opts, w, .{ attr.name(), val });
             } else {
-                cursor.y += fmt_draw_text(
-                    cursor,
-                    "{s} +{}",
-                    opts,
-                    w,
-                    .{ attr.name(), val },
-                );
+                if (extra != 0) {
+                    cursor.y += fmt_draw_text(cursor, "{s} {} [+{}]", opts, w, .{ attr.name(), val, extra });
+                } else {
+                    cursor.y += fmt_draw_text(cursor, "{s} {}", opts, w, .{ attr.name(), val });
+                }
             }
         }
     }
@@ -544,7 +547,6 @@ fn draw_inventory() void {
     const r: IRect = ui.MAIN_VIEW.get("inventory");
     const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
     const w = interior.w;
-    const active_slot = inventory.active_weapon_slot();
 
     var cursor: Vec2 = .ZERO;
     const indent = SPRITE_SCALE * 2;
@@ -568,7 +570,7 @@ fn draw_inventory() void {
             continue;
         }
 
-        const is_active = if (active_slot) |s| s == i else false;
+        const is_active = if (inventory.get_active_index()) |s| s == i else false;
 
         const color: Color = if (is_active) .green else .white;
         const opts = DrawOptions{ .origin = interior.pos(), .color = color };

@@ -9,7 +9,7 @@ const INVENTORY_SIZE: usize = 10;
 
 var pending_pickups: usize = 0;
 pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
-var active_item: ?usize = null;
+var active_index: ?usize = null;
 var item_count: usize = 0;
 pub var item_capacity: usize = 3;
 var cash: usize = 0;
@@ -19,7 +19,14 @@ pub var next_item: Item = undefined;
 const BASE_WEAPON: Item = blk: {
     var it: Item = .tagged(ItemTag.Rifle);
     it.attrs.field(.gun_damage).* = 1;
-    it.attrs.field(.gun_combo).* = 1;
+    it.attrs.field(.accuracy).* = 1;
+    break :blk it;
+};
+
+const EXAMPLE_TRINKET: Item = blk: {
+    var it: Item = .tagged(ItemTag.Hachimaki);
+    it.attrs.field(.gun_damage).* = 1;
+    it.attrs.field(.accuracy).* = 1;
     break :blk it;
 };
 
@@ -31,45 +38,35 @@ const BASE_GAMMA: Item = blk: {
 
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
+    inventory[1] = EXAMPLE_TRINKET;
+    inventory[2] = BASE_GAMMA;
     roll_next_item(rng);
 }
 
 pub fn active_weapon() ?*const Item {
-    if (active_item) |ix| {
+    if (active_index) |ix| {
         return &inventory[ix];
     }
     return null;
 }
 
-pub fn active_weapon_slot() ?usize {
-    return active_item;
+pub fn get_active_index() ?usize {
+    return active_index;
 }
 
 pub fn toggle_weapon(id: usize) void {
-    const selected = nth_weapon_index((id + 9) % 10) orelse {
-        return;
-    };
-
-    if (active_item) |active| {
-        if (active == selected) {
-            active_item = null;
+    const index = (id + 9) % 10;
+    if (active_index) |active| {
+        if (active == index) {
+            active_index = null;
             return;
         }
     }
-    active_item = selected;
-}
-
-fn nth_weapon_index(n: usize) ?usize {
-    var seen: usize = 0;
-    for (inventory, 0..) |item, i| {
-        if (item.tag.is_weapon()) {
-            if (seen == n) {
-                return i;
-            }
-            seen += 1;
-        }
+    if (inventory[index].tag.is_weapon()) {
+        active_index = index;
+    } else {
+        active_index = null;
     }
-    return null;
 }
 
 pub fn has_pending_pickups() bool {
@@ -104,7 +101,7 @@ pub fn roll_next_item(rng: std.Random) void {
 
     switch (t) {
         .Labubu => {
-            next_item.attrs.field(.motorcycle_damage).* +=
+            next_item.attrs.field(.impact_damage).* +=
                 roll_low(rng, 2, 3, 6);
         },
         .Gamma_Beam => {
@@ -114,7 +111,7 @@ pub fn roll_next_item(rng: std.Random) void {
         .Rifle => {
             next_item.attrs.field(.gun_damage).* +=
                 roll_low(rng, 5, 1, 30);
-            next_item.attrs.field(.gun_combo).* +=
+            next_item.attrs.field(.accuracy).* +=
                 roll_low(rng, 3, 1, 10);
         },
         .Rocket_Launcher => {
@@ -136,13 +133,13 @@ pub fn roll_next_item(rng: std.Random) void {
                 roll_low(rng, 3, 1, 10);
         },
         .Talisman => {
-            next_item.attrs.field(.motorcycle_armor).* +=
+            next_item.attrs.field(.armor).* +=
                 roll_low(rng, 2, 3, 6);
         },
         .Hachimaki => {
             next_item.attrs.field(.gun_damage).* +=
                 roll_low(rng, 8, 1, 30);
-            next_item.attrs.field(.gun_combo).* +=
+            next_item.attrs.field(.accuracy).* +=
                 roll_low(rng, 8, 1, 10);
         },
         // .Amulet => { },
@@ -186,16 +183,19 @@ pub fn handle_pending_pickups(rng: std.Random) void {
 
 pub fn overwrite_slot(rng: std.Random, slot: usize) void {
     if (slot < item_capacity) {
-        if (slot == active_item) {
-            active_item = null;
+        if (slot == active_index) {
+            active_index = null;
         }
+        combat_log.log("You throw away your {s}.", .{inventory[slot].tag.name()});
         combat_log.log("You equip the {s}.", .{next_item.tag.name()});
         inventory[slot] = next_item;
-        discard_pending(rng);
+        roll_next_item(rng);
+        pending_pickups -= 1;
     }
 }
 
 pub fn discard_pending(rng: std.Random) void {
+    combat_log.log("You throw away the {s}.", .{next_item.tag.name()});
     roll_next_item(rng);
     pending_pickups -= 1;
 }
@@ -259,12 +259,12 @@ pub const Attribute = enum {
     explosion_radius,
     explosion_damage,
     gun_damage,
-    gun_combo,
+    accuracy,
     crit3_bonus,
     crit4_bonus,
     crit5_bonus,
-    motorcycle_damage,
-    motorcycle_armor,
+    impact_damage,
+    armor,
     top_speed,
     acceleration,
 
