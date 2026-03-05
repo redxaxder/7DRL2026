@@ -222,14 +222,14 @@ pub const Unit = struct {
         return m.tag != .Nil and m.alive;
     }
 
-    pub fn init_motorcycle(pos: IVec2, orientation: Dir4, model: Motorcycle) Unit {
+    pub fn init_motorcycle(pos: IVec2, orientation: Dir4, model: Motorcycle, hp: i64) Unit {
         return Unit{
             .tag = .Motorcycle,
             .position = pos,
             .render_position = pos.float(),
             .orientation = orientation,
             .render_orientation = orientation,
-            .hp = 80,
+            .hp = hp,
             .alive = true,
             .model = model,
         };
@@ -538,7 +538,7 @@ pub const ux = struct {
 };
 
 pub const globals = struct {
-    pub var units: [2000]Unit = .{Unit.DEFAULT} ** 2000;
+    pub var units: [5000]Unit = .{Unit.DEFAULT} ** 5000;
 
     pub var combo_target: ?UnitId = 0;
     pub var combo_count: i64 = 0;
@@ -582,7 +582,7 @@ pub fn spawn(u: Unit) !UnitId {
     globals.unit(id).* = u;
     sector.add(id, globals.unit(id));
 
-    std.log.info("spawn {}", .{u.tag});
+    std.log.info("spawn {}, {}", .{ u.tag, id });
     return id;
 }
 
@@ -601,7 +601,6 @@ pub fn init(rng: std.Random) !void {
 
     const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
     map.new_mapgen(map_rect, .Residential, rng, 0, 25);
-    // map.mapgen(rng);
 
     globals.units[PLAYER_ID] = .init_player(PLAYER_START);
     sector.add(PLAYER_ID, globals.player());
@@ -615,13 +614,58 @@ pub fn init(rng: std.Random) !void {
     sector.add(KMOM_ID, globals.kmom());
     _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
 
-    const moto_id = try spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Nova_Glide));
+    const moto_id = try spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Nova_Glide, 80));
     globals.player().mounted_on = moto_id;
 
     inventory.init(rng);
     fov.refresh_fov(globals.player().position, FOV_RANGE);
 
-    map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.void_);
+    var motoplaced: u32 = 0;
+    { // place motorcycles
+        const placement_attempts = 10;
+        const SECTION_COUNT: i16 = 50;
+        const SECTION_SIZE: i16 = map.BOUNDS.w / SECTION_COUNT;
+        var sections = (IRect{
+            .x = 0,
+            .y = 0,
+            .w = SECTION_COUNT,
+            .h = SECTION_COUNT,
+        }).iter();
+        const rect0 = IRect{ .x = 0, .y = 0, .w = SECTION_SIZE, .h = SECTION_SIZE };
+
+        while (sections.next()) |section| {
+            const rect = rect0.displace(section.scaled(SECTION_SIZE));
+            for (0..placement_attempts) |_| {
+                if (try_place_moto(rect, rng)) {
+                    motoplaced += 1;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn try_place_moto(rect: IRect, rng: std.Random) bool {
+    const pos = rect.roll(rng);
+    const face = rng.enumValue(Dir4);
+    const pos2 = pos.plus(face.ivec());
+    const t1 = map.get_terrain_at(pos);
+    const t2 = map.get_terrain_at(pos2);
+    if (t1.can_place_moto() and t2.can_place_moto()) {
+        _ = spawn(
+            .init_motorcycle(
+                pos,
+                face,
+                rng.enumValue(Motorcycle),
+                rng.intRangeAtMost(i64, 20, 200),
+            ),
+        ) catch {
+            std.log.err("cant seed initial motorcycle", .{});
+            return false;
+        };
+        return true;
+    }
+    return false;
 }
 
 fn handle_vending() void {

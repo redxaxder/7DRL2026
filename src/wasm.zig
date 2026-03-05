@@ -328,8 +328,12 @@ fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
         .Motorcycle => {
             const p0 = unit.render_position;
             const p1 = p0.plus(unit.render_orientation.ivec().float());
-            draw_world_glyph(p0, 'o', .{ .bgcolor = .black, .origin = origin });
-            draw_world_glyph(p1, '%', .{ .bgcolor = .black, .origin = origin });
+            if (map.get_render_terrain_payload_at(unit.position).seen) {
+                draw_world_glyph(p0, 'o', .{ .bgcolor = .black, .origin = origin, .color = .orange });
+            }
+            if (map.get_render_terrain_payload_at(unit.handlepos()).seen) {
+                draw_world_glyph(p1, '%', .{ .bgcolor = .black, .origin = origin, .color = .orange });
+            }
         },
         .Kaiju => render_kaiju(unit, origin),
         .PendingRubble => {
@@ -539,11 +543,13 @@ fn draw_log() void {
     const options: DrawOptions = .{ .origin = bounds.pos() };
 
     var vshift: f32 = 0;
-    var messages = combat_log.storage.iter();
-    while (messages.next()) |message| {
+    var ix: i32 = @as(i32, @intCast(combat_log.storage.len())) - 1;
+    while (ix >= 0) : (ix -= 1) {
+        const message = combat_log.storage.index(ix) orelse continue;
         const h = draw_text(.{ .y = vshift, .x = 0 }, message.*, options, bounds.w);
         vshift += h;
         vshift += SPRITE_SCALE;
+        if (vshift >= bounds.h) break;
     }
     render_buffer.flush();
 }

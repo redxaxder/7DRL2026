@@ -533,6 +533,12 @@ pub const Terrain = enum(u5) {
             else => true,
         };
     }
+    pub fn can_place_moto(self: Terrain) bool {
+        return switch (self) {
+            .asphalt, .road_paint, .sidewalk => true,
+            else => false,
+        };
+    }
 
     pub fn kaiju_passable(self: Terrain) bool {
         return switch (self) {

@@ -610,6 +610,14 @@ pub const IRect = struct {
             .h = self.h,
         };
     }
+
+    pub fn roll(self: IRect, rng: std.Random) IVec2 {
+        const v = IVec2{
+            .x = rng.intRangeAtMost(i16, 1, self.w) - 1,
+            .y = rng.intRangeAtMost(i16, 1, self.h) - 1,
+        };
+        return v.plus(self.ivec());
+    }
 };
 
 pub const Rect = struct {

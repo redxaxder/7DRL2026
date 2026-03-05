@@ -12,7 +12,7 @@ pub const NUM_SECTORS = SECTORS_PER_SIDE * SECTORS_PER_SIDE; // 625
 
 const NodeIndex = u16;
 const SENTINEL: NodeIndex = std.math.maxInt(NodeIndex);
-const MAX_NODES = 4000;
+const MAX_NODES = 5000;
 
 const SectorNode = struct {
     unit_id: UnitId,
