@@ -504,17 +504,11 @@ pub const Terrain = enum(u5) {
         };
     }
 
-    pub fn smashable(self: Terrain) bool {
+    pub fn smash(self: Terrain) ?Terrain {
         return switch (self) {
-            .wall, .door, .rubble, .viscera => true,
-            else => false,
-        };
-    }
-
-    pub fn motosmash(self: Terrain) ?Terrain {
-        return switch (self) {
-            .rubble => .debris,
+            .rubble, .viscera => .debris,
             .wall => .rubble,
+            .door => .debris,
             else => null,
         };
     }

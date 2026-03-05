@@ -668,7 +668,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                     .terrain => |where| {
                         const terrain = map.get_terrain_at(where);
                         combat_log.log("It plows into the {s}.", .{terrain.name()});
-                        if (terrain.motosmash()) |to| {
+                        if (terrain.smash()) |to| {
                             if (motomove.speed > 4) {
                                 _ = animate_terrain_to(
                                     where,
@@ -748,7 +748,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
     }
     const combo_mul: f64 = std.math.pow(f64, 1.03, @floatFromInt(globals.combo_count));
     const combo_linear: f64 = @floatFromInt(globals.combo_count);
-    const crit = crit_bonus();
+    const crit: f64 = @floatFromInt(crit_bonus());
 
     // combat_log.log("You shoot the {s}.", .{terrain.name()});
 
@@ -757,8 +757,8 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
         .Rifle => {
             const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.gun_damage));
             const combo_gain = weapon.attrs.effective_value(.accuracy);
-            const damage: f64 = (base_damage + combo_linear) * combo_mul;
-            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage))) * crit;
+            const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
             globals.combo_target = tid;
             if (target) |u| {
                 u.damage(idamage);
@@ -771,8 +771,8 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
         .Rocket_Launcher => {
             const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.explosion_damage));
             const radius: u8 = @intCast(weapon.attrs.effective_value(.explosion_radius));
-            const damage: f64 = (base_damage + combo_linear) * combo_mul;
-            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage))) * crit;
+            const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
             _ = spawn(.init_pending_explosion(aim, radius, idamage)) catch {
                 std.log.err("out of unit slots? cant fire missiles!", .{});
                 return true;
@@ -784,10 +784,12 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
                 combat_log.log("You shoot the {s}.", .{terrain.name()});
                 return true;
             };
-            const percent: f64 = @floatFromInt(weapon.attrs.effective_value(.radioactive_damage));
+            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.radioactive_damage));
+            const multiplied = (base_damage + combo_linear) * combo_mul * crit;
+            const decay = 1 - std.math.pow(f64, 0.99, multiplied);
             const hp: f64 = @floatFromInt(u.hp);
-            const damage = percent * (hp / 100);
-            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage))) + 1;
+            const damage = decay * hp;
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
             u.damage(idamage);
             combat_log.log("The gamma ray deals {} damage.", .{idamage});
         },
@@ -942,9 +944,43 @@ fn resolve_pending(rng: std.Random) void {
                 if (u.alive) {
                     u.alive = false;
                 } else {
-                    std.log.info("{any}", .{u});
+                    const radius: i16 = @intCast(u.size);
+                    var iter = sector.get_occupants_rect(u.get_rect());
+                    while (iter.next()) |tid| {
+                        const target = globals.unit(tid);
+                        const impact = target.get_rect().count_overlap(u.position, radius);
+                        const damage = impact * u.hp;
+                        switch (target.tag) {
+                            .Kaiju => {
+                                combat_log.log("The explosion deals {} damage to the monster.", .{damage});
+                                target.damage(damage);
+                            },
+                            .Motorcycle => {
+                                const roll = rng.intRangeAtMost(i16, 1, 20);
+                                if (roll > target.model.stats().readfield(.armor)) {
+                                    const max = @as(i64, @intCast(impact)) * 3;
+                                    const dmg = rng.intRangeAtMost(i64, 1, max);
+                                    combat_log.log("The {s} is caught in the blast. It takes {} damage.", .{ target.model.name(), dmg });
+                                    target.damage(dmg);
+                                }
+                            },
+                            .Player => {
+                                // const knockdir =
+                                // TODO: handle explosion hurting player
+                            },
+                            else => {},
+                        }
+                    }
+                    var iterloc = u.get_rect().iter();
+                    while (iterloc.next()) |p| {
+                        if (p.manhattan_distance(u.position) <= radius) {
+                            const roll = rng.intRangeAtMost(u8, 1, 20);
+                            if (roll == 20) {
+                                _ = destroy1(p);
+                            }
+                        }
+                    }
 
-                    // TODO resolve explosion
                     unspawn(u);
                 }
             },
@@ -1149,13 +1185,21 @@ fn harm() void {
     globals.player().hp = 1;
 }
 
-fn destroy(pos: IVec2, rng: std.Random) bool {
-    if (map.get_terrain_at(pos).smashable()) {
-        const rubble_type: Terrain = if (rng.boolean()) .debris else .rubble;
-        _ = set_terrain(pos, rubble_type);
+fn destroy1(pos: IVec2) bool {
+    if (map.get_terrain_at(pos).smash()) |to| {
+        _ = set_terrain(pos, to);
         return true;
     }
     return false;
+}
+
+fn destroy(pos: IVec2, rng: std.Random) bool {
+    const count = rng.intRangeAtMost(usize, 1, 2);
+    var any = false;
+    for (0..count) |_| {
+        any = any or destroy1(pos);
+    }
+    return any;
 }
 
 fn smack_player(dir: Dir4, rng: std.Random) void {
