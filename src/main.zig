@@ -553,7 +553,7 @@ pub fn init(rng: std.Random) !void {
         }
     }
     const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
-    map.new_mapgen(map_rect, .Nil, rng, 0);
+    map.new_mapgen(map_rect, .Residential, rng, 0, 25);
     // map.mapgen(rng);
 
     globals.units[KMOM_ID] = .init_kaiju(KMOM_START, MOTHER_KAIJU_SIZE);

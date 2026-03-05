@@ -96,7 +96,6 @@ fn mapgen_blocks(zone: IVec2, zone_size: IVec2, block_size: IVec2, street_size: 
 }
 
 const Zone = enum {
-    Nil,
     Residential,
     Commercial,
     Industrial,
@@ -109,7 +108,62 @@ fn fill_terrain(rect: IRect, terrain: Terrain) void {
     }
 }
 
-pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
+pub fn fill_hatched(rect: IRect, t1: Terrain, t2: Terrain) void {
+    var iter = rect.iter();
+    const granularity = 3;
+    while (iter.next()) |pos| {
+        const gx = @divFloor(pos.x, granularity);
+        const gy = @divFloor(pos.y, granularity);
+        switch (@mod(gx ^ gy, 2)) {
+            0 => set_terrain_at(pos, t1),
+            1 => set_terrain_at(pos, t2),
+            else => unreachable,
+        }
+    }
+}
+
+pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orientation, zone: Zone, max_road_width: i16) core.Interval {
+    const v_interval, const h_interval = rect.intervals();
+    const interval = switch (orientation) {
+        .v => v_interval,
+        .h => h_interval,
+    };
+
+    std.log.info("interval {any}", .{interval});
+    if (interval.origin < 0) {
+        @panic("oh no");
+    }
+
+    const max_lanes = @divFloor(max_road_width, 4);
+    var lanes = max_lanes;
+
+    if (rng.boolean()) {
+        lanes -= 1;
+    }
+    lanes = @min(lanes, @divFloor(interval.len, 15));
+    _ = zone; // TODO zone affects lanes
+    if (@mod(lanes, 2) == 1 and lanes > 1) {
+        lanes -= 1;
+    }
+    lanes = @max(lanes, 1);
+    const len = lanes * 4 + 1;
+
+    const min_origin = interval.origin + @divFloor(interval.len - len, 3);
+    const max_origin = interval.origin + @divFloor(2 * (interval.len - len), 3);
+    const got: core.Interval = .{
+        .len = len,
+        .origin = rng.intRangeAtMost(
+            i16,
+            min_origin,
+            max_origin,
+        ),
+    };
+
+    std.log.info("got {any}", .{got});
+    return got;
+}
+
+pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_width: i16) void {
     // scheme:
     // recursively -
     //   draw some number of roads, which divide up the given rect
@@ -132,14 +186,12 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
     // }
 
     // blocks
-    const zone_threshold: u16 = 300;
-    const new_zone: Zone = if (zone == .Nil and (rect.w < zone_threshold or rect.h < zone_threshold)) rng.enumValue(Zone) else zone;
-    // std.log.info("zone {} rect {}", .{ zone, rect });
-    const block_threshold: i16 = switch (new_zone) {
+    const zone_is_fixed = @max(rect.w, rect.h) < 300;
+    const new_zone: Zone = if (zone_is_fixed) zone else rng.enumValue(Zone);
+    const block_threshold: i16 = switch (zone) {
         .Residential => 24,
         .Commercial => 48,
         .Industrial => 96,
-        else => 0,
     };
     if (rect.w < block_threshold or rect.h < block_threshold) {
         // TODO real logic
@@ -150,94 +202,63 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
         return;
     }
 
-    // construct roads
-    // draw one horizontal and one vertical in a specific range
-    const num_lanes_v: u8 = switch (zone) {
-        .Nil, .Industrial => rng.intRangeAtMost(u8, 1, 3) * 2,
-        .Residential => rng.intRangeAtMost(u8, 1, 2),
-        .Commercial => rng.intRangeAtMost(u8, 1, 2) * 2,
-    };
-    const num_lanes_h: u8 = switch (zone) {
-        .Nil, .Industrial => rng.intRangeAtMost(u8, 1, 3) * 2,
-        .Residential => rng.intRangeAtMost(u8, 1, 2),
-        .Commercial => rng.intRangeAtMost(u8, 1, 2) * 2,
-    };
-    const road_width_v: i16 = if (num_lanes_v == 1) 5 else 3 + 3 * num_lanes_v;
-    const road_width_h: i16 = if (num_lanes_h == 1) 5 else 3 + 3 * num_lanes_h;
+    const road_v = pick_road_interval(rect, rng, .v, zone, max_road_width);
+    const road_h = pick_road_interval(rect, rng, .h, zone, max_road_width);
+    const max_road: i16 = @min(road_v.len, road_h.len);
 
-    const v_i: i16 = @divFloor(rect.w, 3) + rect.x;
-    const v_j: i16 = 2 * @divFloor(rect.w, 3) + rect.x;
-    const road_start_v: i16 = rng.intRangeAtMost(i16, v_i, v_j);
-    const h_i: i16 = @divFloor(rect.h, 3) + rect.y;
-    const h_j: i16 = 2 * @divFloor(rect.h, 3) + rect.y;
-    const road_start_h: i16 = rng.intRangeAtMost(i16, h_i, h_j);
-
-    //blocks, delimited by roads
-
-    const road_v: Interval = .{ .origin = road_start_v, .len = road_width_v };
-    const road_h: Interval = .{ .origin = road_start_h, .len = road_width_h };
     const l, const v, const r = rect.slice(.v, road_v);
     const ur, const h1, const lr = r.slice(.h, road_h);
     const ul, const h2, const ll = l.slice(.h, road_h);
     const v1, const c, const v2 = v.slice(.h, road_h);
 
-    new_mapgen(ul, new_zone, rng, depth + 1);
-    new_mapgen(ur, new_zone, rng, depth + 1);
-    new_mapgen(ll, new_zone, rng, depth + 1);
-    new_mapgen(lr, new_zone, rng, depth + 1);
+    new_mapgen(ul, new_zone, rng, depth + 1, max_road);
+    new_mapgen(ur, new_zone, rng, depth + 1, max_road);
+    new_mapgen(ll, new_zone, rng, depth + 1, max_road);
+    new_mapgen(lr, new_zone, rng, depth + 1, max_road);
 
     // now actually pave the roads
     // v road
     {
-        pave_road(v1, true);
-        pave_road(v2, true);
+        pave_road(v1, .v);
+        pave_road(v2, .v);
     }
     // h road
     {
-        pave_road(h1, false);
-        pave_road(h2, false);
+        pave_road(h1, .h);
+        pave_road(h2, .h);
     }
     fill_terrain(c, .asphalt);
 }
 
-pub fn pave_road(rect: IRect, is_vertical: bool) void {
-    var paving: IRect = rect;
-    // first fill with sidewalk
-    fill_terrain(paving, .sidewalk);
-    if (is_vertical and rect.w > 3) {
-        paving = paving.expand_horizontally(-1);
+pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
+    const v_interval, const h_interval = rect.intervals();
+    const interval = switch (orientation) {
+        .v => v_interval,
+        .h => h_interval,
+    };
 
-        // now the asphalt
-        fill_terrain(paving, .asphalt);
-
-        while (paving.w > 2) {
-            paving = paving.expand_horizontally(-1);
+    const lanes = @divFloor(interval.len, 4);
+    const pattern = switch (lanes) {
+        1 => "10001",
+        2 => "100020001",
+        4 => "10003000200030001",
+        6 => "1000300030002000300030001",
+        else => unreachable,
+    };
+    for (pattern, 0..) |kind, ix| {
+        const offset: i16 = @intCast(ix);
+        const slice = core.Interval{
+            .origin = offset + interval.origin,
+            .len = 1,
+        };
+        const to_pave = rect.slice(orientation, slice)[1];
+        switch (kind) {
+            '0' => fill_terrain(to_pave, .asphalt),
+            '1' => fill_terrain(to_pave, .sidewalk),
+            '2' => fill_terrain(to_pave, .road_paint),
+            '3' => fill_hatched(to_pave, .road_paint, .asphalt),
+            else => unreachable,
         }
-
-        // now the paint
-        fill_terrain(paving, .road_paint);
-    } else if (is_vertical and rect.w == 3) {
-        paving = paving.expand_horizontally(-1);
-
-        // now the asphalt
-        fill_terrain(paving, .asphalt);
-    } else if (!is_vertical and rect.h > 3) {
-        paving = paving.expand_vertically(-1);
-
-        // now the asphalt
-        fill_terrain(paving, .asphalt);
-
-        while (paving.h > 2) {
-            paving = paving.expand_vertically(-1);
-        }
-
-        // now the paint
-        fill_terrain(paving, .road_paint);
-    } else if (!is_vertical and rect.h == 3) {
-        paving = paving.expand_vertically(-1);
-
-        // now the asphalt
-        fill_terrain(paving, .asphalt);
     }
 }
 

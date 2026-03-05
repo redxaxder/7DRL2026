@@ -237,12 +237,22 @@ pub const Vec2 = extern struct {
     }
 };
 
+pub const Orientation =
+    enum { v, h };
+
 pub const Interval = struct {
     origin: i16,
     len: i16,
 
     pub fn overlap(self: Interval, rhs: Interval) bool {
         return self.origin < rhs.origin + rhs.len and rhs.origin < self.origin + self.len;
+    }
+
+    pub fn expand(self: Interval, amount: i16) Interval {
+        return .{
+            .origin = self.origin - amount,
+            .len = self.origin + 2 * amount,
+        };
     }
 
     pub fn slice(self: Interval, interval: Interval) [3]Interval {
@@ -259,12 +269,31 @@ pub const Interval = struct {
         // C: 890  (8,3)
         //
 
-        return .{
+        if (interval.origin < self.origin or
+            interval.len >= self.len or
+            interval.origin + interval.len > self.origin + self.len)
+        {
+            std.log.info("no! {} {}", .{ self, interval });
+            unreachable;
+        }
+
+        if (interval.len >= self.len) {
+            @panic("oh no no no");
+        }
+
+        const got: [3]Interval = .{
             .{ .origin = self.origin, .len = interval.origin - self.origin }, interval, .{
                 .origin = interval.origin + interval.len,
                 .len = self.origin + self.len - (interval.origin + interval.len),
             },
         };
+        for (got) |it| {
+            if (it.origin < 0 or it.len < 0) {
+                std.log.info("yoyoyo {any}", .{got});
+                @panic("whaaaa");
+            }
+        }
+        return got;
     }
 };
 
@@ -289,7 +318,7 @@ pub const IRect = struct {
         };
     }
 
-    pub fn slice(self: IRect, orientation: enum { v, h }, interval: Interval) [3]IRect {
+    pub fn slice(self: IRect, orientation: Orientation, interval: Interval) [3]IRect {
         const h, const v = self.intervals();
         var result: [3]IRect = undefined;
         switch (orientation) {
