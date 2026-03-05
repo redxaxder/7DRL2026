@@ -31,10 +31,10 @@ const IRect = core.IRect;
 pub const MOTHER_KAIJU_SIZE = 10;
 pub const MIN_KAIJU_SIZE = 3;
 
-const FOV_RANGE = 40;
+pub const FOV_RANGE = 40;
 const DANGER_GROWTH = 90;
 // const DANGER_GROWTH = 0;
-const SPAWN_ROLL = 100000;
+const SPAWN_ROLL = 200000;
 
 const ANIMATION_QUEUE_LEN = 256;
 
@@ -615,7 +615,7 @@ pub fn init(rng: std.Random) !void {
     sector.add(KMOM_ID, globals.kmom());
     _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
 
-    const moto_id = try spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Kawamura_ZX));
+    const moto_id = try spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Nova_Glide));
     globals.player().mounted_on = moto_id;
 
     inventory.init(rng);

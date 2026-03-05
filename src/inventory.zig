@@ -44,9 +44,9 @@ const EXAMPLE_ROCKET: Item = blk: {
 };
 
 pub fn init(rng: std.Random) void {
-    inventory[0] = EXAMPLE_GAMMA;
-    inventory[1] = EXAMPLE_TRINKET;
-    inventory[2] = EXAMPLE_ROCKET;
+    inventory[0] = BASE_WEAPON;
+    // inventory[1] = EXAMPLE_TRINKET;
+    // inventory[2] = EXAMPLE_ROCKET;
     roll_next_item(rng);
 }
 

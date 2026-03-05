@@ -276,33 +276,31 @@ fn render_kaiju(kaiju: *const main.Unit, origin: Vec2) void {
 }
 
 fn update_camera() void {
-    const CAMERA_BUFFER: f32 = 10;
     const player = main.globals.player();
-
-    var points: [7]Vec2 = undefined;
-    points[0] = player.render_position;
-    var count: usize = 1;
-
-    if (main.get_reticle_positions()) |reticles| {
-        for (reticles) |pos| {
-            points[count] = pos.float();
-            count += 1;
-        }
+    var center = player.position.float();
+    if (player.mounted()) {
+        const moto = player.mount();
+        const vel = moto.orientation.ivec().scaled(@intCast(moto.speed));
+        const max_offset = main.FOV_RANGE - @max(camera_w, camera_h) / 2;
+        var ox = @as(f32, @floatFromInt(vel.x)) * 2;
+        var oy = @as(f32, @floatFromInt(vel.y)) * 2;
+        ox = std.math.clamp(ox, -max_offset, max_offset);
+        oy = std.math.clamp(oy, -max_offset, max_offset);
+        center.x += ox;
+        center.y += oy;
     }
-
-    const bbox = bounding_box(points[0..count]);
-
-    const left = bbox.x - CAMERA_BUFFER;
-    const top = bbox.y - CAMERA_BUFFER;
-    const right = bbox.x + bbox.w + 1 + CAMERA_BUFFER;
-    const bottom = bbox.y + bbox.h + 1 + CAMERA_BUFFER;
-
-    var target: Vec2 = camera_target;
-    if (left < target.x) target.x = left;
-    if (top < target.y) target.y = top;
-    if (right > target.x + camera_w) target.x = right - camera_w;
-    if (bottom > target.y + camera_h) target.y = bottom - camera_h;
-
+    const ideal = Vec2{
+        .x = center.x - camera_w / 2,
+        .y = center.y - camera_h / 2,
+    };
+    const BUFFER: f32 = 5;
+    const dx = ideal.x - camera_target.x;
+    const dy = ideal.y - camera_target.y;
+    var target = camera_target;
+    if (dx > BUFFER) target.x = ideal.x - BUFFER;
+    if (dx < -BUFFER) target.x = ideal.x + BUFFER;
+    if (dy > BUFFER) target.y = ideal.y - BUFFER;
+    if (dy < -BUFFER) target.y = ideal.y + BUFFER;
     animate_camera_to(target);
 }
 fn animate_camera_to(target: Vec2) void {
