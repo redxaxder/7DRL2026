@@ -733,7 +733,7 @@ fn draw_gamefield(t: f64) void {
                     continue;
                 }
                 draw_world_glyph(pos.float(), 0x09, .{
-                    .color = .blue,
+                    .color = .cyan,
                     .origin = origin,
                 });
             }

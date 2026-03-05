@@ -429,7 +429,7 @@ pub fn rendered_glyph(pos: IVec2) DrawInfo {
     const glyph = if (terrain == .wall) wall_glyph(pos) else terrain.glyph();
     return .{
         .glyph = glyph,
-        .color = if (payload.bloody) .red else .white,
+        .color = if (payload.bloody) .red else terrain.default_color(),
     };
 }
 
@@ -500,6 +500,21 @@ pub const Terrain = enum(u5) {
         };
     }
 
+    fn default_color(self: Terrain) Color {
+        return switch (self) {
+            .window => .cyan,
+            .grass => .green,
+            .road_paint => .yellow,
+            .trinket => .yellow,
+            .vending_machine => .teal,
+            .sidewalk => .gray,
+            .money => .dark_green,
+            .door => .brown,
+            .void_ => .dark_blue,
+            else => .white,
+        };
+    }
+
     fn glyph(self: Terrain) u8 {
         switch (self) {
             .asphalt => return 0,
@@ -514,7 +529,7 @@ pub const Terrain = enum(u5) {
             .debris => return ';',
             .trinket => return 0x0F,
             .sidewalk => return 0xB0,
-            .road_paint => return 0xB1,
+            .road_paint => return 0xB0,
             .grass => return ',',
             .vending_machine => return 0xF0,
             else => return '/',

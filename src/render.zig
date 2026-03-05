@@ -45,6 +45,13 @@ pub const Color = enum(u8) {
     purple = 11,
     magenta = 12,
     black = 13,
+    gray = 14,
+    dark_gray = 15,
+    brown = 16,
+    pink = 17,
+    dark_red = 18,
+    dark_blue = 19,
+    dark_green = 20,
 };
 
 pub const Sprite = struct {
