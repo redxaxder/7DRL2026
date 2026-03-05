@@ -138,7 +138,7 @@ pub const Queue = struct {
             self.evict_first();
         }
         return self.buffer.try_push_back(anim) catch {
-            std.log.err("out of animation slots", {});
+            std.log.err("out of animation slots", .{});
             unreachable;
         };
     }

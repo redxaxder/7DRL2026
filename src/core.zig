@@ -159,7 +159,7 @@ pub const RelativeDir = enum {
             2 => .Reverse,
             3 => .Right,
             else => {
-                std.log.err("[0123] - [0123] <= 3", {});
+                std.log.err("[0123] - [0123] <= 3", .{});
                 unreachable;
             },
         };

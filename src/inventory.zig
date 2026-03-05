@@ -161,7 +161,7 @@ pub fn roll_next_item(rng: std.Random) void {
                 roll_low(rng, 5, 5, 20);
         },
         .Nil => {
-            std.log.err("we reroll these", {});
+            std.log.err("we reroll these", .{});
             unreachable;
         },
     }

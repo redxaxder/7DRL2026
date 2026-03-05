@@ -122,11 +122,12 @@ const IterSpace = struct {
         if (self.ix == self.src.len) {
             return null;
         }
+        self.ix += 1;
         while (self.ix < self.src.len) {
-            self.ix += 1;
             if (self.src[self.ix] == ' ') {
                 return self.ix;
             }
+            self.ix += 1;
         }
         return self.ix;
     }

@@ -342,7 +342,7 @@ pub const Unit = struct {
                 while (occupants.next()) |uid| {
                     const occupant = globals.unit(uid);
                     if (occupant.tag == .Motorcycle) {
-                        occupant.hp = 0;
+                        occupant.hp -= 1;
                     }
                 }
             }
@@ -657,7 +657,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             }
             const attackroll = rng.intRangeAtMost(i16, 0, 20);
             const armor = motostats.effective_value(.armor);
-            const dmg = rng.intRangeAtMost(i64, 1, motomove.speed);
+            const dmg = rng.intRangeAtMost(i64, 1, @max(1, motomove.speed));
             if (attackroll > armor) {
                 combat_log.log("The {s} took {} damage.", .{ pmount.model.name(), dmg });
                 pmount.damage(dmg);

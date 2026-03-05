@@ -118,7 +118,7 @@ pub fn fill_hatched(rect: IRect, t1: Terrain, t2: Terrain) void {
             0 => set_terrain_at(pos, t1),
             1 => set_terrain_at(pos, t2),
             else => {
-                std.log.err("nontraditional output of mod 2", {});
+                std.log.err("nontraditional output of mod 2", .{});
                 unreachable;
             },
         }
@@ -132,7 +132,7 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
         .h => h_interval,
     };
 
-    std.log.info("interval {any}", .{interval});
+    // std.log.info("interval {any}", .{interval});
     if (interval.origin < 0) {
         @panic("oh no");
     }
@@ -162,7 +162,7 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
         ),
     };
 
-    std.log.info("got {any}", .{got});
+    // std.log.info("got {any}", .{got});
     return got;
 }
 
@@ -247,7 +247,7 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
         4 => "10003000200030001",
         6 => "1000300030002000300030001",
         else => {
-            std.log.err("jank lane count", {});
+            std.log.err("jank lane count", .{});
             unreachable;
         },
     };
@@ -264,7 +264,7 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
             '2' => fill_terrain(to_pave, .road_paint),
             '3' => fill_hatched(to_pave, .road_paint, .asphalt),
             else => {
-                std.log.err("jank kind", {});
+                std.log.err("jank kind", .{});
                 unreachable;
             },
         }
