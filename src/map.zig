@@ -249,9 +249,10 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
 
     // split rect on height
     const orientation: core.Orientation = if (rect.h > rect.w) .h else .v;
+    const ix, const iy = rect.intervals();
     const interval: Interval = switch (orientation) {
-        .h => .{ .origin = rect.y, .len = rect.w },
-        .v => .{ .origin = rect.x, .len = rect.h },
+        .h => iy,
+        .v => ix,
     };
     const min_origin = interval.origin + @divFloor(interval.len - 2, 3);
     const max_origin = interval.origin + @divFloor(2 * (interval.len - 2), 3);

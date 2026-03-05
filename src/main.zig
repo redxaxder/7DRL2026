@@ -342,6 +342,11 @@ pub const Unit = struct {
                             _ = animate_terrain_to(q, .floor).chain();
                             inventory.add_pending_pickup();
                         }
+
+                        if (map.get_terrain_at(q) == .money) {
+                            _ = animate_terrain_to(q, .floor).chain();
+                            globals.money += 1000;
+                        }
                     }
                 }
             }
@@ -528,6 +533,7 @@ pub const globals = struct {
     pub var combo_target: ?UnitId = 0;
     pub var combo_count: i64 = 0;
     pub var turn: i64 = 0;
+    pub var money = 0;
 
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
@@ -826,8 +832,6 @@ pub fn handle_player_attack(dir: Dir4) bool {
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
-    // TODO currently we are iterating through all the units
-    // to get at kaiju. This is an optimization opportunity
     var player_acted = false;
     const player_start = globals.player().position;
     if (globals.player().hp <= 0) {
@@ -878,7 +882,6 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
         fov.refresh_fov(globals.player().position, FOV_RANGE);
         inventory.handle_pending_pickups(rng);
-        // combat_log.log("inventory {any}", .{inventory.inventory});
     }
 }
 
