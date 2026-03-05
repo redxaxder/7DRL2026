@@ -924,7 +924,6 @@ fn animate_terrain_to(pos: IVec2, terrain: Terrain) *animation.Animation {
 }
 
 fn resolve_pending(rng: std.Random) void {
-    // TODO this could be more efficient
     for (globals.units[1..]) |*u| {
         switch (u.tag) {
             .PendingRubble => {
@@ -969,13 +968,14 @@ fn resolve_pending(rng: std.Random) void {
                                 if (roll > target.model.stats().readfield(.armor)) {
                                     const max = @as(i64, @intCast(impact)) * 3;
                                     const dmg = rng.intRangeAtMost(i64, 0, max);
-                                    combat_log.log("The {s} is caught in the blast. It takes {} damage.", .{ target.model.name(), dmg });
+                                    combat_log.log("The explosion deals {} damage to the {s}", .{ dmg, target.model.name() });
                                     target.damage(dmg);
                                 }
                             },
                             .Player => {
-                                // const knockdir =
-                                // TODO: handle explosion hurting player
+                                const knockdir = target.position.minus(u.position).principal_dir();
+                                combat_log.log("You are caught in the blast.", .{});
+                                smack_player(knockdir, rng, damage);
                             },
                             else => {},
                         }
@@ -1190,8 +1190,13 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
         }
     }
 }
-fn harm() void {
-    globals.player().hp = 1;
+fn harm(damage: i64) void {
+    const player = globals.player();
+    const safe = player.hp > 1;
+    player.hp -= damage;
+    if (safe) {
+        player.hp = @max(player.hp, 1);
+    }
 }
 
 fn destroy1(pos: IVec2) bool {
@@ -1211,7 +1216,7 @@ fn destroy(pos: IVec2, rng: std.Random) bool {
     return any;
 }
 
-fn smack_player(dir: Dir4, rng: std.Random) void {
+fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
     const fling_distance: i16 = 10;
     var player = globals.player();
     const moto: ?*Unit = if (player.mounted()) player.mount() else null;
@@ -1224,7 +1229,7 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
         _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
         combat_log.log("You have been killed.", .{});
     } else {
-        harm();
+        harm(damage);
 
         // fling player
         combat_log.log("You are sent flying!", .{});
@@ -1330,7 +1335,7 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
         switch (globals.unit(u).tag) {
             .Player, .Motorcycle => {
                 if (seen.distance <= attack_range) {
-                    smack_player(dir, rng);
+                    smack_player(dir, rng, k.hp);
                     return;
                 }
             },

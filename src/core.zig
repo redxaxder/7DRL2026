@@ -92,7 +92,8 @@ pub const IVec2 = struct {
     pub fn principal_dir(self: IVec2) Dir4 {
         const ax = @abs(self.x);
         const ay = @abs(self.y);
-        if (ax >= ay) {
+        const favor_x = if (ax != ay) ax > ay else (@as(i32, self.x) * @as(i32, self.y) >= 0);
+        if (favor_x) {
             if (self.x >= 0) {
                 return .Right;
             } else {
@@ -287,7 +288,7 @@ pub const Interval = struct {
         //
 
         if (interval.origin < self.origin or
-            interval.len >= self.len or
+            interval.len > self.len or
             interval.origin + interval.len > self.origin + self.len)
         {
             std.log.info("no! {} {}", .{ self, interval });

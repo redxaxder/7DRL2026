@@ -40,42 +40,42 @@ v0.1 technically a game
   + kaiju obstruct each other's movement
 + no vision restrictions
 v0.2 core features
-- motorcycle destruction
-  - if the motorcycle is destroyed when the player is on it, it becomes debris/rubble and the player
-    is flung at speed
++ motorcycle destruction
+  + if the motorcycle is destroyed when the player is on it, it becomes debris/rubble
+  X and the player is flung at speed
 + vision (fov, reveal terrain)
 + progression
   + gain inventory limit based on largest kaiju killed
 - ui
-  - death
+  + death
   - title screen
   + combat log
   - legend
-  - inventory
-    - ui screen
+  + inventory
+    + ui screen
     + pick up item
     + replace item (item in inventory slot is destroyed to accomodate new item)
       + if several items are picked up in the same turn, accumulate them and ask one at a time
         to replace
   + select weapon
-  - indicate selected weapon
-  - projectile indicator
+  + indicate selected weapon
+  + projectile indicator
 - trinkets
-  - damage bonuses
-  - motorcycle bonuses
+  + damage bonuses
+  + motorcycle bonuses
   + crit clocks
-  - autoconsumable heal
+  X autoconsumable heal
 + animation
 - audio
-- enemy behavior
-  - a-star to path around eggs? (maybe not eggs seem eh)
-  - broken obstacles turn into things to dodge
++ enemy behavior
+  X a-star to path around eggs? (maybe not eggs seem eh)
+  + broken obstacles turn into things to dodge
   + sleep
 + dismounting/mounting motorcycles
-- weapons
-  - motorcycle
++ weapons
+  + motorcycle
   + radioactive
-  - explosive
+  + explosive
 - mapgen:
   - varying street sizes
     - alleys
@@ -96,7 +96,7 @@ v0.2 core features
   - kauji density map
   + big mama kaiju
   - kaiju spawn limit
-- ability to win
++ ability to win
 - falling obstacles
   + warnings
   - animation
