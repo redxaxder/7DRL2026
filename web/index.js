@@ -35,7 +35,7 @@ async function main() {
   const DRAW_BUFFER_SIZE = 8192;
   const renderer = await createRenderer(canvas, ATLAS_URL, DRAW_BUFFER_SIZE, colorTable, 8, 8);
   const audio = createAudio();
-  let wasm = await initWasm("../zig-out/bin/_7DRL2026.wasm", renderer, audio)
+  let wasm = await initWasm("game.wasm", renderer, audio)
   renderer.resize();
   window.addEventListener("resize", () => {
     renderer.resize();
@@ -53,8 +53,11 @@ async function main() {
   if (success == 0) {
     audio.load(wasm);
 
+    canvas.focus();
+    canvas.addEventListener("click", () => canvas.focus());
+
     const keyCodeBufPtr = wasm.getKeyCodeBufPtr();
-    document.addEventListener("keydown", e => {
+    canvas.addEventListener("keydown", e => {
       const code = e.code;
       const keyCodeBuf = new Uint8Array(wasm.memory.buffer, keyCodeBufPtr, 32);
       if (code.length > 32) return;
@@ -62,14 +65,14 @@ async function main() {
       wasm.keydown(code.length);
       e.preventDefault()
     });
-    document.addEventListener("keyup", e => {
+    canvas.addEventListener("keyup", e => {
       const code = e.code;
       const keyCodeBuf = new Uint8Array(wasm.memory.buffer, keyCodeBufPtr, 32);
       if (code.length > 32) return;
       for (let i = 0; i < code.length; i++) keyCodeBuf[i] = code.charCodeAt(i);
       wasm.keyup(code.length);
     });
-    document.addEventListener("blur", () => wasm.clearKeys());
+    canvas.addEventListener("blur", () => wasm.clearKeys());
 
 
     canvas.addEventListener("mousedown", e => {
