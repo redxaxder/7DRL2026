@@ -117,7 +117,10 @@ pub fn fill_hatched(rect: IRect, t1: Terrain, t2: Terrain) void {
         switch (@mod(gx ^ gy, 2)) {
             0 => set_terrain_at(pos, t1),
             1 => set_terrain_at(pos, t2),
-            else => unreachable,
+            else => {
+                std.log.err("nontraditional output of mod 2", {});
+                unreachable;
+            },
         }
     }
 }
@@ -243,7 +246,10 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
         2 => "100020001",
         4 => "10003000200030001",
         6 => "1000300030002000300030001",
-        else => unreachable,
+        else => {
+            std.log.err("jank lane count", {});
+            unreachable;
+        },
     };
     for (pattern, 0..) |kind, ix| {
         const offset: i16 = @intCast(ix);
@@ -257,7 +263,10 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
             '1' => fill_terrain(to_pave, .sidewalk),
             '2' => fill_terrain(to_pave, .road_paint),
             '3' => fill_hatched(to_pave, .road_paint, .asphalt),
-            else => unreachable,
+            else => {
+                std.log.err("jank kind", {});
+                unreachable;
+            },
         }
     }
 }
@@ -292,20 +301,17 @@ pub fn mapgen(rng: std.Random) void {
         for (0..MAP_SIZE - 1) |y| {
             if (rng.float(f32) < destruction_factor) {
                 const terrain: Terrain = if (rng.float(f32) < 0.5) .rubble else .debris;
-                switch (terrain) {
-                    .rubble => {
-                        const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng) catch continue;
-                    },
-                    .debris => {
-                        const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
-                        rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng) catch continue;
-                    },
-                    else => {
-                        unreachable;
-                    },
+                if (rng.float(f32) < 0.5) {
+                    // .rubble => {
+                    const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
+                    const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
+                    rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.1, rng) catch continue;
+                } else {
+
+                    // .debris => {
+                    const rx: i16 = rng.intRangeAtMost(i16, 4, 10);
+                    const ry: i16 = rng.intRangeAtMost(i16, 4, 10);
+                    rubblum(.{ .x = rx, .y = ry }, .{ .x = @as(i16, @intCast(x)), .y = @as(i16, @intCast(y)) }, terrain, 0.01, rng) catch continue;
                 }
             }
         }

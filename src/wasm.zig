@@ -475,6 +475,21 @@ pub fn draw_status() !void {
         );
         cursor.y += SPRITE_SCALE;
     }
+
+    const bonuses = inventory.bonuses();
+    if (bonuses.readfield(.crit3_bonus) > 0 or
+        bonuses.readfield(.crit4_bonus) > 0 or
+        bonuses.readfield(.crit5_bonus) > 0)
+    {
+        cursor.y += fmt_draw_text(
+            cursor,
+            "Crit Mul: {}",
+            opts,
+            w,
+            .{main.crit_bonus()},
+        );
+        cursor.y += SPRITE_SCALE;
+    }
 }
 
 // todo - figure this out properly

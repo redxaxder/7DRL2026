@@ -137,7 +137,10 @@ pub const Queue = struct {
         if (self.buffer.full()) {
             self.evict_first();
         }
-        return self.buffer.try_push_back(anim) catch unreachable;
+        return self.buffer.try_push_back(anim) catch {
+            std.log.err("out of animation slots", {});
+            unreachable;
+        };
     }
 
     pub fn force_add_empty(self: *Queue, options: Options) *Animation {

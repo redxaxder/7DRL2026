@@ -25,8 +25,8 @@ const BASE_WEAPON: Item = blk: {
 
 const EXAMPLE_TRINKET: Item = blk: {
     var it: Item = .tagged(ItemTag.Hachimaki);
-    it.attrs.field(.gun_damage).* = 1;
-    it.attrs.field(.accuracy).* = 1;
+    it.attrs.field(.crit4_bonus).* = 4;
+    it.attrs.field(.crit3_bonus).* = 2;
     break :blk it;
 };
 
@@ -161,6 +161,7 @@ pub fn roll_next_item(rng: std.Random) void {
                 roll_low(rng, 5, 5, 20);
         },
         .Nil => {
+            std.log.err("we reroll these", {});
             unreachable;
         },
     }

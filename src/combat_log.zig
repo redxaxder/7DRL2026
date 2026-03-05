@@ -17,5 +17,8 @@ pub fn log(comptime message: []const u8, args: anytype) void {
             allocator.free(m);
         }
     }
-    _ = storage.try_push_back(slice) catch unreachable;
+    _ = storage.try_push_back(slice) catch {
+        std.log.err("out of storage", {});
+        unreachable;
+    };
 }

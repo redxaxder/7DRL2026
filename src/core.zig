@@ -158,7 +158,10 @@ pub const RelativeDir = enum {
             1 => .Left,
             2 => .Reverse,
             3 => .Right,
-            else => unreachable,
+            else => {
+                std.log.err("[0123] - [0123] <= 3", {});
+                unreachable;
+            },
         };
     }
 };
@@ -275,10 +278,6 @@ pub const Interval = struct {
         {
             std.log.info("no! {} {}", .{ self, interval });
             unreachable;
-        }
-
-        if (interval.len >= self.len) {
-            @panic("oh no no no");
         }
 
         const got: [3]Interval = .{

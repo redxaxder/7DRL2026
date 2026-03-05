@@ -505,6 +505,7 @@ pub const globals = struct {
 
     pub var combo_target: ?UnitId = 0;
     pub var combo_count: i64 = 0;
+    pub var turn: i64 = 0;
 
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
@@ -723,13 +724,14 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
     }
     const combo_mul: f64 = std.math.pow(f64, 1.03, @floatFromInt(globals.combo_count));
     const combo_linear: f64 = @floatFromInt(globals.combo_count);
+    const crit = crit_bonus();
 
     switch (weapon.tag) {
         .Rifle => {
             const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.gun_damage));
             const combo_gain = weapon.attrs.effective_value(.accuracy);
             const damage: f64 = (base_damage + combo_linear) * combo_mul;
-            const idamage: i64 = @intFromFloat(@trunc(damage));
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage))) * crit;
             globals.combo_target = tid;
             if (target) |u| {
                 u.damage(idamage);
@@ -819,6 +821,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         const travel_distance: u64 = @intCast(player_start.max_norm_distance(player_end));
         // TODO: vary danger growth by location
         globals.danger += (travel_distance + 1) * DANGER_GROWTH;
+        globals.turn += 1;
 
         tick_kaiju(rng);
 
@@ -834,6 +837,21 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         inventory.handle_pending_pickups(rng);
         // combat_log.log("inventory {any}", .{inventory.inventory});
     }
+}
+
+pub fn crit_bonus() i64 {
+    const bonuses = inventory.bonuses();
+    var mul: i64 = 1;
+    if (@mod(globals.turn, 3) == 0) {
+        mul *= bonuses.readfield(.crit3_bonus) + 1;
+    }
+    if (@mod(globals.turn, 4) == 0) {
+        mul *= bonuses.readfield(.crit4_bonus) + 1;
+    }
+    if (@mod(globals.turn, 5) == 0) {
+        mul *= bonuses.readfield(.crit5_bonus) + 1;
+    }
+    return mul;
 }
 
 fn set_terrain(pos: IVec2, terrain: Terrain) void {
