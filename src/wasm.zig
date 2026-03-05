@@ -228,26 +228,19 @@ pub fn draw_world_glyph(world_pos: Vec2, src_idx: u8, options: DrawOptions) void
     draw_glyph(screen_pos, src_idx, options);
 }
 
-fn render_kaiju(kaiju: *const main.Unit, origin: Vec2) void {
-    // Box-drawing layout for a size-N kaiju
-    //   ┌─…─┐
-    //   │   │
-    //   │ K │
-    //   │   │
-    //   └─…─┘
-    // Draw border and interior spaces at size=1
+fn draw_kaiju_icon(screen_pos: Vec2, size: u8, border_color: Color, origin: Vec2) void {
     var dy: i16 = 0;
-    while (dy < kaiju.size) : (dy += 1) {
+    while (dy < size) : (dy += 1) {
         var dx: i16 = 0;
-        while (dx < kaiju.size) : (dx += 1) {
-            const pos = kaiju.render_position.plus(.{
-                .x = @floatFromInt(dx),
-                .y = @floatFromInt(dy),
+        while (dx < size) : (dx += 1) {
+            const pos = screen_pos.plus(.{
+                .x = @as(f32, @floatFromInt(dx)) * SPRITE_SCALE,
+                .y = @as(f32, @floatFromInt(dy)) * SPRITE_SCALE,
             });
             const is_top = dy == 0;
-            const is_bottom = dy == kaiju.size - 1;
+            const is_bottom = dy == size - 1;
             const is_left = dx == 0;
-            const is_right = dx == kaiju.size - 1;
+            const is_right = dx == size - 1;
 
             const glyph: u8 =
                 if (is_top and is_left) 0xDA // ┌
@@ -258,24 +251,28 @@ fn render_kaiju(kaiju: *const main.Unit, origin: Vec2) void {
                 else if (is_left or is_right) 0xB3 // │
                 else ' ';
 
-            draw_world_glyph(pos, glyph, .{ .bgcolor = .black, .color = .green, .origin = origin });
+            draw_glyph(pos, glyph, .{ .bgcolor = .black, .color = border_color, .origin = origin });
         }
     }
+    render_buffer.flush();
 
-    // Flush before K so it doesn't resize the border batch
+    const icon: u8 = "ABCDEFGHIJKLMNOPQRS"[size - main.MIN_KAIJU_SIZE];
+    draw_glyph(screen_pos.plus(.{ .x = SPRITE_SCALE, .y = SPRITE_SCALE }), icon, .{
+        .bgcolor = .black,
+        .color = .red,
+        .size = @floatFromInt(size - 2),
+        .pixel_shift = true,
+        .origin = origin,
+    });
     render_buffer.flush();
-    draw_world_glyph(
-        kaiju.render_position.plus(Vec2.ONE),
-        "ABCDEFGHIJKLMNOPQRS"[kaiju.size - main.MIN_KAIJU_SIZE],
-        .{
-            .bgcolor = .black,
-            .color = .red,
-            .size = @floatFromInt(kaiju.size - 2),
-            .pixel_shift = true,
-            .origin = origin,
-        },
-    );
-    render_buffer.flush();
+}
+
+fn render_kaiju(kaiju: *const main.Unit, origin: Vec2) void {
+    const is_target = main.globals.focus != 0 and
+        kaiju.get_id() == main.globals.focus;
+    const border_color: Color = if (is_target) .green else .magenta;
+    const screen_pos = kaiju.render_position.minus(camera.rounded(SPRITE_SCALE)).scaled(SPRITE_SCALE);
+    draw_kaiju_icon(screen_pos, kaiju.size, border_color, origin);
 }
 
 fn update_camera() void {
@@ -630,6 +627,25 @@ fn draw_inventory() void {
     render_buffer.flush();
 }
 
+fn draw_target_info() void {
+    const target_id = main.globals.focus;
+    const target = main.globals.unit(target_id);
+    if (target.tag == .Nil) return;
+    if (!target.alive) return;
+
+    const r: IRect = ui.MAIN_VIEW.get("unitinfo");
+    const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
+    const w = interior.w;
+    const opts = DrawOptions{ .origin = interior.pos() };
+    var cursor: Vec2 = .ZERO;
+
+    draw_kaiju_icon(cursor, target.size, .green, interior.pos());
+
+    const text_x = @as(f32, @floatFromInt(target.size)) * SPRITE_SCALE + SPRITE_SCALE;
+    cursor.y += SPRITE_SCALE;
+    cursor.y += fmt_draw_text(.{ .x = text_x, .y = cursor.y }, "Hp: {}", opts, w, .{target.hp});
+}
+
 fn draw_gamefield(t: f64) void {
     // restrict drawing to viewport interior
     const viewport: Rect = ui.MAIN_VIEW.get("viewport").float();
@@ -758,6 +774,8 @@ pub export fn frame(t: f64) void {
     // draw_indicator(core.Dir4.Down.ivec().float());
 
     draw_inventory();
+
+    draw_target_info();
 
     draw_log();
 

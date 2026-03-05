@@ -38,6 +38,11 @@ const SPAWN_ROLL = 100000;
 
 const ANIMATION_QUEUE_LEN = 256;
 
+pub fn danger_growth(pos: IVec2) u64 {
+    const d: u64 = @intCast(KMOM_START.manhattan_distance(pos));
+    return 500 - (d / 10);
+}
+
 pub const animlib = struct {
     pub fn linear_slide(x0: Vec2, x1: Vec2, target: *Vec2, time: animation.Time) animation.Exit!void {
         const t = time.progress();
@@ -417,6 +422,10 @@ pub const Unit = struct {
 
     pub fn damage(self: *Unit, amount: i64) void {
         self.hp -= amount;
+        const id = self.get_id();
+        if (self.tag == .Kaiju and self.hp > 0) {
+            globals.focus = id;
+        }
     }
 
     pub fn mount(self: *const Unit) *Unit {
@@ -535,6 +544,7 @@ pub const globals = struct {
     pub var combo_count: i64 = 0;
     pub var turn: i64 = 0;
     pub var money: i64 = 0;
+    pub var focus: UnitId = 0;
 
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
@@ -654,7 +664,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 player.*.move_to(pmount.position);
             } else {
                 player.*.mounted_on = 0;
-                combat_log.log("You leap off the motorcycle.", .{});
+                combat_log.log("You leap off your motorcycle.", .{});
             }
 
             if (crashed.collided_with) |collision| {
@@ -676,7 +686,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                     },
                     .terrain => |where| {
                         const terrain = map.get_terrain_at(where);
-                        combat_log.log("It plows into the {s}.", .{terrain.name()});
+                        combat_log.log("The motorcycle hits a {s}.", .{terrain.name()});
                         if (terrain.smash()) |to| {
                             if (motomove.speed > 4) {
                                 _ = animate_terrain_to(
@@ -867,8 +877,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         resolve_pending(rng);
         const player_end = globals.player().position;
         const travel_distance: u64 = @intCast(player_start.max_norm_distance(player_end));
-        // TODO: vary danger growth by location
-        globals.danger += (travel_distance + 1) * DANGER_GROWTH;
+        globals.danger += (travel_distance + 1) * danger_growth(player_end);
         globals.turn += 1;
 
         tick_kaiju(rng);
