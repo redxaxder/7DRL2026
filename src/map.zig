@@ -375,7 +375,10 @@ pub const Terrain = enum(u5) {
     _,
 
     pub fn name(self: Terrain) []const u8 {
-        return std.enums.tagName(Terrain, self) orelse "";
+        return switch (self) {
+            .void_ => "strange barrier",
+            else => std.enums.tagName(Terrain, self) orelse "",
+        };
     }
 
     pub fn glyph(self: Terrain) u8 {

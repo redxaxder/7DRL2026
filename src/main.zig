@@ -33,6 +33,7 @@ pub const MIN_KAIJU_SIZE = 3;
 
 const FOV_RANGE = 80;
 const DANGER_GROWTH = 90;
+// const DANGER_GROWTH = 0;
 const SPAWN_ROLL = 100000;
 
 const ANIMATION_QUEUE_LEN = 256;
@@ -122,8 +123,8 @@ pub const Motorcycle = enum {
 
         const got: [4]i16 = switch (self) {
             .Nova_Glide => .{ 10, 0, 8, 2 },
-            .Cinder_Wolf_Pro => .{ 5, 8, 14, 10 },
-            .Kawamura_ZX => .{ 7, 3, 6, 6 },
+            .Cinder_Wolf_Pro => .{ 5, 8, 14, 12 },
+            .Kawamura_ZX => .{ 7, 3, 6, 4 },
             .Nil => .{0} ** 4,
         };
         for (fields, 0..) |field, i| {
@@ -252,13 +253,16 @@ pub const Unit = struct {
     pub fn get_id(self: *const Unit) UnitId {
         return @intCast((@intFromPtr(self) - @intFromPtr(&globals.units)) / @sizeOf(Unit));
     }
-    pub fn check_passable(
+
+    pub const Impassable = union(enum) { terrain: Terrain, unit: UnitId };
+    pub const CheckWhere = struct {
+        pos: IVec2 = .ZERO,
+        orientation: Dir4 = .Right,
+    };
+    pub fn check_passable_full(
         self: *const Unit,
-        where: struct {
-            pos: IVec2 = .ZERO,
-            orientation: Dir4 = .Right,
-        },
-    ) bool {
+        where: CheckWhere,
+    ) ?Impassable {
         const rect = blk: {
             var u: Unit = self.*;
             u.position = where.pos;
@@ -276,11 +280,11 @@ pub const Unit = struct {
             const u = globals.unit(uid);
             switch (u.tag) {
                 .Kaiju, .Player => {
-                    return false;
+                    return .{ .unit = uid };
                 },
                 .Motorcycle => {
                     switch (self.tag) {
-                        .Motorcycle => return false,
+                        .Motorcycle => return .{ .unit = uid },
                         else => continue,
                     }
                 },
@@ -291,10 +295,17 @@ pub const Unit = struct {
         while (it.next()) |pos| {
             const terrain = map.get_terrain_at(pos);
             if (!terrain.unit_passable(self.tag)) {
-                return false;
+                return .{ .terrain = terrain };
             }
         }
-        return true;
+        return null;
+    }
+
+    pub fn check_passable(
+        self: *const Unit,
+        where: CheckWhere,
+    ) bool {
+        return check_passable_full(self, where) == null;
     }
 
     pub fn move_to(self: *Unit, pos: IVec2) void {
@@ -570,9 +581,10 @@ pub fn init(rng: std.Random) !void {
 }
 
 // dir is null when you turn is not an active move, you are maybe just coasting
-pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
+pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
     const player = globals.player();
     const pmount = player.mount();
+    const motostats = pmount.model.stats();
     if (player.mounted()) {
         // mounted movement
         const motomove = resolve_motorcycle_movement(
@@ -599,6 +611,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                 }
                 player.move_to(landed_at);
             }
+
             pmount.move_to(motomove.midpoint);
             pmount.set_orientation(crashed.orientation);
             pmount.move_to(crashed.position);
@@ -608,6 +621,39 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
             } else {
                 player.*.mounted_on = 0;
                 combat_log.log("You leap off the motorcycle.", .{});
+            }
+
+            if (crashed.collided_with) |collision| {
+                const foo = collision;
+                switch (foo) {
+                    .unit => |uid| {
+                        const u = globals.unit(uid);
+                        switch (u.tag) {
+                            .Kaiju => {
+                                const base_damage = motostats.effective_value(.impact_damage);
+                                const dmg = base_damage * motomove.speed * motomove.speed;
+                                combat_log.log("It plows into the beast, dealing {} damage.", .{dmg});
+                                u.damage(dmg);
+                            },
+                            .Motorcycle => {
+                                // TODO: what happens when a motorcycle hits another?
+                            },
+                            else => {},
+                        }
+                    },
+                    .terrain => |terrain| {
+                        combat_log.log("It plows into the {s}.", .{terrain.name()});
+                    },
+                }
+            }
+            const attackroll = rng.intRangeAtMost(i16, 1, 20);
+            const armor = motostats.effective_value(.armor);
+            const dmg = rng.intRangeAtMost(i64, 1, motomove.speed);
+            if (attackroll == 20 or attackroll > armor) {
+                combat_log.log("The {s} took {} damage.", .{ pmount.model.name(), dmg });
+                pmount.damage(dmg);
+            } else {
+                combat_log.log("The {s} came out unscathed.", .{pmount.model.name()});
             }
         } else {
             pmount.*.speed = motomove.speed;
@@ -638,7 +684,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool) bool {
                     .Motorcycle => { // Mount it
                         player.move_to(occupant.position);
                         player.*.mounted_on = occupant_id;
-                        combat_log.log("You start the motorcycle.", .{});
+                        combat_log.log("You start the {s}.", .{occupant.model.name()});
                         return true;
                     },
                     .Kaiju => {
@@ -740,11 +786,11 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         switch (action) {
             .pass => {
                 player_acted = true;
-                _ = handle_player_move(null, false);
+                _ = handle_player_move(null, false, rng);
             },
             .move => |movedata| {
                 const d, const shift = movedata;
-                player_acted = handle_player_move(d, shift);
+                player_acted = handle_player_move(d, shift, rng);
                 if (player_acted) {
                     globals.combo_target = 0;
                 }
@@ -753,7 +799,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
             .attack => |d| {
                 player_acted = handle_player_attack(d);
                 if (player_acted) {
-                    _ = handle_player_move(null, false);
+                    _ = handle_player_move(null, false, rng);
                     // TODO: motorcycle with speed moves
                 }
             },
@@ -1020,11 +1066,6 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
         }
     }
 }
-
-fn die() void {
-    combat_log.log("You have been killed.", .{});
-}
-
 fn harm() void {
     globals.player().hp = 1;
 }
@@ -1044,7 +1085,12 @@ fn smack_player(dir: Dir4, rng: std.Random) void {
     const moto: ?*Unit = if (player.mounted()) player.mount() else null;
     if (globals.player().hp <= 1) {
         globals.player().hp = 0;
-        die();
+        const splatter_zone = globals.player().get_rect().expand(1);
+        const seed = rng.int(u16);
+        do_splatter(splatter_zone, seed, .initial);
+        const callback: Callback = .lambda(do_splatter, .{ splatter_zone, seed, .followup });
+        _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
+        combat_log.log("You have been killed.", .{});
     } else {
         harm();
 
@@ -1180,6 +1226,7 @@ pub const CrashInfo = struct {
     position: IVec2,
     orientation: Dir4,
     fling: bool = false,
+    collided_with: ?Unit.Impassable = null,
 };
 
 pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
@@ -1204,6 +1251,7 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
             if (!moto.check_passable(.{ .pos = p, .orientation = move.orientation })) {
                 // we shouldnt end up here
                 std.log.err("unhandled movement case", .{});
+                unreachable;
             }
             cursor.position = p;
             cursor.orientation = move.orientation;
@@ -1211,9 +1259,11 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         const steps: usize = @intCast(delta.max_norm());
         for (0..steps) |_| {
             const next = cursor.position.plus(v);
-            if (!moto.check_passable(.{ .pos = next, .orientation = cursor.orientation })) {
+            if (moto.check_passable_full(.{ .pos = next, .orientation = cursor.orientation })) |impassable| {
+                cursor.collided_with = impassable;
                 return cursor;
             }
+
             cursor.position = next;
         }
         return null;
@@ -1237,14 +1287,17 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
                 next = next.plus(secondary_vector);
                 shifted = true;
             }
-            if (!moto.check_passable(.{ .pos = next, .orientation = moto.orientation })) {
+            if (moto.check_passable_full(.{ .pos = next, .orientation = moto.orientation })) |impassable| {
+                cursor.collided_with = impassable;
                 return cursor;
             }
+
             cursor.position = next;
         }
         if (!shifted) {
             const final = cursor.position.plus(secondary_vector);
-            if (!moto.check_passable(.{ .pos = final, .orientation = moto.orientation })) {
+            if (moto.check_passable_full(.{ .pos = final, .orientation = moto.orientation })) |impassable| {
+                cursor.collided_with = impassable;
                 return cursor;
             }
         }
@@ -1263,7 +1316,8 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
             moto.orientation
         else
             move.orientation;
-        if (!moto.check_passable(.{ .pos = next, .orientation = o })) {
+        if (moto.check_passable_full(.{ .pos = next, .orientation = o })) |impassable| {
+            cursor.collided_with = impassable;
             return cursor;
         }
         cursor.position = next;
@@ -1274,7 +1328,8 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         const steps2 = delta.projection(move.orientation).max_norm();
         for (0..@intCast(steps2)) |_| {
             const next = cursor.position.plus(move.orientation.ivec());
-            if (!moto.check_passable(.{ .pos = next, .orientation = move.orientation })) {
+            if (moto.check_passable_full(.{ .pos = next, .orientation = move.orientation })) |impassable| {
+                cursor.collided_with = impassable;
                 return cursor;
             }
             cursor.position = next;
