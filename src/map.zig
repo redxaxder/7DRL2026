@@ -144,8 +144,7 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
     if (rng.float(f32) < 0.4) {
         lanes -= 1;
     }
-    // also shrink based on interval
-    lanes = @min(lanes, @divFloor(interval.len, 1));
+    lanes = @min(lanes, @divFloor(interval.len, 16));
     // must have an even number of lanes if more than one
     if (@mod(lanes, 2) == 1 and lanes > 1) {
         lanes -= 1;
@@ -174,7 +173,10 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
         ),
     };
 
-    // std.log.info("got {any}", .{got});
+    if (got.origin < interval.origin or got.origin + got.len > interval.origin + interval.len) {
+        std.log.info("pick_road_interval: interval={} road={} lanes={} len={} orientation={}", .{ interval, got, lanes, len, orientation });
+        unreachable;
+    }
     return got;
 }
 
@@ -669,6 +671,7 @@ pub const Terrain = enum(u5) {
             .rubble, .viscera => .debris,
             .wall => .rubble,
             .door => .debris,
+            .trinket => .debris,
             else => null,
         };
     }
