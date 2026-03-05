@@ -356,6 +356,10 @@ pub const Unit = struct {
                         occupant.hp -= 1;
                     }
                 }
+                var posit = edge.iter();
+                while (posit.next()) |p| {
+                    destroy1(p);
+                }
             }
         }
 
