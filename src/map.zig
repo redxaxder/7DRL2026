@@ -109,84 +109,7 @@ fn fill_terrain(rect: IRect, terrain: Terrain) void {
     }
 }
 
-fn build_roads(num_roads: usize, zone: Zone, rect: IRect, block_intervals: *std.ArrayList(Interval), is_vertical: bool, rng: std.Random, alloc: std.mem.Allocator) !Interval {
-    var road_cursor: u16 = 0;
-    var road_built: Interval = undefined;
-    std.log.info("building vertical roads {}", .{is_vertical});
-    for (0..num_roads) |_| {
-        const num_lanes: u8 = switch (zone) {
-            .Nil, .Industrial => rng.intRangeAtMost(u8, 1, 3) * 2,
-            .Residential => rng.intRangeAtMost(u8, 1, 2),
-            .Commercial => rng.intRangeAtMost(u8, 1, 2) * 2,
-        };
-        const total_width: u8 = if (num_lanes == 1) 5 else 3 + 3 * num_lanes;
-        const rw: i16 = if (is_vertical) rect.w else rect.h;
-        const rx: i16 = if (is_vertical) rect.x else rect.y;
-        const ry: i16 = if (is_vertical) rect.y else rect.x;
-        const rh: i16 = if (is_vertical) rect.h else rect.w;
-
-        // figure out where the roads should go, track for blocks
-        if (road_cursor > rw - total_width) {
-            // we're out of room for roads, just give up
-            break;
-        }
-        const max_w: u16 = if (@as(u16, @intCast(rw)) - total_width > 500) 500 else @as(u16, @intCast(rw)) - total_width;
-        const build_road_at: u16 = @as(u16, @intCast(rx)) + rng.intRangeAtMost(u16, @as(u16, @intCast(road_cursor)), road_cursor + max_w);
-        std.log.info("total_width {} rw {}", .{ total_width, rw });
-        std.log.info("road cursor {} max_w {}", .{ road_cursor, max_w });
-        std.log.info("road at {}", .{build_road_at});
-        try block_intervals.append(alloc, .{ .origin = @as(i16, @intCast(road_cursor)), .len = @as(i16, @intCast(build_road_at - road_cursor)) - 1 });
-
-        //actually build the road
-        const y_pos: i16 = ry;
-        const length: i16 = ry + rh;
-        var construction_cursor: i16 = 0;
-        const left_sidewalk_rect: IRect = if (is_vertical)
-            .{ .x = @as(i16, @intCast(build_road_at)) + construction_cursor, .y = y_pos, .w = 1, .h = length }
-        else
-            .{ .y = @as(i16, @intCast(build_road_at)) + construction_cursor, .x = y_pos, .h = 1, .w = length };
-        fill_terrain(left_sidewalk_rect, .sidewalk);
-        construction_cursor += 1;
-        if (num_lanes == 1) {
-            const lane_rect: IRect = if (is_vertical)
-                .{ .x = @as(i16, @intCast(build_road_at)) + construction_cursor, .y = y_pos, .w = 3, .h = length }
-            else
-                .{ .y = @as(i16, @intCast(build_road_at)) + construction_cursor, .x = y_pos, .h = 3, .w = length };
-            fill_terrain(lane_rect, .asphalt);
-            construction_cursor += 1;
-        } else {
-            const lanes_width = 3 * @divExact(num_lanes, 2);
-            const left_lanes_rect: IRect = if (is_vertical)
-                .{ .x = @as(i16, @intCast(build_road_at)) + construction_cursor, .y = y_pos, .w = lanes_width, .h = length }
-            else
-                .{ .y = @as(i16, @intCast(build_road_at)) + construction_cursor, .x = y_pos, .h = lanes_width, .w = length };
-            construction_cursor += lanes_width;
-            fill_terrain(left_lanes_rect, .asphalt);
-            const stripe: IRect = if (is_vertical)
-                .{ .x = @as(i16, @intCast(build_road_at)) + construction_cursor, .y = y_pos, .w = 1, .h = length }
-            else
-                .{ .y = @as(i16, @intCast(build_road_at)) + construction_cursor, .x = y_pos, .h = 1, .w = length };
-            fill_terrain(stripe, .road_paint);
-            construction_cursor += 1;
-            const right_lanes_rect: IRect = if (is_vertical)
-                .{ .x = @as(i16, @intCast(build_road_at)) + construction_cursor, .y = y_pos, .w = lanes_width, .h = length }
-            else
-                .{ .y = @as(i16, @intCast(build_road_at)) + construction_cursor, .x = y_pos, .h = lanes_width, .w = length };
-            fill_terrain(right_lanes_rect, .asphalt);
-            construction_cursor += lanes_width;
-        }
-        const right_sidewalk_rect: IRect = if (is_vertical)
-            .{ .x = @as(i16, @intCast(build_road_at)) + construction_cursor, .y = y_pos, .w = 1, .h = length }
-        else
-            .{ .y = @as(i16, @intCast(build_road_at)) + construction_cursor, .x = y_pos, .h = 1, .w = length };
-        fill_terrain(right_sidewalk_rect, .sidewalk);
-        road_cursor += build_road_at + total_width * 10;
-        road_built = .{ .origin = @as(i16, @intCast(build_road_at)), .len = total_width };
-    }
-    return road_built;
-}
-
-pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random) void {
+pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8) void {
     // scheme:
     // recursively -
     //   draw some number of roads, which divide up the given rect
@@ -204,56 +127,89 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random) void {
     // Once the rects are small enough, stop subdividing and do individual blocks
     // "small enough" being based on Zone.
     // TODO vary destruction level based on where mama kaiju spawns
+    // if (depth > 1) {
+    //     return;
+    // }
 
     // blocks
-    std.log.info("rect {}", .{rect});
-    const area: u32 = @as(u32, @intCast(rect.h)) * @as(u32, @intCast(rect.w));
-    const block_threshold: u32 = switch (zone) {
-        .Residential => 2000,
-        .Commercial => 5000,
-        .Industrial => 12000,
+    const zone_threshold: u16 = 300;
+    const new_zone: Zone = if (zone == .Nil and (rect.w < zone_threshold or rect.h < zone_threshold)) rng.enumValue(Zone) else zone;
+    // std.log.info("zone {} rect {}", .{ zone, rect });
+    const block_threshold: i16 = switch (new_zone) {
+        .Residential => 24,
+        .Commercial => 48,
+        .Industrial => 96,
         else => 0,
     };
-    if (area < block_threshold) {
-        std.log.info("block threshold {} reached at {}, stopping recursion", .{ block_threshold, area });
+    if (rect.w < block_threshold or rect.h < block_threshold) {
         // TODO real logic
-        fill_terrain(rect, .floor);
+        if (rect.w > 3 and rect.h > 3) {
+            fill_terrain(rect.expand(-1), .floor);
+        }
+        fill_terrain(rect, .wall);
         return;
     }
 
-    // construct roads and determine subblocks
-    var buffer: [1024]u8 = .{0} ** 1024;
-    var fba: std.heap.FixedBufferAllocator = .init(&buffer);
-    const allocator = fba.allocator();
-    var block_widths: std.ArrayList(Interval) = .empty;
-    defer block_widths.deinit(allocator);
-    var block_heights: std.ArrayList(Interval) = .empty;
-    defer block_heights.deinit(allocator);
-    const num_roads_vert: u8 = rng.intRangeAtMost(u8, 1, 3);
-    const num_roads_horiz: u8 = rng.intRangeAtMost(u8, 1, 3);
-    _ = build_roads(num_roads_vert, zone, rect, &block_widths, true, rng, allocator) catch return;
-    _ = build_roads(num_roads_horiz, zone, rect, &block_heights, false, rng, allocator) catch return;
+    // construct roads
+    // draw one horizontal and one vertical in a specific range
+    const num_lanes_v: u8 = switch (zone) {
+        .Nil, .Industrial => rng.intRangeAtMost(u8, 1, 3) * 2,
+        .Residential => rng.intRangeAtMost(u8, 1, 2),
+        .Commercial => rng.intRangeAtMost(u8, 1, 2) * 2,
+    };
+    const num_lanes_h: u8 = switch (zone) {
+        .Nil, .Industrial => rng.intRangeAtMost(u8, 1, 3) * 2,
+        .Residential => rng.intRangeAtMost(u8, 1, 2),
+        .Commercial => rng.intRangeAtMost(u8, 1, 2) * 2,
+    };
+    const road_width_v: i16 = if (num_lanes_v == 1) 5 else 3 + 3 * num_lanes_v;
+    const road_width_h: i16 = if (num_lanes_h == 1) 5 else 3 + 3 * num_lanes_h;
 
-    // get blocks and recurse
-    // append edge blocks
-    // const origin_w = last_vert_road.origin + last_vert_road.len;
-    // const w_int: Interval = .{ .origin = origin_w, .len = rect.w - origin_w };
-    // std.log.info("last_vert_road {} origin_w {} w_int {}", .{ last_vert_road, origin_w, w_int });
-    // block_widths.append(allocator, w_int) catch return;
-    // const origin_h = last_horiz_road.origin + last_horiz_road.len;
-    // const h_int: Interval = .{ .origin = origin_h, .len = rect.h - origin_h };
-    // std.log.info("last_horiz_road {} origin_h {} h_int {}", .{ last_horiz_road, origin_h, h_int });
-    // block_widths.append(allocator, h_int) catch return;
-    // // block_widths.append(
-    const zone_threshold: u32 = 20000;
-    // std.log.info("block widths {any}, block heights {any}", .{ block_widths, block_heights });
-    for (block_widths.items) |w| {
-        for (block_heights.items) |h| {
-            const new_rect: IRect = .{ .x = w.origin, .y = h.origin, .w = w.len, .h = h.len };
-            const new_zone: Zone = if (new_rect.w * new_rect.h < zone_threshold) rng.enumValue(Zone) else zone;
-            std.log.info("new rect {} with zone {}", .{ new_rect, new_zone });
-            new_mapgen(new_rect, new_zone, rng);
-        }
+    const v_i: i16 = @divFloor(rect.w, 3) + rect.x;
+    const v_j: i16 = 2 * @divFloor(rect.w, 3) + rect.x;
+    const road_start_v: i16 = rng.intRangeAtMost(i16, v_i, v_j);
+    const h_i: i16 = @divFloor(rect.h, 3) + rect.y;
+    const h_j: i16 = 2 * @divFloor(rect.h, 3) + rect.y;
+    const road_start_h: i16 = rng.intRangeAtMost(i16, h_i, h_j);
+    const intersection: IRect = .{ .x = road_start_v, .y = road_start_h, .w = road_width_v, .h = road_width_h };
+
+    //blocks, delimited by roads
+    const ul_coords: IVec2 = .{ .x = rect.x, .y = rect.y };
+    const ul_size: IVec2 = .{ .x = road_start_v - rect.x, .y = road_start_h - rect.y };
+    const ul: IRect = IRect.from(ul_coords, ul_size);
+
+    const ur_coords: IVec2 = .{ .x = rect.x + road_start_v + road_width_v, .y = rect.y };
+    const ur_size: IVec2 = .{ .x = rect.w - ul.w - road_width_v, .y = ul.h };
+    const ur: IRect = IRect.from(ur_coords, ur_size);
+
+    const ll_coords: IVec2 = .{ .x = rect.x, .y = rect.y + ul.h + road_width_h };
+    const ll_size: IVec2 = .{ .x = ul.w, .y = rect.h - ul.h - road_width_h };
+    const ll: IRect = IRect.from(ll_coords, ll_size);
+
+    const lr_coords: IVec2 = .{ .x = ur.x, .y = ll.y };
+    const lr_size: IVec2 = .{ .x = rect.w - ll.w - road_width_v, .y = ur.w };
+    const lr: IRect = IRect.from(lr_coords, lr_size);
+
+    new_mapgen(ul, new_zone, rng, depth + 1);
+    new_mapgen(ur, new_zone, rng, depth + 1);
+    new_mapgen(ll, new_zone, rng, depth + 1);
+    new_mapgen(lr, new_zone, rng, depth + 1);
+
+    // now actually pave the roads
+    fill_terrain(intersection, .asphalt);
+    // v road
+    {
+        const road_start: IVec2 = .{ .x = road_start_v, .y = rect.y };
+        const road_size: IVec2 = .{ .x = road_width_v, .y = rect.h };
+        const rr: IRect = IRect.from(road_start, road_size);
+        fill_terrain(rr, .asphalt);
+    }
+    // h road
+    {
+        const road_start: IVec2 = .{ .x = rect.x, .y = road_start_h };
+        const road_size: IVec2 = .{ .x = rect.w, .y = road_width_h };
+        const rr: IRect = IRect.from(road_start, road_size);
+        fill_terrain(rr, .asphalt);
     }
 }
 
@@ -325,7 +281,7 @@ pub const MAP_SIZE = 2500;
 pub const MAPDATA_LEN = MAP_SIZE * MAP_SIZE;
 pub const BOUNDS: core.IRect = .{ .x = 0, .y = 0, .w = MAP_SIZE, .h = MAP_SIZE };
 
-pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.floor)} ** MAPDATA_LEN;
+pub var mapdata: [MAPDATA_LEN]FullTerrain = .{FullTerrain.from(.asphalt)} ** MAPDATA_LEN;
 
 pub const FullTerrain = packed struct(u8) {
     terrain: Terrain,
