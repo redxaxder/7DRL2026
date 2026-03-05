@@ -256,7 +256,16 @@ pub const Vec2 = extern struct {
 };
 
 pub const Orientation =
-    enum { v, h };
+    enum {
+        v,
+        h,
+        pub fn flip(self: Orientation) Orientation {
+            return switch (self) {
+                .v => .h,
+                .h => .v,
+            };
+        }
+    };
 
 pub const Interval = struct {
     origin: i16,
@@ -302,7 +311,7 @@ pub const Interval = struct {
             },
         };
         for (got) |it| {
-            if (it.origin < 0 or it.len < 0) {
+            if (it.len < 0) {
                 std.log.info("yoyoyo {any}", .{got});
                 @panic("whaaaa");
             }
@@ -420,6 +429,19 @@ pub const IRect = struct {
     pub fn intersects(self: IRect, other: IRect) bool {
         return self.x < other.x + other.w and other.x < self.x + self.w and
             self.y < other.y + other.h and other.y < self.y + self.h;
+    }
+
+    pub fn intersection(self: IRect, other: IRect) IRect {
+        const x0 = @max(self.x, other.x);
+        const y0 = @max(self.y, other.y);
+        const x1 = @min(self.x + self.w, other.x + other.w);
+        const y1 = @min(self.y + self.h, other.y + other.h);
+        return .{
+            .x = x0,
+            .y = y0,
+            .w = @max(x1 - x0, 0),
+            .h = @max(y1 - y0, 0),
+        };
     }
 
     pub fn expand(self: IRect, amount: i16) IRect {
@@ -556,6 +578,12 @@ pub const IRect = struct {
         }
     };
 
+    pub fn expando(self: IRect, o: Orientation, n: i16) IRect {
+        switch (o) {
+            .h => return self.expand_horizontally(n),
+            .v => return self.expand_vertically(n),
+        }
+    }
     pub fn expand_vertically(self: IRect, n: i16) IRect {
         return .{
             .x = self.x,

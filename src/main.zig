@@ -543,7 +543,7 @@ pub const globals = struct {
     pub var combo_target: ?UnitId = 0;
     pub var combo_count: i64 = 0;
     pub var turn: i64 = 0;
-    pub var money: i64 = 0;
+    pub var money: i64 = 1000;
     pub var focus: UnitId = 0;
 
     pub var danger: u64 = 0;

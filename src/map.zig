@@ -103,7 +103,7 @@ const Zone = enum {
 };
 
 fn fill_terrain(rect: IRect, terrain: Terrain) void {
-    var iter = rect.iter();
+    var iter = BOUNDS.intersection(rect).iter();
     while (iter.next()) |pos| {
         set_terrain_at(pos, terrain);
     }
@@ -381,11 +381,6 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     const ul, const h2, const ll = l.slice(.h, road_h);
     const v1, const c, const v2 = v.slice(.h, road_h);
 
-    new_mapgen(ul, new_zone, rng, depth + 1, max_road);
-    new_mapgen(ur, new_zone, rng, depth + 1, max_road);
-    new_mapgen(ll, new_zone, rng, depth + 1, max_road);
-    new_mapgen(lr, new_zone, rng, depth + 1, max_road);
-
     // now actually pave the roads
     // v road
     {
@@ -398,6 +393,10 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
         pave_road(h2, .h, rng);
     }
     fill_terrain(c, .asphalt);
+    new_mapgen(ul, new_zone, rng, depth + 1, max_road);
+    new_mapgen(ur, new_zone, rng, depth + 1, max_road);
+    new_mapgen(ll, new_zone, rng, depth + 1, max_road);
+    new_mapgen(lr, new_zone, rng, depth + 1, max_road);
 }
 
 pub fn pave_road(rect: IRect, orientation: core.Orientation, rng: std.Random) void {
@@ -436,6 +435,14 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation, rng: std.Random) vo
             },
         }
     }
+
+    const other_interval = switch (orientation) {
+        .v => h_interval,
+        .h => v_interval,
+    };
+    const danglers = rect.expando(orientation, 1).slice(orientation.flip(), other_interval);
+    fill_terrain(danglers[0], .asphalt);
+    fill_terrain(danglers[2], .asphalt);
 }
 
 fn fill_sidewalk(rect: IRect, rng: std.Random) void {
