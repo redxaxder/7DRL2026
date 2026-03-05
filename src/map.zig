@@ -224,7 +224,7 @@ pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
         .Ground,
     };
     const roll_table: [6]f32 = switch (zone) {
-        .Residential => .{ 0.01, 0.02, 0.05, 0.01, 0, 0 },
+        .Residential => .{ 0.03, 0.02, 0.05, 0.1, 0, 0 },
         .Commercial => .{ 0.0025, 0.005, 0.0075, 0.005, 0.001, 0.0015 },
         .Industrial => .{ 0, 0.004, 0.010, 0, 0, 0.002 },
     };

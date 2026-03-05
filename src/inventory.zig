@@ -32,7 +32,7 @@ const EXAMPLE_TRINKET: Item = blk: {
 
 const EXAMPLE_GAMMA: Item = blk: {
     var it: Item = .tagged(ItemTag.Gamma_Beam);
-    it.attrs.field(.radioactive_damage).* = 10;
+    it.attrs.field(.radiation_damage).* = 10;
     break :blk it;
 };
 
@@ -109,10 +109,12 @@ pub fn roll_next_item(rng: std.Random) void {
     switch (t) {
         .Labubu => {
             next_item.attrs.field(.impact_damage).* +=
-                roll_low(rng, 2, 3, 6);
+                roll_low(rng, 2, 2, 10);
+            next_item.attrs.field(.armor).* +=
+                roll_low(rng, 2, 2, 6);
         },
         .Gamma_Beam => {
-            next_item.attrs.field(.radioactive_damage).* +=
+            next_item.attrs.field(.radiation_damage).* +=
                 roll_low(rng, 4, 2, 10);
         },
         .Rifle => {
@@ -139,10 +141,6 @@ pub fn roll_next_item(rng: std.Random) void {
             next_item.attrs.field(.top_speed).* +=
                 roll_low(rng, 3, 1, 10);
         },
-        .Talisman => {
-            next_item.attrs.field(.armor).* +=
-                roll_low(rng, 2, 3, 6);
-        },
         .Hachimaki => {
             next_item.attrs.field(.gun_damage).* +=
                 roll_low(rng, 8, 1, 30);
@@ -152,7 +150,10 @@ pub fn roll_next_item(rng: std.Random) void {
         // .Amulet => { },
         // .Briefcase => {},
         // .Hair_Clip => {},
-        // .Juzu_Beads => {},
+        .Juzu_Beads => {
+            next_item.attrs.field(.radiation_damage).* +=
+                roll_low(rng, 4, 2, 10);
+        },
         // .Credit_Card => {},
         // .Stamp_Seal => {},
         .Odd_Odometer => {
@@ -218,12 +219,12 @@ pub const ItemTag = enum {
     Cell_Phone,
     Figurine,
     Pencil_Case,
-    Talisman,
+    // Talisman,
     Hachimaki,
+    Juzu_Beads,
     // Amulet,
     // Briefcase,
     // Hair_Clip,
-    // Juzu_Beads,
     // Credit_Card,
     // Stamp_Seal,
     Odd_Odometer,
@@ -265,7 +266,7 @@ pub const ItemTag = enum {
 };
 
 pub const Attribute = enum {
-    radioactive_damage,
+    radiation_damage,
     explosion_radius,
     explosion_damage,
     gun_damage,

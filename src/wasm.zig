@@ -341,7 +341,8 @@ fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
             const period = 600;
             const phase = @mod(pos.x + 3 * pos.y, 5) * period / 5;
             const blink = @mod(t + phase, period) < period / 2;
-            if (blink) {
+            const seen = map.get_render_terrain_payload_at(unit.position).seen;
+            if (blink and seen) {
                 draw_world_glyph(unit.render_position, 'X', .{
                     .color = .yellow,
                     .bgcolor = .black,
@@ -357,7 +358,8 @@ fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
                     const period = 700;
                     const phase = @mod(pos.float().x + 3 * pos.float().y, 5) * period / 5;
                     const blink = @mod(t + phase, period) < period / 2;
-                    if (blink) {
+                    const seen = map.get_render_terrain_payload_at(pos).seen;
+                    if (blink and seen) {
                         draw_world_glyph(pos.float(), 'X', .{
                             .color = .red,
                             .bgcolor = .black,

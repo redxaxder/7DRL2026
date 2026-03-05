@@ -338,7 +338,7 @@ pub const Unit = struct {
                 const tt = map.get_terrain_at(p);
                 if (tt.halting()) {
                     halt = true;
-                    combat_log.log("You drive through the {}.", .{tt});
+                    combat_log.log("You drive through the {s}.", .{tt.name()});
                     _ = animate_terrain_to(p, .floor).chain();
                 }
                 if (self.tag == .Player) {
@@ -869,7 +869,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
                 combat_log.log("You shoot the {s}.", .{terrain.name()});
                 return true;
             };
-            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.radioactive_damage));
+            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.radiation_damage));
             const multiplied = (base_damage + combo_linear) * combo_mul * crit;
             const decay = 1 - std.math.pow(f64, 0.99, multiplied);
             const hp: f64 = @floatFromInt(u.hp);
@@ -1009,14 +1009,14 @@ fn resolve_pending(rng: std.Random) void {
 
                 var player: *Unit = globals.player();
                 const moto: ?*Unit = if (player.mounted()) player.mount() else null;
-                // damage player if hit
-                // TODO how much damage?
                 if (pos.eq(player.position)) {
-                    player.damage(10);
+                    const dmg = rng.intRangeAtMost(i64, 1, 6);
+                    combat_log.log("You take {} damage from falling debris", .{dmg});
+                    player.damage(dmg);
                 } else if (moto) |m| {
-                    // damage moto if hit
+                    const dmg = rng.intRangeAtMost(i64, 1, 6);
                     if (m.get_rect().contains(pos)) {
-                        m.damage(10);
+                        m.damage(dmg);
                     }
                 }
             },
@@ -1229,7 +1229,7 @@ fn roll_new_enemy(rng: std.Random) ?IRect {
         return null;
     }
 
-    globals.danger -= roll;
+    globals.danger = 0;
     return target_rect;
 }
 
@@ -1250,9 +1250,10 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     }
 
     // spawn pending rubble
-    const fling_distance: i16 = 10;
+    const maxrng = 6 * @as(i16, @intCast(demolitionist.size));
+    const fling_distance: i16 = rng.intRangeAtMost(i16, 6, maxrng);
     const rubble_spawn_chance: f32 = 0.05;
-    var rubble_iter = demolitionist.get_rect().slide(dir, fling_distance);
+    var rubble_iter = demolitionist.get_rect().expand(demolitionist.size / 2).slide(dir, fling_distance);
     while (rubble_iter.next()) |front| {
         var front_iter = front.iter();
         while (front_iter.next()) |pos| {
