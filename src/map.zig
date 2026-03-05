@@ -36,7 +36,7 @@ pub fn fill_hatched(rect: IRect, t1: Terrain, t2: Terrain) void {
     }
 }
 
-pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orientation, zone: Zone, max_road_width: i16) core.Interval {
+pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orientation, zone: Zone, zone_is_fixed: bool, max_road_width: i16) core.Interval {
     const v_interval, const h_interval = rect.intervals();
     const interval = switch (orientation) {
         .v => v_interval,
@@ -50,26 +50,35 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
 
     const max_lanes = @divFloor(max_road_width, 4);
     var lanes = max_lanes;
-    // random chance to drop a lane
-    if (rng.float(f32) < 0.4) {
-        lanes -= 1;
+    // std.log.info("2 lanes {}", .{lanes});
+    // bias lanes
+    if (zone_is_fixed) {
+        const commercial_options: [2]i16 = .{ 2, 4 };
+        const industrial_options: [2]i16 = .{ 4, 6 };
+        const residential_options: [2]i16 = .{ 1, 2 };
+        const bias: [2]f32 = .{ 0.3, 0.7 };
+        lanes = switch (zone) {
+            .Commercial => commercial_options[rng.weightedIndex(f32, &bias)],
+            .Industrial => industrial_options[rng.weightedIndex(f32, &bias)],
+            .Residential => residential_options[rng.weightedIndex(f32, &bias)],
+        };
+    } else {
+        const bias: [2]f32 = .{ 0.3, 0.7 };
+        const zone_options: [2]i16 = .{ 4, 6 };
+        lanes = zone_options[rng.weightedIndex(f32, &bias)];
     }
-    lanes = @min(lanes, @divFloor(interval.len, 16));
+    // std.log.info("1 lanes {}", .{lanes});
+    // lanes = @min(lanes, @divFloor(interval.len, 16));
     // must have an even number of lanes if more than one
     if (@mod(lanes, 2) == 1 and lanes > 1) {
         lanes -= 1;
     }
+    // std.log.info("3 lanes {}", .{lanes});
     // can't have 0 lanes
     lanes = @max(1, lanes);
-    // bias lanes
-    const commercial_options: [3]i16 = .{ 2, 4, lanes };
-    const industrial_options: [3]i16 = .{ 4, 6, lanes };
-    const bias: [3]f32 = .{ 0.5, 0.4, 0.1 };
-    lanes = switch (zone) {
-        .Commercial => @max(2, commercial_options[rng.weightedIndex(f32, &bias)]),
-        .Industrial => @max(2, industrial_options[rng.weightedIndex(f32, &bias)]),
-        else => lanes,
-    };
+    // std.log.info("4 lanes {}", .{lanes});
+    lanes = @min(lanes, max_lanes);
+    std.log.info("max_lanes {} lanes {}", .{ max_lanes, lanes });
     const len = lanes * 4 + 1;
 
     const min_origin = interval.origin + @divFloor(interval.len - len, 3);
@@ -284,8 +293,8 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
         return;
     }
 
-    const road_v = pick_road_interval(rect, rng, .v, zone, max_road_width);
-    const road_h = pick_road_interval(rect, rng, .h, zone, max_road_width);
+    const road_v = pick_road_interval(rect, rng, .v, zone, zone_is_fixed, max_road_width);
+    const road_h = pick_road_interval(rect, rng, .h, zone, zone_is_fixed, max_road_width);
     const max_road: i16 = @min(road_v.len, road_h.len);
 
     const l, const v, const r = rect.slice(.v, road_v);
