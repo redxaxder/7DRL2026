@@ -139,16 +139,29 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
 
     const max_lanes = @divFloor(max_road_width, 4);
     var lanes = max_lanes;
-
-    if (rng.boolean()) {
+    // random chance to drop a lane
+    if (rng.float(f32) < 0.4) {
         lanes -= 1;
     }
-    lanes = @min(lanes, @divFloor(interval.len, 15));
-    _ = zone; // TODO zone affects lanes
+    // also shrink based on interval
+    lanes = @min(lanes, @divFloor(interval.len, 1));
+    // must have an even number of lanes if more than one
     if (@mod(lanes, 2) == 1 and lanes > 1) {
         lanes -= 1;
     }
-    lanes = @max(lanes, 1);
+    // can't have 0 lanes
+    lanes = @max(1, lanes);
+    // bias lanes
+    std.log.info("lanes going into bias {}", .{lanes});
+    const commercial_options: [3]i16 = .{ 2, 4, lanes };
+    const industrial_options: [3]i16 = .{ 4, 6, lanes };
+    const bias: [3]f32 = .{ 0.5, 0.4, 0.1 };
+    lanes = switch (zone) {
+        .Commercial => @max(2, commercial_options[rng.weightedIndex(f32, &bias)]),
+        .Industrial => @max(2, industrial_options[rng.weightedIndex(f32, &bias)]),
+        else => lanes,
+    };
+    std.log.info("lanes after bias {}", .{lanes});
     const len = lanes * 4 + 1;
 
     const min_origin = interval.origin + @divFloor(interval.len - len, 3);
@@ -241,6 +254,7 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
     };
 
     const lanes = @divFloor(interval.len, 4);
+    std.log.info("num lanes {}", .{lanes});
     const pattern = switch (lanes) {
         1 => "10001",
         2 => "100020001",
@@ -258,6 +272,7 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation) void {
             .len = 1,
         };
         const to_pave = rect.slice(orientation, slice)[1];
+        std.log.info("paving {}", .{kind});
         switch (kind) {
             '0' => fill_terrain(to_pave, .asphalt),
             '1' => fill_terrain(to_pave, .sidewalk),
