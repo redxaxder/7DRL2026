@@ -477,9 +477,39 @@ pub fn rendered_glyph(pos: IVec2) DrawInfo {
         payload.terrain
     else
         .void_;
+    const glyph = if (terrain == .wall) wall_glyph(pos) else terrain.glyph();
     return .{
-        .glyph = terrain.glyph(),
+        .glyph = glyph,
         .color = if (payload.bloody) .red else .white,
+    };
+}
+
+fn is_wall_at(pos: IVec2) bool {
+    return get_render_terrain_payload_at(pos).terrain == .wall;
+}
+
+fn wall_glyph(pos: IVec2) u8 {
+    const right: u4 = if (is_wall_at(pos.plus(.{ .x = 1 }))) 1 else 0;
+    const up: u4 = if (is_wall_at(pos.plus(.{ .y = -1 }))) 2 else 0;
+    const left: u4 = if (is_wall_at(pos.plus(.{ .x = -1 }))) 4 else 0;
+    const down: u4 = if (is_wall_at(pos.plus(.{ .y = 1 }))) 8 else 0;
+    const mask = right | up | left | down;
+
+    // CP437 double-line box-drawing characters indexed by adjacency bitmask
+    // bit 0=right, 1=up, 2=left, 3=down
+    return switch (mask) {
+        0b0101 => 0xCD, // ═  left+right
+        0b1010 => 0xBA, // ║  up+down
+        0b1001 => 0xC9, // ╔  down+right
+        0b1100 => 0xBB, // ╗  down+left
+        0b0011 => 0xC8, // ╚  up+right
+        0b0110 => 0xBC, // ╝  up+left
+        0b1101 => 0xCB, // ╦  down+left+right
+        0b0111 => 0xCA, // ╩  up+left+right
+        0b1011 => 0xCC, // ╠  up+down+right
+        0b1110 => 0xB9, // ╣  up+down+left
+        0b1111 => 0xCE, // ╬  all four
+        else => '#', // ╬
     };
 }
 

@@ -16,8 +16,8 @@
 + kaiju should crush motorcycles they stand on
 + bust down doors
 + destroy should treat flat areas differently
-- dont lets things go out of bounds
-- dont walk through walls on foot
++ dont lets things go out of bounds
++ dont walk through walls on foot
 + fix masking
 + update fov at end of turn
 

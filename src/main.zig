@@ -31,7 +31,7 @@ const IRect = core.IRect;
 pub const MOTHER_KAIJU_SIZE = 10;
 pub const MIN_KAIJU_SIZE = 3;
 
-const FOV_RANGE = 80;
+const FOV_RANGE = 40;
 const DANGER_GROWTH = 90;
 // const DANGER_GROWTH = 0;
 const SPAWN_ROLL = 100000;
@@ -343,8 +343,6 @@ pub const Unit = struct {
                             inventory.add_pending_pickup();
                         }
                     }
-
-                    fov.refresh_fov(p, FOV_RANGE);
                 }
             }
             // kaiju crush motorcycles and smashable terrain
@@ -953,6 +951,9 @@ fn resolve_pending(rng: std.Random) void {
                     while (iter.next()) |tid| {
                         const target = globals.unit(tid);
                         const impact = target.get_rect().count_overlap(u.position, radius);
+                        if (impact == 0) {
+                            continue;
+                        }
                         const damage = impact * u.hp;
                         switch (target.tag) {
                             .Kaiju => {
@@ -963,7 +964,7 @@ fn resolve_pending(rng: std.Random) void {
                                 const roll = rng.intRangeAtMost(i16, 1, 20);
                                 if (roll > target.model.stats().readfield(.armor)) {
                                     const max = @as(i64, @intCast(impact)) * 3;
-                                    const dmg = rng.intRangeAtMost(i64, 1, max);
+                                    const dmg = rng.intRangeAtMost(i64, 0, max);
                                     combat_log.log("The {s} is caught in the blast. It takes {} damage.", .{ target.model.name(), dmg });
                                     target.damage(dmg);
                                 }
