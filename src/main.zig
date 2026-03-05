@@ -254,7 +254,7 @@ pub const Unit = struct {
         return @intCast((@intFromPtr(self) - @intFromPtr(&globals.units)) / @sizeOf(Unit));
     }
 
-    pub const Impassable = union(enum) { terrain: Terrain, unit: UnitId };
+    pub const Impassable = union(enum) { terrain: IVec2, unit: UnitId };
     pub const CheckWhere = struct {
         pos: IVec2 = .ZERO,
         orientation: Dir4 = .Right,
@@ -295,7 +295,7 @@ pub const Unit = struct {
         while (it.next()) |pos| {
             const terrain = map.get_terrain_at(pos);
             if (!terrain.unit_passable(self.tag)) {
-                return .{ .terrain = terrain };
+                return .{ .terrain = pos };
             }
         }
         return null;
@@ -624,8 +624,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             }
 
             if (crashed.collided_with) |collision| {
-                const foo = collision;
-                switch (foo) {
+                switch (collision) {
                     .unit => |uid| {
                         const u = globals.unit(uid);
                         switch (u.tag) {
@@ -641,15 +640,24 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                             else => {},
                         }
                     },
-                    .terrain => |terrain| {
+                    .terrain => |where| {
+                        const terrain = map.get_terrain_at(where);
                         combat_log.log("It plows into the {s}.", .{terrain.name()});
+                        if (terrain.motosmash()) |to| {
+                            if (motomove.speed > 4) {
+                                _ = animate_terrain_to(
+                                    where,
+                                    to,
+                                ).lock_exclusive(pmount.lock());
+                            }
+                        }
                     },
                 }
             }
-            const attackroll = rng.intRangeAtMost(i16, 1, 20);
+            const attackroll = rng.intRangeAtMost(i16, 0, 20);
             const armor = motostats.effective_value(.armor);
             const dmg = rng.intRangeAtMost(i64, 1, motomove.speed);
-            if (attackroll == 20 or attackroll > armor) {
+            if (attackroll > armor) {
                 combat_log.log("The {s} took {} damage.", .{ pmount.model.name(), dmg });
                 pmount.damage(dmg);
             } else {

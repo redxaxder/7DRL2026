@@ -443,6 +443,14 @@ pub const Terrain = enum(u5) {
         };
     }
 
+    pub fn motosmash(self: Terrain) ?Terrain {
+        return switch (self) {
+            .rubble => .debris,
+            .wall => .rubble,
+            else => null,
+        };
+    }
+
     pub fn blocks_fov(self: Terrain) bool {
         return switch (self) {
             .void_, .wall, .door => true,

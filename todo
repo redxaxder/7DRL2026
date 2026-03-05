@@ -1,8 +1,14 @@
-- display player state:
-  - hp
-  - mode
-  - combo
-  - motorcycle hp
+
+- crit
+- motorcycle survival
++ rubble collision
+- rockets
+
++ display player state:
+  + hp
+  + mode
+  + combo
+  + motorcycle hp
 
 
 - blink anim for kaiju smash
