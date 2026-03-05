@@ -640,14 +640,14 @@ pub const Terrain = enum(u5) {
     }
     pub fn player_passable(self: Terrain) bool {
         return switch (self) {
-            .wall, .void_ => false,
+            .wall, .void_, .vending => false,
             else => true,
         };
     }
 
     pub fn moto_passable(self: Terrain) bool {
         return switch (self) {
-            .wall, .rubble, .void_ => false,
+            .wall, .rubble, .void_, .vending => false,
             else => true,
         };
     }

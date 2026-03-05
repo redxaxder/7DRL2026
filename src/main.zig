@@ -624,6 +624,25 @@ pub fn init(rng: std.Random) !void {
     map.set_render_terrain_at(IVec2.ONE.scaled(7), Terrain.void_);
 }
 
+fn handle_vending() void {
+    if (globals.money < 100) {
+        combat_log.log("You don't have money for a drink.", .{});
+    } else {
+        combat_log.log("You put money in the vending machine.", .{});
+        const healing: i64 = globals.rng.intRangeAtMost(i64, 1, 6);
+        const phrase: u8 = globals.rng.intRangeAtMost(u8, 0, 3);
+        switch (phrase) {
+            0 => combat_log.log("Ramune! You heal {} HP.", .{healing}),
+            1 => combat_log.log("Executive Coffee! You heal {} HP.", .{healing}),
+            2 => combat_log.log("Cowbliss! You heal {} HP.", .{healing}),
+            3 => combat_log.log("D.D. Lime! You heal {} HP.", .{healing}),
+            else => unreachable,
+        }
+        globals.player().hp += healing;
+        globals.money -= 100;
+    }
+}
+
 // dir is null when you turn is not an active move, you are maybe just coasting
 pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
     const player = globals.player();
@@ -724,6 +743,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 switch (terrain) {
                     .wall => combat_log.log("The wall rejects your advances.", .{}),
                     .void_ => combat_log.log("You're not done yet.", .{}),
+                    .vending => handle_vending(),
                     else => combat_log.log("Can't go there", .{}),
                 }
                 return false;
