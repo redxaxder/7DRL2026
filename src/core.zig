@@ -411,6 +411,15 @@ pub const IRect = struct {
         return .{ .rect = self };
     }
 
+    pub fn corners(self: IRect) [4]IVec2 {
+        return .{
+            .{ .x = self.x, .y = self.y },
+            .{ .x = self.x + self.w - 1, .y = self.y },
+            .{ .x = self.x + self.w - 1, .y = self.y + self.h - 1 },
+            .{ .x = self.x, .y = self.y + self.h - 1 },
+        };
+    }
+
     pub fn from(loc: IVec2, size: IVec2) IRect {
         return .{ .x = loc.x, .y = loc.y, .w = size.x, .h = size.y };
     }
