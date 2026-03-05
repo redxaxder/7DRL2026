@@ -186,8 +186,8 @@ fn gen_industrial(rect: IRect, rng: std.Random) void {
     var perimeter = rect.perimeter(&buffer);
     var gap_size: u8 = 0;
     while (perimeter.next()) |pos| {
-        if (gap_size == 0 and rng.float(f32) < 0.3) {
-            gap_size = rng.intRangeAtMost(u8, 3, 7);
+        if (gap_size == 0 and rng.float(f32) < 0.1) {
+            gap_size = rng.intRangeAtMost(u8, 3, 5);
         }
         if (gap_size > 0) {
             set_terrain_at(pos, .asphalt);
@@ -221,6 +221,49 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
     }
 }
 
+pub fn gen_residential_building(rect: IRect, rng: std.Random) void {
+    // fill with floor
+    fill_terrain(rect, .floor);
+    var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
+    var perimeter = rect.perimeter(&buffer);
+    var gap_size: u8 = 0;
+    var num_doors: u8 = 0;
+    const max_doors: u8 = 2;
+    while (perimeter.next()) |pos| {
+        if (gap_size == 0 and rng.float(f32) < 0.3 and num_doors < max_doors) {
+            gap_size = rng.intRangeAtMost(u8, 1, 2);
+            num_doors += 1;
+        }
+        if (gap_size > 0) {
+            set_terrain_at(pos, .door);
+            gap_size -= 1;
+        } else {
+            set_terrain_at(pos, .wall);
+        }
+    }
+}
+
+fn gen_residential(rect: IRect, rng: std.Random) void {
+    // fill with sidewalk
+    fill_terrain(rect, .sidewalk);
+
+    // split rect on height
+    const orientation: core.Orientation = if (rect.h > rect.w) .h else .v;
+    const interval: Interval = switch (orientation) {
+        .h => .{ .origin = rect.y, .len = rect.w },
+        .v => .{ .origin = rect.x, .len = rect.h },
+    };
+    const min_origin = interval.origin + @divFloor(interval.len - 2, 3);
+    const max_origin = interval.origin + @divFloor(2 * (interval.len - 2), 3);
+    const origin = rng.intRangeAtMost(i16, min_origin, max_origin);
+    const slice_interval: Interval = .{ .origin = origin, .len = 2 };
+    const first, const m, const second = rect.slice(orientation, slice_interval);
+    _ = m;
+
+    gen_residential_building(first, rng);
+    gen_residential_building(second, rng);
+}
+
 pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_width: i16) void {
     // scheme:
     // recursively -
@@ -247,7 +290,7 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     const block_threshold: i16 = switch (zone) {
         .Residential => 24,
         .Commercial => 48,
-        .Industrial => 96,
+        .Industrial => 64,
     };
     if (rect.w < block_threshold or rect.h < block_threshold) {
         // TODO real logic
@@ -258,11 +301,8 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
             .Commercial => {
                 gen_commercial(rect, rng);
             },
-            else => {
-                fill_terrain(rect, .wall);
-                if (rect.w > 3 and rect.h > 3) {
-                    fill_terrain(rect.expand(-1), .floor);
-                }
+            .Residential => {
+                gen_residential(rect, rng);
             },
         }
         return;
