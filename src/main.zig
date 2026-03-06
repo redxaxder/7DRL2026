@@ -38,7 +38,7 @@ const ANIMATION_QUEUE_LEN = 256;
 
 pub fn danger_growth(pos: IVec2) u64 {
     const d: u64 = @intCast(KMOM_START.manhattan_distance(pos));
-    return 500 - (d / 10);
+    return (5000 - d) / 7;
 }
 
 pub const animlib = struct {
@@ -352,7 +352,7 @@ pub const Unit = struct {
 
                         if (map.get_terrain_at(q) == .money) {
                             _ = animate_terrain_to(q, .floor).chain();
-                            combat_log.log("You pick up a shiny coin", .{});
+                            combat_log.log("You pick up 100 yen", .{});
                             globals.money += 100;
                         }
                     }
@@ -1238,11 +1238,28 @@ fn units_cleanup(rng: std.Random) void {
 
 fn roll_new_enemy(rng: std.Random) ?IRect {
     const player = globals.player();
-    var roll: u64 = std.math.maxInt(u64);
-    for (0..3) |_| {
-        roll = @min(roll, rng.int(u64) % SPAWN_ROLL);
-    }
-    if (roll > globals.danger) {
+    const roll: u64 = blk: {
+        var z: u64 = std.math.maxInt(u64);
+        for (0..3) |_| {
+            z = @min(z, rng.int(u64) % SPAWN_ROLL);
+        }
+        break :blk z;
+    };
+
+    const active_threat: u64 = blk: {
+        var count: u64 = 0;
+        const nearby = player.get_rect().expand(30);
+        var it = sector.get_occupants_rect(nearby);
+        while (it.next()) |uid| {
+            const u = globals.unit(uid);
+            if (u.tag == .Kaiju) {
+                count += u.size * u.size;
+            }
+        }
+        break :blk count * 1000;
+    };
+
+    if (roll + active_threat > globals.danger) {
         return null;
     }
     // how far away they can spawn
@@ -1288,7 +1305,6 @@ fn roll_new_enemy(rng: std.Random) ?IRect {
 }
 
 // destroys wall
-// TODO, fling rubble
 fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     var wall_iter = demolitionist.get_rect().slide(dir, 1);
 
@@ -1304,9 +1320,9 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     }
 
     // spawn pending rubble
-    const maxrng = 6 * @as(i16, @intCast(demolitionist.size));
+    const maxrng = 5 * @as(i16, @intCast(demolitionist.size));
     const fling_distance: i16 = rng.intRangeAtMost(i16, 6, maxrng);
-    const rubble_spawn_chance: f32 = 0.05;
+    const rubble_spawn_chance: f32 = 0.03;
     var rubble_iter = demolitionist.get_rect().expand(demolitionist.size / 2).slide(dir, fling_distance);
     while (rubble_iter.next()) |front| {
         var front_iter = front.iter();

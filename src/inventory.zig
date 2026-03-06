@@ -2,6 +2,7 @@ const IVec2 = @import("core.zig").IVec2;
 const Dir4 = @import("core.zig").Dir4;
 const map = @import("map.zig");
 const std = @import("std");
+const main = @import("main.zig");
 const combat_log = @import("combat_log.zig");
 
 const BASE_ITEM_CAPACITY: usize = 3;
@@ -107,6 +108,9 @@ pub fn roll_low(rng: std.Random, rounds: usize, min: i16, max: i16) i16 {
 }
 
 pub fn roll_next_item(rng: std.Random) void {
+    const danger_level: f32 = @floatFromInt(main.danger_growth(main.globals.player().position));
+    const qualmod = 0.4 + std.math.sqrt(danger_level) / 10;
+
     const t: ItemTag = blk: while (true) {
         const x: ItemTag = rng.enumValue(ItemTag);
         if (x != .Nil) {
@@ -114,73 +118,22 @@ pub fn roll_next_item(rng: std.Random) void {
         }
     };
     next_item = .tagged(t);
+    if (t.is_weapon()) {
+        for (gun_stats(t)) |attr| {
+            next_item.roll_attr(rng, qualmod, attr);
+        }
+    } else if (t.is_trinket()) {
+        const stat2 = rng.enumValue(Attribute);
+        next_item.roll_attr(rng, qualmod * 0.3, stat2);
 
-    switch (t) {
-        .Labubu => {
-            next_item.attrs.field(.impact_damage).* +=
-                roll_low(rng, 2, 2, 10);
-            next_item.attrs.field(.armor).* +=
-                roll_low(rng, 2, 2, 6);
-        },
-        .Gamma_Beam => {
-            next_item.attrs.field(.radiation_damage).* +=
-                roll_low(rng, 4, 2, 10);
-        },
-        .Rifle => {
-            next_item.attrs.field(.gun_damage).* +=
-                roll_low(rng, 5, 1, 30);
-            next_item.attrs.field(.accuracy).* +=
-                roll_low(rng, 3, 1, 10);
-        },
-        .Rocket_Launcher => {
-            next_item.attrs.field(.explosion_damage).* +=
-                roll_low(rng, 5, 1, 30);
-            next_item.attrs.field(.explosion_radius).* +=
-                roll_low(rng, 8, 1, 5);
-        },
-        .Cell_Phone => {
-            next_item.attrs.field(.explosion_radius).* +=
-                roll_low(rng, 12, 1, 5);
-        },
-        .Figurine => {
-            next_item.attrs.field(.top_speed).* +=
-                roll_low(rng, 3, 1, 10);
-        },
-        .Pencil_Case => {
-            next_item.attrs.field(.top_speed).* +=
-                roll_low(rng, 3, 1, 10);
-        },
-        .Hachimaki => {
-            next_item.attrs.field(.gun_damage).* +=
-                roll_low(rng, 8, 1, 30);
-            next_item.attrs.field(.accuracy).* +=
-                roll_low(rng, 8, 1, 10);
-        },
-        // .Amulet => { },
-        // .Briefcase => {},
-        // .Hair_Clip => {},
-        .Juzu_Beads => {
-            next_item.attrs.field(.radiation_damage).* +=
-                roll_low(rng, 4, 2, 10);
-        },
-        // .Credit_Card => {},
-        // .Stamp_Seal => {},
-        .Odd_Odometer => {
-            next_item.attrs.field(.crit3_bonus).* +=
-                roll_low(rng, 3, 2, 10);
-        },
-        .Odder_Odometer => {
-            next_item.attrs.field(.crit4_bonus).* +=
-                roll_low(rng, 4, 4, 15);
-        },
-        .Oddest_Odometer => {
-            next_item.attrs.field(.crit5_bonus).* +=
-                roll_low(rng, 5, 5, 20);
-        },
-        .Nil => {
-            std.log.err("we reroll these", .{});
-            unreachable;
-        },
+        const primary_options = trinket_stat(t);
+        if (primary_options.len < 1) {
+            return;
+        }
+        const ix = rng.intRangeAtMost(usize, 0, primary_options.len - 1);
+
+        const stat1 = primary_options[ix];
+        next_item.roll_attr(rng, qualmod * 0.5, stat1);
     }
 }
 
@@ -220,6 +173,31 @@ pub fn discard_pending(rng: std.Random) void {
     pending_pickups -= 1;
 }
 
+fn gun_stats(t: ItemTag) []const Attribute {
+    return switch (t) {
+        .Rifle => ([_]Attribute{ .gun_damage, .accuracy })[0..],
+        .Gamma_Beam => ([_]Attribute{.radiation_damage})[0..],
+        .Rocket_Launcher => ([_]Attribute{ .explosion_damage, .explosion_radius })[0..],
+        else => &.{},
+    };
+}
+
+fn trinket_stat(t: ItemTag) []const Attribute {
+    const T = Attribute;
+    return switch (t) {
+        .Labubu => ([_]T{.impact_damage})[0..],
+        .Cell_Phone => ([_]T{.explosion_radius})[0..],
+        .Figurine => ([_]T{ .crit3_bonus, .crit4_bonus, .crit5_bonus })[0..],
+        .Pencil_Case => ([_]T{.acceleration})[0..],
+        .Talisman => ([_]T{.armor})[0..],
+        .Hachimaki => ([_]T{.accuracy})[0..],
+        .Juzu_Beads => ([_]T{.radiation_damage})[0..],
+        .Briefcase => ([_]T{.explosion_damage})[0..],
+        .Odometer => ([_]T{.top_speed})[0..],
+        else => &.{},
+    };
+}
+
 pub const ItemTag = enum {
     Nil,
 
@@ -228,17 +206,15 @@ pub const ItemTag = enum {
     Cell_Phone,
     Figurine,
     Pencil_Case,
-    // Talisman,
+    Talisman,
     Hachimaki,
     Juzu_Beads,
     // Amulet,
-    // Briefcase,
+    Briefcase,
     // Hair_Clip,
     // Credit_Card,
     // Stamp_Seal,
-    Odd_Odometer,
-    Odder_Odometer,
-    Oddest_Odometer,
+    Odometer,
 
     // Weapons
     Rifle,
@@ -253,6 +229,15 @@ pub const ItemTag = enum {
         return switch (self) {
             .Rifle, .Rocket_Launcher, .Gamma_Beam => true,
             else => false,
+        };
+    }
+
+    pub fn prefix(self: ItemTag) []const u8 {
+        return switch (self) {
+            .Rifle => "gun ",
+            .Gamma_Beam => "radiation ",
+            .Rocket_Launcher => "explosion ",
+            else => "",
         };
     }
 
@@ -287,6 +272,73 @@ pub const Attribute = enum {
     armor,
     top_speed,
     acceleration,
+
+    const Config = struct { low: f32, high: f32, n: f32 };
+    pub fn config(self: Attribute) Config {
+        return switch (self) {
+            .radiation_damage => .{
+                .low = 2,
+                .high = 10,
+                .n = 4,
+            },
+            .explosion_radius => .{
+                .low = 1,
+                .high = 9,
+                .n = 4,
+            },
+            .explosion_damage => .{
+                .low = 5,
+                .high = 90,
+                .n = 9,
+            },
+            .gun_damage => .{
+                .low = 1,
+                .high = 30,
+                .n = 5,
+            },
+            .accuracy => .{
+                .low = 1,
+                .high = 10,
+                .n = 3,
+            },
+            .crit3_bonus => .{
+                .low = 2,
+                .high = 20,
+                .n = 3,
+            },
+            .crit4_bonus => .{
+                .low = 4,
+                .high = 15,
+                .n = 4,
+            },
+            .crit5_bonus => .{
+                .low = 5,
+                .high = 20,
+                .n = 5,
+            },
+
+            .impact_damage => .{
+                .low = 2,
+                .high = 10,
+                .n = 2,
+            },
+            .armor => .{
+                .low = 1,
+                .high = 6,
+                .n = 2,
+            },
+            .top_speed => .{
+                .low = 1,
+                .high = 10,
+                .n = 2,
+            },
+            .acceleration => .{
+                .low = 1,
+                .high = 10,
+                .n = 4,
+            },
+        };
+    }
 
     pub fn name(self: Attribute) []const u8 {
         return switch (self) {
@@ -356,6 +408,20 @@ pub const Item = struct {
 
     pub fn tagged(t: ItemTag) Item {
         return .{ .tag = t };
+    }
+
+    pub fn roll_attr(self: *Item, rng: std.Random, qualmod: f32, attr: Attribute) void {
+        const config = attr.config();
+        const up = (config.high * qualmod) + qualmod;
+        const down = config.low;
+        const n = config.n * qualmod;
+        const got = roll_low(
+            rng,
+            @intFromFloat(@floor(n)),
+            @intFromFloat(@floor(down)),
+            @intFromFloat(@ceil(up)),
+        );
+        self.attrs.field(attr).* = got;
     }
 };
 

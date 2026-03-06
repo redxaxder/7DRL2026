@@ -489,6 +489,7 @@ pub fn draw_status() !void {
             cursor.plus(.{ .x = SPRITE_SCALE * 2 }),
             false,
             &mount.model.stats(),
+            "",
             opts,
             w,
         );
@@ -550,24 +551,29 @@ fn draw_item_desc(pos: Vec2, item: *const inventory.Item, opts: DrawOptions, w: 
         return 0;
     }
     cursor.y += fmt_draw_text(cursor, "{s}", opts, w, .{item.tag.name()});
-    cursor.y += draw_attrs(cursor, item.tag.is_trinket(), &item.attrs, opts, w);
+    cursor.y += draw_attrs(cursor, item.tag.is_trinket(), &item.attrs, item.tag.prefix(), opts, w);
     return cursor.y - pos.y;
 }
 
-fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, opts: DrawOptions, w: f32) f32 {
+fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, strip_prefix: []const u8, opts: DrawOptions, w: f32) f32 {
     var cursor: Vec2 = pos;
     const bonuses = inventory.bonuses();
     for (std.enums.values(inventory.Attribute)) |attr| {
         const val = attrs.readfield(attr);
         const extra = bonuses.readfield(attr);
         if (val != 0) {
+            const full_name = attr.name();
+            const display_name = if (strip_prefix.len > 0 and std.mem.startsWith(u8, full_name, strip_prefix))
+                full_name[strip_prefix.len..]
+            else
+                full_name;
             if (is_bonus) {
-                cursor.y += fmt_draw_text(cursor, "{s} +{}", opts, w, .{ attr.name(), val });
+                cursor.y += fmt_draw_text(cursor, "{s} +{}", opts, w, .{ display_name, val });
             } else {
                 if (extra != 0) {
-                    cursor.y += fmt_draw_text(cursor, "{s} {} [+{}]", opts, w, .{ attr.name(), val, extra });
+                    cursor.y += fmt_draw_text(cursor, "{s} {} [+{}]", opts, w, .{ display_name, val, extra });
                 } else {
-                    cursor.y += fmt_draw_text(cursor, "{s} {}", opts, w, .{ attr.name(), val });
+                    cursor.y += fmt_draw_text(cursor, "{s} {}", opts, w, .{ display_name, val });
                 }
             }
         }
