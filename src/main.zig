@@ -1103,7 +1103,7 @@ fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
         }
         previous = k_id;
         resonance = true;
-        combat_log.log("The monster takes {} psychic damage.", .{damage});
+        combat_log.log("The monster takes {} damage.", .{damage});
         globals.units[k_id].damage(damage);
     }
 
@@ -1194,7 +1194,7 @@ fn decay_psi() void {
     const base_decay = 0.95;
     const effective_decay = std.math.pow(f64, base_decay, 1 / reservoir);
     const result = psi * effective_decay;
-    globals.psi = @intFromFloat(@ceil(result));
+    globals.psi = @intFromFloat(@floor(result));
 }
 
 pub fn crit_bonus() i64 {
