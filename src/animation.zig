@@ -289,6 +289,9 @@ pub const Animation = struct {
         if (lock.conflicts(self.lock)) {
             return;
         }
+        if (lock.conflicts(self.lock_until_start)) {
+            return;
+        }
         const woke = switch (self.state) {
             .Waiting => true,
             .Chain => has_chain,

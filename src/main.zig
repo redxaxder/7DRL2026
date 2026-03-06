@@ -886,6 +886,7 @@ const SHOT_RANGE: usize = 64;
 pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
     const weapon = inventory.active_weapon() orelse return false;
 
+    const lock: animation.AnimationLock = .{ .exclusive = globals.player().lock() };
     switch (weapon.tag) {
         .Rifle => {
             const p = globals.player().position;
@@ -902,6 +903,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                     .glyph = glyph,
                     .speed = 70,
                     .color = .red,
+                    .start_lock = lock,
                 });
             }
         },
@@ -920,6 +922,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                     .glyph = glyph,
                     .speed = 0.2,
                     .color = .green,
+                    .start_lock = lock,
                 });
                 send_projectile(.{
                     .from = b,
@@ -927,6 +930,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                     .glyph = glyph,
                     .speed = 0.2,
                     .color = .dark_green,
+                    .start_lock = lock,
                 });
             }
         },
@@ -939,6 +943,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                 .glyph = 'O',
                 .speed = base_speed,
                 .color = .white,
+                .start_lock = lock,
             });
             for (1..8) |i| {
                 const color: RenderBuffer.Color = switch (i) {
@@ -954,6 +959,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                     .glyph = '%',
                     .speed = n * base_speed / (n + j),
                     .color = color,
+                    .start_lock = lock,
                 });
             }
         },
@@ -1893,6 +1899,7 @@ pub fn send_projectile(opts: struct {
     glyph: u8 = 'o',
     color: RenderBuffer.Color = .black,
     speed: f32 = 1,
+    start_lock: animation.AnimationLock = .EMPTY,
 }) void {
     const ix = globals.particles.free_id() catch {
         std.log.err("no particle slots", .{});
@@ -1903,11 +1910,14 @@ pub fn send_projectile(opts: struct {
     it.color = opts.color;
     it.pending = true;
     const duration = opts.from.distance(opts.to) * 100 / opts.speed;
-    _ = globals.animation_queue.add(.{
+    var anim = globals.animation_queue.add(.{
         .duration = duration,
         .on_wake = .lambda(Particle.wake, .{it}),
         .on_finish = .lambda(Particle.release, .{it}),
-    }, animlib.linear_slide, .{ opts.from, opts.to, &it.pos }) catch {};
+    }, animlib.linear_slide, .{ opts.from, opts.to, &it.pos }) catch {
+        return;
+    };
+    anim.lock_until_start = opts.start_lock;
 }
 
 test {
