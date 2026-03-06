@@ -1010,7 +1010,7 @@ fn resolve_pending(rng: std.Random) void {
     for (globals.units[1..]) |*u| {
         switch (u.tag) {
             .PendingRubble => {
-                const terrain: Terrain = if (rng.boolean()) .debris else .rubble;
+                const terrain: Terrain = if (rng.float(f32) < 90) .debris else .rubble;
                 const pos = u.position;
                 unspawn(u);
                 _ = animate_terrain_to(pos, terrain).chain();
