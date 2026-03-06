@@ -588,13 +588,10 @@ pub fn spawn(u: Unit) !UnitId {
     globals.unit(id).* = u;
     sector.add(id, globals.unit(id));
 
-    std.log.info("spawn {}, {}", .{ u.tag, id });
     return id;
 }
 
 pub fn unspawn(u: *Unit) void {
-    std.log.info("unspawn {}", .{u.tag});
-
     const anim = u.deferred_set(.tag, .Nil);
     _ = anim.lock_exclusive(u.lock())
         .lock_exclusive(animlib.lock_rect(u.get_rect()));

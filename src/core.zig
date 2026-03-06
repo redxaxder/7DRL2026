@@ -300,7 +300,7 @@ pub const Interval = struct {
             interval.len > self.len or
             interval.origin + interval.len > self.origin + self.len)
         {
-            std.log.info("no! {} {}", .{ self, interval });
+            std.log.info("no slicing {} with {}", .{ self, interval });
             unreachable;
         }
 
@@ -460,6 +460,10 @@ pub const IRect = struct {
             .w = self.w + 2 * amount,
             .h = self.h + 2 * amount,
         };
+    }
+
+    pub fn from_sides(l: i16, t: i16, r: i16, b: i16) IRect {
+        return .{ .x = l, .y = t, .w = r - l, .h = b - t };
     }
 
     pub fn displace(self: IRect, displacement: IVec2) IRect {

@@ -78,7 +78,6 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
     lanes = @max(1, lanes);
     // std.log.info("4 lanes {}", .{lanes});
     lanes = @min(lanes, max_lanes);
-    std.log.info("max_lanes {} lanes {}", .{ max_lanes, lanes });
     const len = lanes * 4 + 1;
 
     const min_origin = interval.origin + @divFloor(interval.len - len, 3);
@@ -102,10 +101,41 @@ pub fn pick_road_interval(rect: IRect, rng: std.Random, orientation: core.Orient
 fn gen_industrial(rect: IRect, rng: std.Random) void {
     // fill with grass
     fill_terrain(rect, .grass);
+
     roll_interesting_terrain(rect, .Industrial, rng);
 
-    var buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
-    var perimeter = rect.perimeter(&buffer);
+    // gen small buildings
+    // approach: gen 2-3 disjoint intervals in the interior
+    // of the zone in each direction. Those are rects that we can use
+    const interior: IRect = rect.expand(-1);
+    std.log.info("interior {}", .{interior});
+    var subrects: [6]?IRect = .{null} ** 6;
+    const tries: usize = 6;
+    var i: usize = 0;
+    for (0..tries) |_| {
+        //generate a random rect in the interior
+        const l: i16 = rng.intRangeAtMost(i16, interior.x + 1, interior.x + interior.w - 1);
+        const t: i16 = rng.intRangeAtMost(i16, interior.y + 1, interior.y + interior.h - 1);
+        const r: i16 = rng.intRangeAtMost(i16, l + 1, interior.x + interior.w);
+        const b: i16 = rng.intRangeAtMost(i16, t + 1, interior.y + interior.h);
+        const candidate: IRect = IRect.from_sides(l, t, r, b);
+        if (candidate.w < 3 or candidate.h < 3) {
+            continue;
+        }
+        for (&subrects) |sr| {
+            if (sr) |s| {
+                if (candidate.intersects(s)) {
+                    break;
+                }
+            }
+        }
+        gen_small_building(candidate, rng);
+        subrects[i] = candidate;
+        i += 1;
+    }
+
+    var p_buffer: [1 << 12]?IVec2 = .{null} ** (1 << 12);
+    var perimeter = rect.perimeter(&p_buffer);
     var gap_size: u8 = 0;
     while (perimeter.next()) |pos| {
         if (gap_size == 0 and rng.float(f32) < 0.1) {
@@ -147,7 +177,7 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
     }
 }
 
-pub fn gen_residential_building(rect: IRect, rng: std.Random) void {
+pub fn gen_small_building(rect: IRect, rng: std.Random) void {
     // fill with floor
     fill_terrain(rect, .floor);
     roll_interesting_terrain(rect, .Residential, rng);
@@ -188,8 +218,8 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
     const first, const m, const second = rect.slice(orientation, slice_interval);
     _ = m;
 
-    gen_residential_building(first, rng);
-    gen_residential_building(second, rng);
+    gen_small_building(first, rng);
+    gen_small_building(second, rng);
 }
 
 const Option = enum {
@@ -245,7 +275,9 @@ pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
                 .Industrial => .grass,
             },
         };
-        set_terrain_at(pos, terrain);
+        if (get_terrain_at(pos) != .wall) {
+            set_terrain_at(pos, terrain);
+        }
     }
 }
 
