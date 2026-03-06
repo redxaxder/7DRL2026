@@ -584,6 +584,21 @@ pub const globals = struct {
         }
         return error.OutOfUnitSlots;
     }
+
+    pub fn reset() void {
+        units = .{Unit.DEFAULT} ** 5000;
+
+        combo_target = 0;
+        combo_count = 0;
+        turn = 0;
+        money = 1000;
+        focus = 0;
+
+        danger = 0;
+        animation_queue = undefined;
+        rng = undefined;
+        gamestate = .TitleScreen;
+    }
 };
 
 pub const PLAYER_ID: UnitId = 1;
@@ -606,6 +621,7 @@ pub fn unspawn(u: *Unit) void {
 }
 
 pub fn init(rng: std.Random) !void {
+    globals.reset();
     sector.init();
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
     globals.rng = rng;
@@ -1168,8 +1184,8 @@ fn do_splatter(rect: IRect, seed: u16, mode: enum { initial, followup }) void {
 
 pub fn trigger_victory() void {
     combat_log.log("You have finally put down the menace.", .{});
-    // TBD
-    //
+    combat_log.log("Press the R key to go back to the title screen.", .{});
+    globals.gamestate = .Victory;
 }
 
 fn units_cleanup(rng: std.Random) void {
@@ -1333,6 +1349,8 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
         const callback: Callback = .lambda(do_splatter, .{ splatter_zone, seed, .followup });
         _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
         combat_log.log("You have been killed.", .{});
+        combat_log.log("Press the R key to restart.", .{});
+        globals.gamestate = .Death;
     } else {
         harm(damage);
 

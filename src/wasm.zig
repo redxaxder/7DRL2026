@@ -69,6 +69,10 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
 
     render_buffer = RenderBuffer.init(allocator, @intCast(buffer_size)) catch return -1;
 
+    return game_init();
+}
+
+fn game_init() i32 {
     main.init(prng.random()) catch return -1;
 
     combat_log.storage = .init(&combat_log.buffer);
@@ -77,7 +81,6 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
     camera.x -= camera_w / 2;
     camera.y -= camera_h / 2;
     camera_target = camera;
-
     return 0;
 }
 
@@ -780,7 +783,14 @@ pub export fn frame(t: f64) void {
 
     RenderBuffer.clear();
     switch (main.globals.gamestate) {
-        .Death => {},
+        .Victory, .Death => {
+            if (keyboard.firstJustPressed()) |key| {
+                if (key == .KeyR) {
+                    _ = game_init();
+                }
+            }
+            draw_main_screen(t);
+        },
         .MainGame => {
             if (keyboard.firstJustPressed()) |key| {
                 main.logic_tick(key, prng.random());
@@ -794,7 +804,6 @@ pub export fn frame(t: f64) void {
             }
             draw_title_screen(t);
         },
-        .Victory => {},
     }
 }
 

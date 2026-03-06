@@ -48,7 +48,7 @@ v0.2 core features
   + gain inventory limit based on largest kaiju killed
 - ui
   + death
-  - title screen
+  + title screen
   + combat log
   - legend
   + inventory
@@ -110,9 +110,9 @@ v0.3 stretch
 - weapons
   - psychic
   - poison
-- zones
-  - residential
-  - industrial
++ zones
+  + residential
+  + industrial
 - flavorful map features
   - even more varieties of alternate motorcycles
   - trails of destruction
@@ -120,7 +120,7 @@ v0.3 stretch
   - potholes
   - fire hydrants
   - trees
-  - grass
+  + grass
   - downed aircraft
 - flavorful terrain stuff
   - broken glass
@@ -128,9 +128,9 @@ v0.3 stretch
     - brake sounds
   - scorch marks
   - burn marks
-  - blood
-  - corpses (terrain type: viscera)
-    - colliding with this terrain destroys it but makes you stop
+  + blood
+  + corpses (terrain type: viscera)
+    + colliding with this terrain destroys it but makes you stop
       - leaves streaks of red when this happens
 - enemy behavior
   - special attacks
@@ -139,3 +139,4 @@ v0.3 stretch
     - leap
 - consolidate orthogonal raycasting
 - crosswalks
+- make title screen nicer
