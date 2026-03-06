@@ -621,6 +621,7 @@ pub fn unspawn(u: *Unit) void {
 
 pub fn init(rng: std.Random) !void {
     globals.reset();
+    inventory.reset();
     sector.init();
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
     globals.rng = rng;

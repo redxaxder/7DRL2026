@@ -16,6 +16,15 @@ var cash: usize = 0;
 
 pub var next_item: Item = undefined;
 
+pub fn reset() void {
+    pending_pickups = 0;
+    inventory = .{Item.DEFAULT} ** INVENTORY_SIZE;
+    active_index = null;
+    item_count = 0;
+    item_capacity = 3;
+    cash = 0;
+}
+
 const BASE_WEAPON: Item = blk: {
     var it: Item = .tagged(ItemTag.Rifle);
     it.attrs.field(.gun_damage).* = 1;
