@@ -47,12 +47,10 @@ pub const animlib = struct {
         target.* = x0.scaled(1 - t).plus(x1.scaled(t));
     }
 
-    pub fn defer_set(comptime T: type) fn (T, *T, animation.Time) animation.Exit!void {
+    pub fn setval(comptime T: type) fn (*T, T) void {
         return struct {
-            pub fn call(val: T, ptr: *T, time: animation.Time) animation.Exit!void {
-                _ = time;
+            pub fn call(ptr: *T, val: T) void {
                 ptr.* = val;
-                return error.Exit;
             }
         }.call;
     }
@@ -409,7 +407,14 @@ pub const Unit = struct {
 
     pub fn deferred_set(self: *Unit, comptime field: Field, val: @TypeOf(@field(self.*, @tagName(field)))) *animation.Animation {
         const name = @tagName(field);
-        return globals.animation_queue.force_add(.{}, animlib.defer_set(@TypeOf(@field(self.*, name))), .{ val, &@field(self, name) });
+        return globals.animation_queue.force_add(
+            .{ .on_wake = .lambda(
+                animlib.setval(@TypeOf(@field(self.*, name))),
+                .{ &@field(self, name), val },
+            ) },
+            animation.noop,
+            .{},
+        );
     }
 
     pub fn lock(self: *const Unit) animation.LockData {
@@ -562,6 +567,7 @@ pub const globals = struct {
     pub var rng: std.Random = undefined;
     pub var gamestate: GameState = .TitleScreen;
     pub var psi: i64 = 0;
+    pub var particles: Particles = .{};
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];
@@ -598,6 +604,7 @@ pub const globals = struct {
         rng = undefined;
         gamestate = .TitleScreen;
         psi = 0;
+        particles = .{};
     }
 };
 
@@ -876,8 +883,89 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
 
 const SHOT_RANGE: usize = 64;
 
-pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
+pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
     const weapon = inventory.active_weapon() orelse return false;
+
+    switch (weapon.tag) {
+        .Rifle => {
+            const p = globals.player().position;
+            const d = aim.minus(p).principal_dir();
+            const glyph: u8 = switch (d.orientation()) {
+                .v => 0xB3, // │
+                .h => 0xC4, // ─
+            };
+            var starts = p.minus(d.ivec().scaled(4)).scan(d, 8);
+            while (starts.next()) |start| {
+                send_projectile(.{
+                    .from = start.float(),
+                    .to = aim.float(),
+                    .glyph = glyph,
+                    .speed = 70,
+                    .color = .red,
+                });
+            }
+        },
+        .Gamma_Beam => {
+            const p = globals.player().position;
+            const delta = aim.minus(p);
+            const d = delta.principal_dir();
+            const glyph: u8 = 'X';
+            var starts = p.scan(d, delta.max_norm() - 1);
+            while (starts.next()) |start| {
+                const a = start.float();
+                const b = start.plus(d.ivec()).float();
+                send_projectile(.{
+                    .from = a,
+                    .to = b,
+                    .glyph = glyph,
+                    .speed = 0.2,
+                    .color = .green,
+                });
+                send_projectile(.{
+                    .from = b,
+                    .to = a,
+                    .glyph = glyph,
+                    .speed = 0.2,
+                    .color = .dark_green,
+                });
+            }
+        },
+        .Rocket_Launcher => {
+            const p = globals.player().position;
+            const base_speed: f32 = 10;
+            send_projectile(.{
+                .from = p.float(),
+                .to = aim.float(),
+                .glyph = 'O',
+                .speed = base_speed,
+                .color = .white,
+            });
+            for (1..8) |i| {
+                const color: RenderBuffer.Color = switch (i) {
+                    1, 3 => .red,
+                    2, 4, 6 => .orange,
+                    else => .dark_gray,
+                };
+                const j: f32 = @floatFromInt(i);
+                const n: f32 = 9;
+                send_projectile(.{
+                    .from = p.float(),
+                    .to = aim.float(),
+                    .glyph = '%',
+                    .speed = n * base_speed / (n + j),
+                    .color = color,
+                });
+            }
+        },
+
+        else => {},
+    }
+
+    if (whiff) {
+        combat_log.log("You fire off into the distance.", .{});
+        globals.combo_count = 0;
+        return true;
+    }
 
     const tid: ?UnitId = if (target) |t| t.get_id() else null;
 
@@ -887,8 +975,6 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
     const combo_mul: f64 = std.math.pow(f64, 1.03, @floatFromInt(globals.combo_count));
     const combo_linear: f64 = @floatFromInt(globals.combo_count);
     const crit: f64 = @floatFromInt(crit_bonus());
-
-    // combat_log.log("You shoot the {s}.", .{terrain.name()});
 
     const terrain = map.get_terrain_at(aim);
     switch (weapon.tag) {
@@ -956,19 +1042,18 @@ pub fn handle_player_attack(dir: Dir4) bool {
             // you shoot at the terrain
             // consequences TBD
             globals.combo_count = 0;
-            return fire_weapon(aim, null);
+            return fire_weapon(aim, null, false);
         }
         var aim_occupants = get_occupants(aim);
         while (aim_occupants.next()) |occupant_id| {
             const unit = globals.unit(occupant_id);
             if (unit.tag == .Kaiju) {
-                return fire_weapon(aim, unit);
+                return fire_weapon(aim, unit, false);
             }
         }
     }
-    combat_log.log("You fire off into the distance.", .{});
-    globals.combo_count = 0;
-    return true;
+    const aim = globals.player().position.plus(dir.ivec().scaled(SHOT_RANGE));
+    return fire_weapon(aim, null, true);
 }
 
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
@@ -1324,10 +1409,7 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
     while (wall_iter.next()) |wall| {
         var boom_iter = wall.iter();
         while (boom_iter.next()) |boom_coord| {
-            if (map.get_terrain_at(boom_coord) == .wall) {
-                const terrain: Terrain = if (rng.boolean()) .rubble else .debris;
-                _ = animate_terrain_to(boom_coord, terrain).chain();
-            }
+            _ = destroy(boom_coord, rng);
         }
     }
 
@@ -1350,9 +1432,15 @@ fn destroy_wall(demolitionist: *const Unit, dir: Dir4, rng: std.Random) void {
 }
 fn harm(damage: i64) void {
     const player = globals.player();
+    combat_log.log("You are hit for {} damage.", .{damage});
+
     const safe = player.hp > 1;
     player.hp -= damage;
     if (safe) {
+        if (player.hp < 1) {
+            combat_log.log("You barely survive.", .{});
+        }
+
         player.hp = @max(player.hp, 1);
     }
 }
@@ -1763,6 +1851,63 @@ pub fn get_reticle_positions() ?[5]IVec2 {
     }
 
     return result;
+}
+
+pub const Particle = struct {
+    pending: bool = false,
+    active: bool = false,
+    pos: Vec2 = .ZERO,
+    color: RenderBuffer.Color = .black,
+    glyph: u8 = 'o',
+
+    pub fn release(self: *Particle) void {
+        self.pending = false;
+        self.active = false;
+    }
+
+    pub fn wake(self: *Particle) void {
+        self.active = true;
+    }
+};
+
+pub const Particles = struct {
+    data: [200]Particle = .{Particle{}} ** 200,
+
+    pub fn clear(self: *Particles) void {
+        self.* = .{};
+    }
+
+    pub fn free_id(self: *const Particles) !usize {
+        for (self.data, 0..) |it, ix| {
+            if (!it.pending) {
+                return ix;
+            }
+        }
+        return error.OutOfSlots;
+    }
+};
+
+pub fn send_projectile(opts: struct {
+    from: Vec2,
+    to: Vec2,
+    glyph: u8 = 'o',
+    color: RenderBuffer.Color = .black,
+    speed: f32 = 1,
+}) void {
+    const ix = globals.particles.free_id() catch {
+        std.log.err("no particle slots", .{});
+        return;
+    };
+    var it = &globals.particles.data[ix];
+    it.glyph = opts.glyph;
+    it.color = opts.color;
+    it.pending = true;
+    const duration = opts.from.distance(opts.to) * 100 / opts.speed;
+    _ = globals.animation_queue.add(.{
+        .duration = duration,
+        .on_wake = .lambda(Particle.wake, .{it}),
+        .on_finish = .lambda(Particle.release, .{it}),
+    }, animlib.linear_slide, .{ opts.from, opts.to, &it.pos }) catch {};
 }
 
 test {

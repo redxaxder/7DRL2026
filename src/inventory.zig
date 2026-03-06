@@ -62,7 +62,7 @@ const EXAMPLE_FOCUS: Item = blk: {
 
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
-    // inventory[1] = EXAMPLE_TRINKET;
+    // inventory[1] = EXAMPLE_ROCKET;
     // inventory[2] = EXAMPLE_ROCKET;
     roll_next_item(rng);
 }

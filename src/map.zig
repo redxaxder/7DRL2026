@@ -696,7 +696,7 @@ pub const Terrain = enum(u5) {
 
     pub fn blocks_shot(self: Terrain) bool {
         return switch (self) {
-            .wall, .door, .void_ => true,
+            .wall, .door, .void_, .window => true,
             else => false,
         };
     }

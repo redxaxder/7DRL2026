@@ -7,7 +7,7 @@ pub const Entry = struct {
     turn: i64,
 };
 
-pub var buffer: [20]Entry = undefined;
+pub var buffer: [30]Entry = undefined;
 pub var storage: RingBuffer(Entry) = undefined;
 var printBuffers: [2][8192]u8 = .{.{0} ** 8192} ** 2;
 var fbas: [2]std.heap.FixedBufferAllocator = .{ .init(&printBuffers[0]), .init(&printBuffers[1]) };

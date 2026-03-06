@@ -529,6 +529,9 @@ fn draw_log() void {
     RenderBuffer.clear_rect(r.expand(-SPRITE_SCALE / 2), .dark_gray);
     const interior = r.expand(-SPRITE_SCALE);
 
+    RenderBuffer.scissor(interior);
+    defer RenderBuffer.unscissor();
+
     var vshift: f32 = 0;
     var ix: i32 = @as(i32, @intCast(combat_log.storage.len())) - 1;
     while (ix >= 0) : (ix -= 1) {
@@ -649,6 +652,7 @@ fn draw_target_info() void {
     const text_x = @as(f32, @floatFromInt(target.size)) * SPRITE_SCALE + SPRITE_SCALE;
     cursor.y += SPRITE_SCALE;
     cursor.y += fmt_draw_text(.{ .x = text_x, .y = cursor.y }, "Hp: {}", opts, w, .{target.hp});
+    render_buffer.flush();
 }
 
 fn draw_gamefield(t: f64) void {
@@ -716,6 +720,13 @@ fn draw_gamefield(t: f64) void {
                 render_unit(u, origin, t);
             }
         }
+
+        // particles
+        for (main.globals.particles.data) |proj| {
+            if (!proj.active) continue;
+            const options: DrawOptions = .{ .origin = origin, .color = proj.color };
+            draw_world_glyph(proj.pos, proj.glyph, options);
+        }
     }
 
     // Draw movement preview reticles
@@ -766,7 +777,7 @@ pub fn draw_main_screen(t: f64) void {
 
     draw_target_info();
 
-    // render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
+    // render_debug(.{ .p = main.globals.projectile.pos });
     var weap: ?inventory.ItemTag = null;
     if (inventory.active_weapon()) |w| {
         weap = w.tag;

@@ -102,11 +102,19 @@ pub const Queue = struct {
             if (self.buffer.index(@intCast(ix))) |animation| {
                 animation.try_wake(lock, can_chain);
                 animation.tick(dt);
-                if (animation.state == .Finished) {
-                    can_chain = true;
-                } else {
-                    can_chain = false;
-                    lock.merge(animation.lock);
+                switch (animation.state) {
+                    .Finished => {
+                        can_chain = true;
+                    },
+                    .Active => {
+                        can_chain = false;
+                        lock.merge(animation.lock);
+                    },
+                    else => {
+                        can_chain = false;
+                        lock.merge(animation.lock);
+                        lock.merge(animation.lock_until_start);
+                    },
                 }
             }
         }
@@ -255,6 +263,8 @@ pub const Animation = struct {
     // If two animations have conflicting locks, the earlier one in the queue has to finish playing before
     // the later one starts.
     lock: AnimationLock = .EMPTY,
+    // This lock is immediately released when the animation starts
+    lock_until_start: AnimationLock = .EMPTY,
     func: Fn = .constant({}),
     on_wake: func.Callback = func.nil,
     on_finish: func.Callback = func.nil,

@@ -140,6 +140,12 @@ pub const Dir4 = enum {
         };
     }
 
+    pub fn orientation(self: Dir4) Orientation {
+        return switch (self) {
+            .Right, .Left => .h,
+            .Up, .Down => .v,
+        };
+    }
     pub fn turn(self: Dir4, rd: RelativeDir) Dir4 {
         const uself: u8 = @intFromEnum(self);
         const urd: u8 = @intFromEnum(rd);
