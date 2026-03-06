@@ -120,7 +120,7 @@ fn gen_industrial(rect: IRect, rng: std.Random) void {
         const r: i16 = rng.intRangeAtMost(i16, l + 1, interior.x + interior.w);
         const b: i16 = rng.intRangeAtMost(i16, t + 1, interior.y + interior.h);
         const candidate: IRect = IRect.from_sides(l, t, r, b);
-        if (candidate.w < 3 or candidate.h < 3) {
+        if (candidate.w < 4 or candidate.h < 4) {
             continue;
         }
         for (&subrects) |sr| {

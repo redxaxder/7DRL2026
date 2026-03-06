@@ -601,7 +601,7 @@ pub const globals = struct {
 
 pub const PLAYER_ID: UnitId = 1;
 pub const KMOM_ID: UnitId = 2;
-pub const PLAYER_START: IVec2 = .{ .x = 200, .y = 2300 };
+pub const PLAYER_START: IVec2 = .{ .x = 300, .y = 2200 };
 pub const KMOM_START: IVec2 = .{ .x = 2300, .y = 200 };
 
 pub fn spawn(u: Unit) !UnitId {
@@ -627,19 +627,27 @@ pub fn init(rng: std.Random) !void {
     const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
     map.new_mapgen(map_rect, .Residential, rng, 0, 25);
 
-    globals.units[PLAYER_ID] = .init_player(PLAYER_START);
-    sector.add(PLAYER_ID, globals.player());
-    {
-        var it = globals.player().get_rect().expand(3).iter();
-        while (it.next()) |pos| {
-            map.set_terrain_at(pos, .grass);
+    // start within a hundred units or so of PLAYER_START but only if on a road
+    const start_radius = 50;
+    const num_tries: usize = 1000;
+    var start: IVec2 = PLAYER_START;
+    for (0..num_tries) |_| {
+        const player_x = PLAYER_START.x + rng.intRangeAtMost(i16, -1 * start_radius, start_radius);
+        const player_y = PLAYER_START.y + rng.intRangeAtMost(i16, -1 * start_radius, start_radius);
+        const pos: IVec2 = .{ .x = player_x, .y = player_y };
+        const t: Terrain = map.get_terrain_at(pos);
+        if (t == .asphalt or t == .road_paint or t == .road_paint_2) {
+            start = pos;
+            break;
         }
     }
+    globals.units[PLAYER_ID] = .init_player(start);
+    sector.add(PLAYER_ID, globals.player());
     globals.units[KMOM_ID] = .init_kaiju(KMOM_START, MOTHER_KAIJU_SIZE);
     sector.add(KMOM_ID, globals.kmom());
     _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
 
-    const moto_id = try spawn(Unit.init_motorcycle(PLAYER_START, .Right, .Nova_Glide, 80));
+    const moto_id = try spawn(Unit.init_motorcycle(start, .Right, .Nova_Glide, 80));
     globals.player().mounted_on = moto_id;
 
     inventory.init(rng);
@@ -1230,12 +1238,10 @@ fn units_cleanup(rng: std.Random) void {
 
 fn roll_new_enemy(rng: std.Random) ?IRect {
     const player = globals.player();
-    const roll = {
-        const z = std.math.maxInt(u64);
-        for (0..3) |_| {
-            z = @min(z, rng.int(u64) % SPAWN_ROLL);
-        }
-    };
+    var roll: u64 = std.math.maxInt(u64);
+    for (0..3) |_| {
+        roll = @min(roll, rng.int(u64) % SPAWN_ROLL);
+    }
     if (roll > globals.danger) {
         return null;
     }
