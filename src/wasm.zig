@@ -654,6 +654,7 @@ fn draw_target_info() void {
     if (target.tag == .Nil) return;
     if (!target.alive) return;
 
+    indicate_unit(target);
     const w = interior.w;
     const opts = DrawOptions{ .origin = interior.pos() };
     var cursor: Vec2 = .ZERO;
@@ -791,18 +792,7 @@ pub fn draw_main_screen(t: f64) void {
         std.log.err("draw status err {}", .{e});
     };
 
-    const kmom = main.globals.kmom();
-    const kvec = kmom.get_rect().float().center()
-        .minus(camera.plus(Vec2.ONE.scaled(camera_w / 2)));
-    const norm = kvec.max_norm();
-    if (norm > 34) {
-        draw_indicator(kvec);
-    }
-
-    // draw_indicator(core.Dir4.Right.ivec().float());
-    // draw_indicator(core.Dir4.Left.ivec().float());
-    // draw_indicator(core.Dir4.Up.ivec().float());
-    // draw_indicator(core.Dir4.Down.ivec().float());
+    indicate_unit(main.globals.kmom());
 
     draw_inventory();
 
@@ -864,12 +854,24 @@ pub fn draw_title_screen(t: f64) void {
     render_buffer.flush();
 }
 
-pub fn draw_indicator(v: Vec2) void {
+pub fn indicate_unit(u: *const main.Unit) void {
+    if (u.tag != .Kaiju) {
+        return;
+    }
+    const uvec = u.get_rect().float().center()
+        .minus(camera.plus(Vec2.ONE.scaled(camera_w / 2)));
+    const norm = uvec.max_norm();
+    const glyph: u8 = "ABCDEFGHIJKLMNOPQRS"[u.size - main.MIN_KAIJU_SIZE];
+    if (norm > 30) {
+        draw_indicator(uvec, glyph);
+    }
+}
+
+pub fn draw_indicator(v: Vec2, glyph: u8) void {
     const r = ui.MAIN_VIEW.get("viewport").float().scaled(SPRITE_SCALE);
     const center = edge_point(r.expand(-SPRITE_SCALE * 2), v);
     const corner = center.minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
-    draw_glyph(corner, 'H', .{ .color = .red });
-    // draw_glyph(corner, 0x13, .{ .color = .red });
+    draw_glyph(corner, glyph, .{ .color = .red });
 }
 
 // Casts a ray from the center of `rect` in the given `dir`ection,
