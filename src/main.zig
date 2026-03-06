@@ -678,13 +678,18 @@ fn try_place_moto(rect: IRect, rng: std.Random) bool {
     return false;
 }
 
-fn handle_vending() void {
+fn handle_vending(rng: std.Random) bool {
     if (globals.money < 100) {
         combat_log.log("You don't have money for a drink.", .{});
     } else {
+        if (rng.float(f32) < 0.05) {
+            combat_log.log("The vending machine has run dry.", .{});
+            return false;
+        }
+
         combat_log.log("You put money in the vending machine.", .{});
-        const healing: i64 = globals.rng.intRangeAtMost(i64, 1, 6);
-        const phrase: u8 = globals.rng.intRangeAtMost(u8, 0, 3);
+        const healing: i64 = rng.intRangeAtMost(i64, 1, 6);
+        const phrase: u8 = rng.intRangeAtMost(u8, 0, 3);
         switch (phrase) {
             0 => combat_log.log("Ramune! You heal {} HP.", .{healing}),
             1 => combat_log.log("Executive Coffee! You heal {} HP.", .{healing}),
@@ -693,8 +698,10 @@ fn handle_vending() void {
             else => unreachable,
         }
         globals.player().hp += healing;
+
         globals.money -= 100;
     }
+    return true;
 }
 
 // dir is null when you turn is not an active move, you are maybe just coasting
@@ -798,8 +805,14 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                     .wall => combat_log.log("The wall rejects your advances.", .{}),
                     .void_ => combat_log.log("You're not done yet.", .{}),
                     .window => combat_log.log("The window is cold.", .{}),
-                    .vending_machine => handle_vending(),
-                    else => combat_log.log("Can't go there", .{}),
+                    .vending_machine => {
+                        const remaining = handle_vending(rng);
+                        if (!remaining) {
+                            // TODO: empty vending machine
+                            animate_terrain_to(target, .rubble);
+                        }
+                    },
+                    else => combat_log.log("You can't go there", .{}),
                 }
                 return false;
             }
