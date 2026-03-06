@@ -553,6 +553,8 @@ pub const ux = struct {
             if (key == .Escape) {
                 inventory.active_index = null;
             }
+        } else if (key == .Slash) {
+            globals.gamestate = .Help;
         } else if (pass) {
             return .pass;
         }
@@ -566,6 +568,7 @@ pub const GameState = enum {
     MainGame,
     Death,
     Victory,
+    Help,
 };
 
 pub const globals = struct {
