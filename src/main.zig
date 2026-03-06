@@ -656,11 +656,17 @@ fn try_place_moto(rect: IRect, rng: std.Random) bool {
     const t1 = map.get_terrain_at(pos);
     const t2 = map.get_terrain_at(pos2);
     if (t1.can_place_moto() and t2.can_place_moto()) {
+        const model = blk: {
+            const v = std.enums.values(Motorcycle);
+            const ix = rng.intRangeAtMost(usize, 1, v.len - 1);
+            break :blk v[ix];
+        };
+
         _ = spawn(
             .init_motorcycle(
                 pos,
                 face,
-                rng.enumValue(Motorcycle),
+                model,
                 rng.intRangeAtMost(i64, 20, 200),
             ),
         ) catch {
