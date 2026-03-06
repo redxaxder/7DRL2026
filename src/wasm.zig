@@ -82,9 +82,9 @@ pub export fn init(buffer_size: i32, screenW: f32, screenH: f32) i32 {
 }
 
 pub export fn resize(w: f32, h: f32) void {
-    // TODO
     screen_w = w;
     screen_h = h;
+    RenderBuffer.setTransform(w, h, 128 * SPRITE_SCALE, 72 * SPRITE_SCALE);
 }
 
 fn splat_wrap_string(x: f32, y: f32, text: []const u8, color: Color, size: f32, width: i16) usize {
@@ -574,6 +574,7 @@ fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, opt
 fn draw_inventory() void {
     const r: IRect = ui.MAIN_VIEW.get("inventory");
     const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
+    RenderBuffer.clear_rect(interior, .dark_gray);
     const w = interior.w;
 
     var cursor: Vec2 = .ZERO;

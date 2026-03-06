@@ -4,6 +4,26 @@ const Rect = @import("core.zig").Rect;
 
 const Self = @This();
 
+var xform_scale: f32 = 1.0;
+var xform_offset: Vec2 = .ZERO;
+
+pub fn setTransform(screen_w: f32, screen_h: f32, virtual_w: f32, virtual_h: f32) void {
+    xform_scale = @min(screen_w / virtual_w, screen_h / virtual_h);
+    xform_offset = .{
+        .x = (screen_w - virtual_w * xform_scale) / 2,
+        .y = (screen_h - virtual_h * xform_scale) / 2,
+    };
+}
+
+fn transformRect(r: Rect) Rect {
+    return .{
+        .x = r.x * xform_scale + xform_offset.x,
+        .y = r.y * xform_scale + xform_offset.y,
+        .w = r.w * xform_scale,
+        .h = r.h * xform_scale,
+    };
+}
+
 dest_pos: [*]Vec2,
 src_idx: [*]u8,
 color: [*]Color,
@@ -23,11 +43,13 @@ pub const clear = js.clear;
 pub const unscissor = js.unscissor;
 
 pub fn scissor(r: Rect) void {
-    js.scissor(r.x, r.y, r.w, r.h);
+    const t = transformRect(r);
+    js.scissor(t.x, t.y, t.w, t.h);
 }
 
 pub fn clear_rect(r: Rect, color: Color) void {
-    js.clearRect(r.x, r.y, r.w, r.h, @intFromEnum(color));
+    const t = transformRect(r);
+    js.clearRect(t.x, t.y, t.w, t.h, @intFromEnum(color));
 }
 
 pub const Color = enum(u8) {
@@ -78,7 +100,7 @@ pub fn push(self: *Self, sprite: Sprite) void {
         self.flush();
     }
     self.last_seen_size = sprite.size;
-    self.dest_pos[self.occupancy] = sprite.pos;
+    self.dest_pos[self.occupancy] = sprite.pos.scaled(xform_scale).plus(xform_offset);
     self.src_idx[self.occupancy] = sprite.src_idx;
     self.color[self.occupancy] = sprite.color;
     self.occupancy += 1;
@@ -89,6 +111,6 @@ pub fn flush(self: *Self) void {
     const srcPtr: i32 = @intCast(@intFromPtr(self.src_idx));
     const colorPtr: i32 = @intCast(@intFromPtr(@as([*]u8, @ptrCast(self.color))));
     const count: i32 = @intCast(self.occupancy);
-    js.draw(dstPtr, srcPtr, colorPtr, count, 8, 8, self.last_seen_size.x, self.last_seen_size.y);
+    js.draw(dstPtr, srcPtr, colorPtr, count, 8, 8, self.last_seen_size.x * xform_scale, self.last_seen_size.y * xform_scale);
     self.occupancy = 0;
 }

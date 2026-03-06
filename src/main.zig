@@ -811,7 +811,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                         const remaining = handle_vending(rng);
                         if (!remaining) {
                             // TODO: empty vending machine
-                            animate_terrain_to(target, .rubble);
+                            _ = animate_terrain_to(target, .rubble);
                         }
                     },
                     else => combat_log.log("You can't go there", .{}),
