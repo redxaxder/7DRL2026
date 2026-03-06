@@ -543,6 +543,13 @@ pub const ux = struct {
     }
 };
 
+pub const GameState = enum {
+    TitleScreen,
+    MainGame,
+    Death,
+    Victory,
+};
+
 pub const globals = struct {
     pub var units: [5000]Unit = .{Unit.DEFAULT} ** 5000;
 
@@ -555,6 +562,7 @@ pub const globals = struct {
     pub var danger: u64 = 0;
     pub var animation_queue: animation.Queue = undefined;
     pub var rng: std.Random = undefined;
+    pub var gamestate: GameState = .TitleScreen;
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];

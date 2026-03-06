@@ -734,23 +734,7 @@ fn draw_gamefield(t: f64) void {
     render_buffer.flush();
 }
 
-pub export fn frame(t: f64) void {
-    const rawdt = t - prev_time;
-    const dt: f32 = @floatCast(@min(20, rawdt));
-    prev_time = t;
-
-    audio.tick(dt);
-    main.globals.animation_queue.tick(dt);
-    keyboard.globals.update();
-    mouse.globals.update();
-
-    RenderBuffer.clear();
-
-    if (keyboard.firstJustPressed()) |key| {
-        main.logic_tick(key, prng.random());
-        update_camera();
-    }
-
+pub fn draw_main_screen(t: f64) void {
     draw_gamefield(t);
     draw_status() catch |e| {
         std.log.err("draw status err {}", .{e});
@@ -781,6 +765,45 @@ pub export fn frame(t: f64) void {
 
     draw_log();
 
+    render_buffer.flush();
+}
+
+pub export fn frame(t: f64) void {
+    const rawdt = t - prev_time;
+    const dt: f32 = @floatCast(@min(20, rawdt));
+    prev_time = t;
+
+    audio.tick(dt);
+    keyboard.globals.update();
+    mouse.globals.update();
+    main.globals.animation_queue.tick(dt);
+
+    RenderBuffer.clear();
+    switch (main.globals.gamestate) {
+        .Death => {},
+        .MainGame => {
+            if (keyboard.firstJustPressed()) |key| {
+                main.logic_tick(key, prng.random());
+                update_camera();
+            }
+            draw_main_screen(t);
+        },
+        .TitleScreen => {
+            if (keyboard.firstJustPressed()) |_| {
+                main.globals.gamestate = .MainGame;
+            }
+            draw_title_screen(t);
+        },
+        .Victory => {},
+    }
+}
+
+pub fn draw_title_screen(t: f64) void {
+    _ = t;
+    const w: f32 = 1000;
+    var cursor: f32 = 20;
+    cursor += draw_text(.{ .x = 0, .y = cursor }, "THE STOMPING GROUNDS", .{ .color = .red }, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, "press the any key", .{ .color = .white }, w);
     render_buffer.flush();
 }
 
