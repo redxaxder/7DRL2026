@@ -797,6 +797,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 switch (terrain) {
                     .wall => combat_log.log("The wall rejects your advances.", .{}),
                     .void_ => combat_log.log("You're not done yet.", .{}),
+                    .window => combat_log.log("The window is cold.", .{}),
                     .vending_machine => handle_vending(),
                     else => combat_log.log("Can't go there", .{}),
                 }

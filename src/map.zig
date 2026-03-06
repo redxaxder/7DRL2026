@@ -421,11 +421,20 @@ const DrawInfo = struct {
     color: Color,
 };
 pub fn rendered_glyph(pos: IVec2) DrawInfo {
+    if (!BOUNDS.contains(pos)) {
+        return .{
+            .glyph = '%',
+            .color = .dark_gray,
+        };
+    }
     const payload: FullTerrain.Payload = get_render_terrain_payload_at(pos);
-    const terrain = if (payload.seen)
-        payload.terrain
-    else
-        .void_;
+    if (!payload.seen) {
+        return .{
+            .glyph = '/',
+            .color = .dark_blue,
+        };
+    }
+    const terrain = payload.terrain;
     const glyph = if (terrain == .wall) wall_glyph(pos) else terrain.glyph();
     return .{
         .glyph = glyph,
