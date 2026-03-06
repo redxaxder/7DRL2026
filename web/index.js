@@ -28,6 +28,7 @@ const colorTable = [
   [0.55, 0.10, 0.10, 1], // 18 dark_red
   [0.10, 0.15, 0.50, 1], // 19 dark_blue
   [0.10, 0.45, 0.10, 1], // 20 dark_green
+  [0.06, 0.06, 0.06, 1], // 20 shadow
 ];
 
 async function main() {

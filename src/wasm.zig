@@ -671,8 +671,28 @@ fn draw_gamefield(t: f64) void {
         .h = @intFromFloat(camera_h + 1),
     };
 
-    // Draw the terrain
+    // Draw threat indicators
+    {
+        var iter = sector.get_occupants_rect(seen_rect);
+        while (iter.next()) |uid| {
+            const u = main.globals.unit(uid);
+            if (u.tag == .Kaiju) {
+                const offset = u.render_position.minus(u.position.float());
+                for (u.threat()) |threat_rect| {
+                    var it = threat_rect.iter();
+                    while (it.next()) |pos| {
+                        draw_world_glyph(
+                            pos.float().plus(offset),
+                            0xDB,
+                            .{ .color = .shadow, .origin = origin },
+                        );
+                    }
+                }
+            }
+        }
+    }
 
+    // Draw the terrain
     var terrain_iter = seen_rect.iter();
     while (terrain_iter.next()) |world_pos| {
         const to_draw = map.rendered_glyph(world_pos);
@@ -837,7 +857,8 @@ pub fn draw_indicator(v: Vec2) void {
     const r = ui.MAIN_VIEW.get("viewport").float().scaled(SPRITE_SCALE);
     const center = edge_point(r.expand(-SPRITE_SCALE * 2), v);
     const corner = center.minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
-    draw_glyph(corner, 0x13, .{ .color = .red });
+    draw_glyph(corner, 'H', .{ .color = .red });
+    // draw_glyph(corner, 0x13, .{ .color = .red });
 }
 
 // Casts a ray from the center of `rect` in the given `dir`ection,

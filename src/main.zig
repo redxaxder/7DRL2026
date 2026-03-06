@@ -32,7 +32,7 @@ pub const MOTHER_KAIJU_SIZE = 10;
 pub const MIN_KAIJU_SIZE = 3;
 
 pub const FOV_RANGE = 40;
-const SPAWN_ROLL = 600000;
+const SPAWN_ROLL = 400000;
 
 const ANIMATION_QUEUE_LEN = 256;
 
@@ -477,6 +477,17 @@ pub const Unit = struct {
                 };
             },
         }
+    }
+
+    pub fn attack_range(self: *const Unit) i16 {
+        return self.size / 3;
+    }
+
+    pub fn threat(self: *const Unit) [2]core.IRect {
+        const r = self.get_rect();
+        const reach = self.attack_range();
+
+        return .{ r.expando(.v, reach), r.expando(.h, reach) };
     }
 
     pub fn handlepos(self: *const Unit) IVec2 {
@@ -1480,7 +1491,7 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
         const callback: Callback = .lambda(do_splatter, .{ splatter_zone, seed, .followup });
         _ = globals.animation_queue.force_add_empty(.{ .on_wake = callback, .chain = true });
         combat_log.log("You have been killed.", .{});
-        combat_log.log("Press the R key to restart.", .{});
+        combat_log.log("Press R to restart.", .{});
         globals.gamestate = .Death;
     } else {
         harm(damage);
@@ -1516,6 +1527,7 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
 
 const KaijuLook = struct {
     distance: i16 = 0,
+    position: IVec2 = .DEFAULT,
     unit: ?UnitId = null,
     terrain: ?Terrain = null,
 };
@@ -1528,6 +1540,7 @@ fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
             const terrain = map.get_terrain_at(pos);
             if (!terrain.kaiju_passable()) {
                 result.terrain = terrain;
+                result.position = pos;
                 return result;
             }
         }
@@ -1537,11 +1550,14 @@ fn kaiju_look(from: *const Unit, dir: Dir4, limit: i16) KaijuLook {
             switch (u.tag) {
                 .Kaiju, .Player => {
                     result.unit = uid;
+                    result.position = u.position;
                     return result;
                 },
                 .Motorcycle => {
                     if (uid == globals.player().mounted_on) {
                         result.unit = uid;
+                        const r = u.get_rect().intersection(edge);
+                        result.position = r.ivec();
                         return result;
                     }
                 },
@@ -1579,7 +1595,6 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
 
     // const dir: Dir4 = k.position.facing(globals.player().position);
     const seen = kaiju_look(k, dir, k.size);
-    const attack_range = k.size / 3;
     if (seen.terrain) |_| {
         if (seen.distance == 0) {
             destroy_wall(k, dir, rng);
@@ -1588,9 +1603,11 @@ fn kaiju_logic(k: *Unit, rng: std.Random) void {
     } else if (seen.unit) |u| {
         switch (globals.unit(u).tag) {
             .Player, .Motorcycle => {
-                if (seen.distance <= attack_range) {
-                    smack_player(dir, rng, k.hp);
-                    return;
+                for (k.threat()) |threat_rect| {
+                    if (threat_rect.contains(seen.position)) {
+                        smack_player(dir, rng, k.hp);
+                        return;
+                    }
                 }
             },
             else => {},

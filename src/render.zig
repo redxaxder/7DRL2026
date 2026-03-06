@@ -74,6 +74,7 @@ pub const Color = enum(u8) {
     dark_red = 18,
     dark_blue = 19,
     dark_green = 20,
+    shadow = 21,
 };
 
 pub const Sprite = struct {
