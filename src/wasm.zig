@@ -497,6 +497,16 @@ pub fn draw_status() !void {
         cursor.y += SPRITE_SCALE;
     }
 
+    if (inventory.has_psi()) {
+        cursor.y += fmt_draw_text(
+            cursor,
+            "Psi: {}",
+            opts,
+            w,
+            .{main.globals.psi},
+        );
+    }
+
     if (main.globals.combo_count > 0) {
         cursor.y += fmt_draw_text(
             cursor,
@@ -505,7 +515,6 @@ pub fn draw_status() !void {
             w,
             .{main.globals.combo_count},
         );
-        cursor.y += SPRITE_SCALE;
     }
 
     const bonuses = inventory.bonuses();
@@ -570,7 +579,7 @@ fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, str
                 full_name[strip_prefix.len..]
             else
                 full_name;
-            if (is_bonus) {
+            if (is_bonus or attr == .psi_reservoir) {
                 cursor.y += fmt_draw_text(cursor, "{s} +{}", opts, w, .{ display_name, val });
             } else {
                 if (extra != 0) {
@@ -615,8 +624,10 @@ fn draw_inventory() void {
         }
 
         const is_active = if (inventory.get_active_index()) |s| s == i else false;
+        const is_weapon = item.tag.is_weapon();
 
-        const color: Color = if (is_active) .green else .white;
+        const color: Color = if (is_active) .green else if (is_weapon) .white else Color.gray;
+
         const opts = DrawOptions{ .origin = interior.pos(), .color = color };
 
         const slot_number = (i + 1) % 10;
@@ -797,7 +808,7 @@ pub fn draw_main_screen(t: f64) void {
 
     draw_target_info();
 
-    // render_debug(.{ .p = main.globals.projectile.pos });
+    // render_debug(.{ .p = inventory.has_psi() });
     var weap: ?inventory.ItemTag = null;
     if (inventory.active_weapon()) |w| {
         weap = w.tag;

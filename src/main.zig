@@ -1040,17 +1040,14 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             combat_log.log("You fire a rocket.", .{});
         },
         .Psionic_Focus => {
-            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.psi_damage));
+            const base_damage: f64 = @floatFromInt(globals.psi);
             const radius: u8 = @intCast(weapon.attrs.effective_value(.psi_radius));
             const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
             const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
 
             const target_pos: IVec2 = ppos.plus(dir.scaled(SHOT_RANGE));
-            if (handle_psychic_damage(target_pos, radius, idamage)) {
-                combat_log.log("You unleash a psychic blast.", .{});
-            } else {
-                combat_log.log("You lash out with psychic energy, but feel no resonance.", .{});
-            }
+            globals.combo_count = 0;
+            handle_psychic_damage(target_pos, radius, idamage);
         },
         .Gamma_Beam => {
             const u = target orelse {
@@ -1073,14 +1070,13 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
     return true;
 }
 
-fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) bool {
+fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
     var cone = core.cone_iter(globals.player().position, target_pos, radius);
-    var i: UnitId = 0;
+    var i: usize = 0;
     var candidate_kaiju: [100]UnitId = .{0} ** 100;
     var resonance = false;
+
     while (cone.next()) |pos| {
-        // std.log.info("cone pos {}", .{pos});
-        map.set_terrain_at(pos, .money);
         var occupants = get_occupants(pos);
         while (occupants.next()) |id| {
             const unit = globals.unit(id);
@@ -1089,24 +1085,31 @@ fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) bool {
                 i += 1;
             }
         }
-        // dedup and do_damage
-        std.mem.sort(UnitId, &candidate_kaiju, {}, comptime std.sort.desc(UnitId));
-        var previous: UnitId = 0;
-        for (&candidate_kaiju) |k_id| {
-            resonance = true;
-            if (k_id == previous) {
-                continue;
-            }
-            if (k_id == 0) {
-                break;
-            }
-            previous = k_id;
-            const total_damage: i64 = damage + globals.psi;
-            combat_log.log("It takes {} psychic damage.", .{total_damage});
-            globals.units[k_id].damage(total_damage);
-        }
     }
-    return resonance;
+
+    // dedup and do_damage
+    std.mem.sort(UnitId, candidate_kaiju[0..i], {}, comptime std.sort.desc(UnitId));
+    var previous: UnitId = 0;
+    for (candidate_kaiju[0..i]) |k_id| {
+        if (k_id == previous) {
+            continue;
+        }
+        if (k_id == 0) {
+            break;
+        }
+        if (!resonance) {
+            combat_log.log("You unleash a psychic blast.", .{});
+            resonance = true;
+        }
+        previous = k_id;
+        resonance = true;
+        combat_log.log("The monster takes {} psychic damage.", .{damage});
+        globals.units[k_id].damage(damage);
+    }
+
+    if (!resonance) {
+        combat_log.log("You lash out with psychic energy, but feel no resonance.", .{});
+    }
 }
 
 pub fn handle_player_attack(dir: Dir4) bool {
@@ -1178,10 +1181,20 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         }
 
         units_cleanup(rng);
+        decay_psi();
 
         fov.refresh_fov(globals.player().position, FOV_RANGE);
         inventory.handle_pending_pickups(rng);
     }
+}
+
+fn decay_psi() void {
+    const psi: f64 = @floatFromInt(globals.psi);
+    const reservoir: f64 = @floatFromInt(inventory.bonuses().readfield(.psi_reservoir));
+    const base_decay = 0.95;
+    const effective_decay = std.math.pow(f64, base_decay, 1 / reservoir);
+    const result = psi * effective_decay;
+    globals.psi = @intFromFloat(@ceil(result));
 }
 
 pub fn crit_bonus() i64 {
@@ -1383,6 +1396,10 @@ fn units_cleanup(rng: std.Random) void {
                     if (u.size == MOTHER_KAIJU_SIZE) {
                         trigger_victory();
                     }
+                    if (u.hp < 0 and inventory.has_psi()) {
+                        globals.psi -= u.hp;
+                    }
+
                     const leveled_up = inventory.extend_item_capacity(u.size);
                     if (leveled_up) {
                         combat_log.log("You feel stronger after felling a powerful foe.", .{});
@@ -1567,6 +1584,8 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
                 if (terrain == .void_) {
                     break :outer;
                 }
+
+                destroyed = destroyed or destroy(pos, rng);
                 destroyed = destroyed or destroy(pos, rng);
             }
             flung += 1;

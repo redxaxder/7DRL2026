@@ -55,7 +55,7 @@ const EXAMPLE_ROCKET: Item = blk: {
 
 const EXAMPLE_FOCUS: Item = blk: {
     var it: Item = .tagged(ItemTag.Psionic_Focus);
-    it.attrs.field(.psi_damage).* = 1;
+    it.attrs.field(.psi_reservoir).* = 1;
     it.attrs.field(.psi_radius).* = 10;
     break :blk it;
 };
@@ -63,7 +63,7 @@ const EXAMPLE_FOCUS: Item = blk: {
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
     inventory[1] = EXAMPLE_FOCUS;
-    // inventory[2] = EXAMPLE_ROCKET;
+    inventory[2] = EXAMPLE_TRINKET;
     roll_next_item(rng);
 }
 
@@ -185,7 +185,7 @@ fn gun_stats(t: ItemTag) []const Attribute {
         .Rifle => ([_]Attribute{ .gun_damage, .accuracy })[0..],
         .Gamma_Beam => ([_]Attribute{.radiation_damage})[0..],
         .Rocket_Launcher => ([_]Attribute{ .explosion_damage, .explosion_radius })[0..],
-        .Psionic_Focus => ([_]Attribute{ .psi_damage, .psi_radius })[0..],
+        .Psionic_Focus => ([_]Attribute{ .psi_reservoir, .psi_radius })[0..],
         else => &.{},
     };
 }
@@ -199,7 +199,7 @@ fn trinket_stat(t: ItemTag) []const Attribute {
         .Pencil_Case => ([_]T{.acceleration})[0..],
         .Talisman => ([_]T{.armor})[0..],
         .Hachimaki => ([_]T{.accuracy})[0..],
-        .Juzu_Beads => ([_]T{.psi_damage})[0..],
+        .Juzu_Beads => ([_]T{.psi_reservoir})[0..],
         .Briefcase => ([_]T{.explosion_damage})[0..],
         .Odometer => ([_]T{.top_speed})[0..],
         .Hair_Clip => ([_]T{.radiation_damage})[0..],
@@ -283,7 +283,7 @@ pub const Attribute = enum {
     armor,
     top_speed,
     acceleration,
-    psi_damage,
+    psi_reservoir,
     psi_radius,
 
     const Config = struct { low: f32, high: f32, n: f32 };
@@ -309,7 +309,7 @@ pub const Attribute = enum {
                 .high = 10,
                 .n = 3,
             },
-            .psi_damage => .{
+            .psi_reservoir => .{
                 .low = 5,
                 .high = 30,
                 .n = 5,
@@ -418,6 +418,9 @@ pub fn bonuses() Attributes {
         if (item.tag.is_trinket()) {
             accum.pluseq(&item.attrs);
         }
+        if (item.tag == .Psionic_Focus) {
+            accum.field(.psi_reservoir).* += item.attrs.readfield(.psi_reservoir);
+        }
     }
     return accum;
 }
@@ -455,4 +458,8 @@ fn inventory_first_free() ?usize {
         }
     }
     return null;
+}
+
+pub fn has_psi() bool {
+    return bonuses().effective_value(.psi_reservoir) > 0;
 }
