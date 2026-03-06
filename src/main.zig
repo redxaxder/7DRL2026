@@ -529,7 +529,7 @@ pub const ux = struct {
                 globals.animation_queue.hurry(3);
                 return null;
             },
-            .Space, .Period, .Escape, .NumpadDecimal => true,
+            .Space, .Period, .NumpadDecimal => true,
             else => false,
         };
 
@@ -537,7 +537,7 @@ pub const ux = struct {
             if (number) |slot| {
                 inventory.overwrite_slot(rng, (slot + 9) % 10);
             }
-            if (pass) {
+            if (pass or key == .Escape) {
                 inventory.discard_pending(rng);
             }
         } else if (dir) |d| {
@@ -549,6 +549,10 @@ pub const ux = struct {
             }
         } else if (number) |weapon_id| {
             inventory.toggle_weapon(weapon_id);
+        } else if (inventory.active_weapon()) |_| {
+            if (key == .Escape) {
+                inventory.active_index = null;
+            }
         } else if (pass) {
             return .pass;
         }

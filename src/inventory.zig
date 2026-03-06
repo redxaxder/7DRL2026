@@ -10,7 +10,7 @@ const INVENTORY_SIZE: usize = 10;
 
 var pending_pickups: usize = 0;
 pub var inventory: [INVENTORY_SIZE]Item = .{Item.DEFAULT} ** INVENTORY_SIZE;
-var active_index: ?usize = null;
+pub var active_index: ?usize = null;
 var item_count: usize = 0;
 pub var item_capacity: usize = 3;
 var cash: usize = 0;
