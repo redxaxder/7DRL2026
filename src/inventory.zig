@@ -53,6 +53,13 @@ const EXAMPLE_ROCKET: Item = blk: {
     break :blk it;
 };
 
+const EXAMPLE_FOCUS: Item = blk: {
+    var it: Item = .tagged(ItemTag.Psionic_Focus);
+    it.attrs.field(.psi_damage).* = 1;
+    it.attrs.field(.psi_rasius).* = 10;
+    break :blk it;
+};
+
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
     // inventory[1] = EXAMPLE_TRINKET;
@@ -178,6 +185,7 @@ fn gun_stats(t: ItemTag) []const Attribute {
         .Rifle => ([_]Attribute{ .gun_damage, .accuracy })[0..],
         .Gamma_Beam => ([_]Attribute{.radiation_damage})[0..],
         .Rocket_Launcher => ([_]Attribute{ .explosion_damage, .explosion_radius })[0..],
+        .Psionic_Focus => ([_]Attribute{ .psi_damage, .psi_radius })[0..],
         else => &.{},
     };
 }
@@ -191,9 +199,10 @@ fn trinket_stat(t: ItemTag) []const Attribute {
         .Pencil_Case => ([_]T{.acceleration})[0..],
         .Talisman => ([_]T{.armor})[0..],
         .Hachimaki => ([_]T{.accuracy})[0..],
-        .Juzu_Beads => ([_]T{.radiation_damage})[0..],
+        .Juzu_Beads => ([_]T{.psi_damage})[0..],
         .Briefcase => ([_]T{.explosion_damage})[0..],
         .Odometer => ([_]T{.top_speed})[0..],
+        .Hair_Clip => ([_]T{.radiation_damage})[0..],
         else => &.{},
     };
 }
@@ -211,7 +220,7 @@ pub const ItemTag = enum {
     Juzu_Beads,
     // Amulet,
     Briefcase,
-    // Hair_Clip,
+    Hair_Clip,
     // Credit_Card,
     // Stamp_Seal,
     Odometer,
@@ -220,6 +229,7 @@ pub const ItemTag = enum {
     Rifle,
     Rocket_Launcher,
     Gamma_Beam,
+    Psionic_Focus,
 
     pub fn is_trinket(self: ItemTag) bool {
         return !self.is_weapon();
@@ -227,7 +237,7 @@ pub const ItemTag = enum {
 
     pub fn is_weapon(self: ItemTag) bool {
         return switch (self) {
-            .Rifle, .Rocket_Launcher, .Gamma_Beam => true,
+            .Rifle, .Rocket_Launcher, .Gamma_Beam, .Psionic_Focus => true,
             else => false,
         };
     }
@@ -272,6 +282,8 @@ pub const Attribute = enum {
     armor,
     top_speed,
     acceleration,
+    psi_damage,
+    psi_radius,
 
     const Config = struct { low: f32, high: f32, n: f32 };
     pub fn config(self: Attribute) Config {
@@ -290,6 +302,16 @@ pub const Attribute = enum {
                 .low = 5,
                 .high = 90,
                 .n = 9,
+            },
+            .psi_radius => .{
+                .low = 5,
+                .high = 10,
+                .n = 3,
+            },
+            .psi_damage => .{
+                .low = 5,
+                .high = 30,
+                .n = 5,
             },
             .gun_damage => .{
                 .low = 1,

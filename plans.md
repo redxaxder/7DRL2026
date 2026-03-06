@@ -109,6 +109,13 @@ v0.3 stretch
 - mouse hover for info
 - weapons
   - psychic
+    - accumulate PSI from overkilling enemies
+    - PSI decays at 1% per turn
+    - psychic attacks hit everything in a large area
+    + psionic focus
+    - surfaced to the player next to precision
+      - only if the player has a psionic focus
+    - psi decay stat
   - poison
 + zones
   + residential

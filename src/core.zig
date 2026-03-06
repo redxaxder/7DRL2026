@@ -628,6 +628,8 @@ pub const IRect = struct {
     }
 };
 
+// pub fn cone_iter(point: IVec2, base_center: IVec2, )
+
 pub const Rect = struct {
     x: f32 = 0,
     y: f32 = 0,

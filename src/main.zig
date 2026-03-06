@@ -561,6 +561,7 @@ pub const globals = struct {
     pub var animation_queue: animation.Queue = undefined;
     pub var rng: std.Random = undefined;
     pub var gamestate: GameState = .TitleScreen;
+    pub var psi: i64 = 0;
 
     pub fn unit(u: UnitId) *Unit {
         return &units[@intCast(u)];
@@ -596,6 +597,7 @@ pub const globals = struct {
         animation_queue = undefined;
         rng = undefined;
         gamestate = .TitleScreen;
+        psi = 0;
     }
 };
 
@@ -914,6 +916,16 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit) bool {
                 return true;
             };
             combat_log.log("You fire a rocket.", .{});
+        },
+        .Psionic_Focus => {
+            // const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.psionic_damage));
+            // const radius: u8 = @intCast(weapon.attrs.effective_value(.explosion_radius));
+            // const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
+            if (target) |_| {
+                combat_log.log("You concentrate a psycic blast at the beast.", .{});
+            } else {
+                combat_log.log("You concentrate a psycic blast at the {s}.", .{terrain.name()});
+            }
         },
         .Gamma_Beam => {
             const u = target orelse {
