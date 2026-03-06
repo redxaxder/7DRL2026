@@ -5,6 +5,7 @@ const IRect = core.IRect;
 const Interval = core.Interval;
 const UnitType = @import("main.zig").UnitType;
 const Color = @import("render.zig").Color;
+const stamp_floorplan = @import("floorplan.zig").stamp_floorplan;
 
 const Zone = enum {
     Residential,
@@ -178,6 +179,9 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
 }
 
 pub fn gen_small_building(rect: IRect, rng: std.Random) void {
+    if (stamp_floorplan(rect, rng)) {
+        return;
+    }
     // fill with floor
     fill_terrain(rect, .floor);
     roll_interesting_terrain(rect, .Residential, rng);
@@ -200,9 +204,25 @@ pub fn gen_small_building(rect: IRect, rng: std.Random) void {
     }
 }
 
+fn is_residential_size(rect: IRect) bool {
+    return rect.w <= 12 and rect.h <= 12;
+}
+
+fn assert(comptime s: []const u8, b: bool) void {
+    if (!b) {
+        std.log.err(s, .{});
+        unreachable;
+    }
+}
+
 fn gen_residential(rect: IRect, rng: std.Random) void {
     // fill with sidewalk
     fill_terrain(rect, .sidewalk);
+
+    if (is_residential_size(rect)) {
+        gen_small_building(rect, rng);
+        return;
+    }
 
     // split rect on height
     const orientation: core.Orientation = if (rect.h > rect.w) .h else .v;
@@ -211,15 +231,20 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
         .h => iy,
         .v => ix,
     };
-    const min_origin = interval.origin + @divFloor(interval.len - 2, 3);
-    const max_origin = interval.origin + @divFloor(2 * (interval.len - 2), 3);
+    const MIN_LEFTOVER = 4;
+    const min_flat = MIN_LEFTOVER;
+    const max_flat = interval.len - 2 - MIN_LEFTOVER;
+    const min_origin = interval.origin + @max(@divFloor(interval.len - 2, 3), min_flat);
+    const max_origin = interval.origin + @min(@divFloor(2 * (interval.len - 2), 3), max_flat);
+    std.log.err("rect {}", .{rect});
+    assert("no slicey", min_origin < max_origin);
+
     const origin = rng.intRangeAtMost(i16, min_origin, max_origin);
     const slice_interval: Interval = .{ .origin = origin, .len = 2 };
-    const first, const m, const second = rect.slice(orientation, slice_interval);
-    _ = m;
-
-    gen_small_building(first, rng);
-    gen_small_building(second, rng);
+    const sliced = rect.slice(orientation, slice_interval);
+    for ([2]usize{ 0, 2 }) |i| {
+        gen_residential(sliced[i], rng);
+    }
 }
 
 fn prob_table(entries: []const f32, comptime size: usize) [size]f32 {
@@ -407,7 +432,7 @@ pub fn pave_road(rect: IRect, orientation: core.Orientation, rng: std.Random) vo
         switch (kind) {
             '0' => fill_terrain(to_pave, .asphalt),
             '1' => fill_sidewalk(to_pave, rng),
-            '2' => fill_terrain(to_pave, .road_paint),
+            '2' => fill_terrain(to_pave, .road_paint_2),
             '3' => fill_hatched(to_pave, .road_paint, .asphalt),
             else => {
                 std.log.err("jank kind", .{});
@@ -542,6 +567,7 @@ pub const Terrain = enum(u5) {
     money,
     sidewalk,
     road_paint,
+    road_paint_2,
     grass,
     vending_machine,
     window,
@@ -569,6 +595,7 @@ pub const Terrain = enum(u5) {
             .window => .cyan,
             .grass => .green,
             .road_paint => .yellow,
+            .road_paint_2 => .gray,
             .trinket => .yellow,
             .vending_machine => .teal,
             .sidewalk => .gray,
@@ -595,6 +622,7 @@ pub const Terrain = enum(u5) {
             .trinket => return 0x0F,
             .sidewalk => return 0xB0,
             .road_paint => return 0xB0,
+            .road_paint_2 => return 0xB1,
             .grass => return ',',
             .vending_machine => return 0xF0,
             else => return '/',
@@ -654,6 +682,13 @@ pub const Terrain = enum(u5) {
     pub fn blocks_fov(self: Terrain) bool {
         return switch (self) {
             .void_, .wall, .door => true,
+            else => false,
+        };
+    }
+
+    pub fn restricted(self: Terrain) bool {
+        return switch (self) {
+            .wall, .door, .window, .vending_machine => true,
             else => false,
         };
     }
