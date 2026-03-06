@@ -411,6 +411,10 @@ pub const IRect = struct {
         return .{ .rect = self };
     }
 
+    pub fn sample(self: IRect, rng: std.Random) IVec2 {
+        return .{ .x = rng.intRangeAtMost(i16, self.x, self.x + self.w - 1), .y = rng.intRangeAtMost(i16, self.y, self.y + self.h - 1) };
+    }
+
     pub fn corners(self: IRect) [4]IVec2 {
         return .{
             .{ .x = self.x, .y = self.y },

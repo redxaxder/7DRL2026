@@ -222,16 +222,6 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
     gen_small_building(second, rng);
 }
 
-const Option = enum {
-    Item,
-    Rubble,
-    Debris,
-    Money,
-    Vending,
-    Wall,
-    Ground,
-};
-
 fn prob_table(entries: []const f32, comptime size: usize) [size]f32 {
     var sum: f32 = 0;
     var result: [size]f32 = .{0} ** size;
@@ -244,39 +234,72 @@ fn prob_table(entries: []const f32, comptime size: usize) [size]f32 {
 }
 
 pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
-    const options: [7]Option = .{
-        .Item,
-        .Rubble,
-        .Debris,
-        .Money,
-        .Vending,
-        .Wall,
-        .Ground,
+    const Option = enum {
+        Item,
+        Rubble,
+        Debris,
+        Money,
+        Wall,
     };
-    const roll_table: [6]f32 = switch (zone) {
-        .Residential => .{ 0.03, 0.02, 0.05, 0.1, 0, 0 },
-        .Commercial => .{ 0.0025, 0.005, 0.0075, 0.005, 0.001, 0.0015 },
-        .Industrial => .{ 0, 0.004, 0.010, 0, 0, 0.002 },
+    const amount_table: [5]i8 = switch (zone) {
+        .Residential => .{ 3, 2, 5, 5, 0 },
+        .Commercial => .{ 5, 5, 10, 10, 5 },
+        .Industrial => .{ 0, 10, 20, 0, 5 },
     };
-    const probs: [7]f32 = prob_table(&roll_table, 7);
-    var iter = rect.iter();
-    while (iter.next()) |pos| {
-        const thing: Option = options[rng.weightedIndex(f32, &probs)];
-        const terrain: Terrain = switch (thing) {
-            .Item => .trinket,
-            .Rubble => .rubble,
-            .Debris => .debris,
-            .Money => .money,
-            .Wall => .wall,
-            .Vending => .vending_machine,
-            .Ground => switch (zone) {
-                .Residential => .floor,
-                .Commercial => .floor,
-                .Industrial => .grass,
-            },
-        };
-        if (get_terrain_at(pos) != .wall) {
-            set_terrain_at(pos, terrain);
+    var n_items: i8 = if (amount_table[0] > 0) rng.intRangeAtMost(i8, 0, amount_table[0]) else 0;
+    var n_rubble: i8 = if (amount_table[1] > 0) rng.intRangeAtMost(i8, 0, amount_table[1]) else 0;
+    var n_debris: i8 = if (amount_table[2] > 0) rng.intRangeAtMost(i8, 0, amount_table[2]) else 0;
+    var n_money: i8 = if (amount_table[3] > 0) rng.intRangeAtMost(i8, 0, amount_table[3]) else 0;
+    var n_wall: i8 = if (amount_table[4] > 0) rng.intRangeAtMost(i8, 0, amount_table[4]) else 0;
+
+    const ground: Terrain = switch (zone) {
+        .Industrial => .grass,
+        else => .floor,
+    };
+
+    const tries: usize = 100;
+    for (0..tries) |_| {
+        const pos: IVec2 = rect.sample(rng);
+        if (get_terrain_at(pos) == ground) {
+            const option: Option = rng.enumValue(Option);
+            var t: Terrain = undefined;
+            switch (option) {
+                .Item => {
+                    t = .trinket;
+                    n_items -= 1;
+                    if (n_items >= 0) {
+                        set_terrain_at(pos, t);
+                    }
+                },
+                .Rubble => {
+                    t = .rubble;
+                    n_rubble -= 1;
+                    if (n_rubble >= 0) {
+                        set_terrain_at(pos, t);
+                    }
+                },
+                .Debris => {
+                    t = .debris;
+                    n_debris -= 1;
+                    if (n_debris >= 0) {
+                        set_terrain_at(pos, t);
+                    }
+                },
+                .Money => {
+                    t = .money;
+                    n_money -= 1;
+                    if (n_money >= 0) {
+                        set_terrain_at(pos, t);
+                    }
+                },
+                .Wall => {
+                    t = .wall;
+                    n_wall -= 1;
+                    if (n_wall >= 0) {
+                        set_terrain_at(pos, t);
+                    }
+                },
+            }
         }
     }
 }

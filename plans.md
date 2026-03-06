@@ -60,7 +60,7 @@ v0.2 core features
   + select weapon
   + indicate selected weapon
   + projectile indicator
-- trinkets
++ trinkets
   + damage bonuses
   + motorcycle bonuses
   + crit clocks
@@ -76,28 +76,28 @@ v0.2 core features
   + motorcycle
   + radioactive
   + explosive
-- mapgen:
-  - varying street sizes
-    - alleys
-  - zones
++ mapgen:
+  + varying street sizes
+    + alleys
+  + zones
     + multiple zones of the same type can abut in a not grid-aligned way
-    - commercial
-    - nest
-  - mechanical map features
-    - vending machines
+    + commercial
+    X nest
+  + mechanical map features
+    + vending machines
     + items
-    - money
-    - alternate motorcycles
-  - terrain types
-    - glass wall/door
-    - painted asphalt (road stripes)
-    - sidewalks
-- more sizes/kinds of kaiju
-  - kauji density map
+    + money
+    + alternate motorcycles
+  + terrain types
+    + glass wall/door
+    + painted asphalt (road stripes)
+    + sidewalks
++ more sizes/kinds of kaiju
+  + kauji density map
   + big mama kaiju
-  - kaiju spawn limit
+  + kaiju spawn limit
 + ability to win
-- falling obstacles
++ falling obstacles
   + warnings
   - animation
 v0.3 stretch
