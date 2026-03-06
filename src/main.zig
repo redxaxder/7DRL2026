@@ -338,7 +338,9 @@ pub const Unit = struct {
                 const tt = map.get_terrain_at(p);
                 if (tt.halting()) {
                     halt = true;
-                    combat_log.log("You drive through the {s}.", .{tt.name()});
+                    if (self.tag == .Player and globals.player().mounted()) {
+                        combat_log.log("You drive through the {s}.", .{tt.name()});
+                    }
                     _ = animate_terrain_to(p, .floor).chain();
                 }
                 if (self.tag == .Player) {
