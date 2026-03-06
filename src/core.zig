@@ -647,67 +647,45 @@ pub const IRect = struct {
 };
 
 pub fn cone_iter(apex: IVec2, base: IVec2, base_radius: i16) ConeIter {
-    // approach
-    // have a big ol' rect centered at the player and going past the base_center by base_radius.
-    // better too big than too small, iterating is fast.
-    // iterate over that rect, continuing for any space not in the cone
-    const a: Vec2 = apex.float();
-    const b: Vec2 = base.float();
-    const r: f32 = @floatFromInt(base_radius);
-    const v: Vec2 = b.minus(a);
-    const l: f32 = v.euclidean_norm();
-    const v_perp: Vec2 = v.perp();
-    const p1_: Vec2 = v_perp.scaled(r / l);
-    const p2_: Vec2 = p1_.scaled(-1);
-    const p1: Vec2 = p1_.plus(a).plus(v);
-    const p2: Vec2 = p2_.plus(a).plus(v);
-    std.log.info("a {}, b {}, r {}, v {}, l {}, v_perp {}, p1 {}, p2 {}", .{ a, b, r, v, l, v_perp, p1, p2 });
-
-    const rect_l: i16 = @as(i16, @intFromFloat(@min((p1.x), (@min(p2.x, a.x)))));
-    const rect_t: i16 = @as(i16, @intFromFloat(@min((p1.y), (@min(p2.y, a.y)))));
-    const rect_r: i16 = @as(i16, @intFromFloat(@max((p1.x), (@max(p2.x, a.x)))));
-    const rect_b: i16 = @as(i16, @intFromFloat(@max((p1.y), (@max(p2.y, a.y)))));
-    const rect: IRect = IRect.from_sides(rect_l, rect_t, rect_r, rect_b);
-    return .{ .p1 = p1, .p2 = p2, .p3 = a, .rect_iter = rect.iter() };
+    const dir = apex.facing(base);
+    const l = dir.turn(.Left);
+    const r = dir.turn(.Right);
+    const left = base.plus(l.ivec().scaled(base_radius));
+    const right = base.plus(r.ivec().scaled(base_radius));
+    const points: [3]IVec2 = .{ apex, left, right };
+    const rect = IRect.bounding_box(&points);
+    return .{ .apex = apex, .left = left, .right = right, .rect_iter = rect.iter() };
 }
 
 pub const ConeIter = struct {
-    p1: Vec2,
-    p2: Vec2,
-    p3: Vec2,
+    apex: IVec2,
+    left: IVec2,
+    right: IVec2,
     rect_iter: IRect.LocationIterator,
+
+    fn orient2di(p: IVec2, q: IVec2, r: IVec2) i32 {
+        const ax: i32 = @as(i32, q.x) - @as(i32, p.x);
+        const ay: i32 = @as(i32, q.y) - @as(i32, p.y);
+        const bx: i32 = @as(i32, r.x) - @as(i32, p.x);
+        const by: i32 = @as(i32, r.y) - @as(i32, p.y);
+        return ay * bx - ax * by;
+    }
+
+    fn arc_contains(self: ConeIter, v: IVec2) bool {
+        const o1 = orient2di(self.apex, v, self.left);
+        const o2 = orient2di(self.apex, self.right, v);
+        return (o1 >= 0) and (o2 >= 0);
+    }
 
     pub fn next(self: *ConeIter) ?IVec2 {
         while (self.rect_iter.next()) |pos| {
-            if (is_in_triangle(pos.float(), self.p1, self.p2, self.p3)) {
+            if (self.arc_contains(pos)) {
                 return pos;
             }
         }
         return null;
     }
 };
-
-fn sign(p1: Vec2, p2: Vec2, p3: Vec2) f32 {
-    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
-}
-
-fn is_in_triangle(p: Vec2, a: Vec2, b: Vec2, c: Vec2) bool {
-    var d1: f32 = undefined;
-    var d2: f32 = undefined;
-    var d3: f32 = undefined;
-
-    var has_neg: bool = undefined;
-    var has_pos: bool = undefined;
-
-    d1 = sign(p, a, b);
-    d2 = sign(p, b, c);
-    d3 = sign(p, c, a);
-
-    has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0);
-    has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0);
-
-    return !(has_neg and has_pos);
-}
 
 pub const Rect = struct {
     x: f32 = 0,

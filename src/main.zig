@@ -902,15 +902,18 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
     const weapon = inventory.active_weapon() orelse return false;
 
     const lock: animation.AnimationLock = .{ .exclusive = globals.player().lock() };
+    const ppos = globals.player().position;
+    const delta = aim.minus(ppos);
+    const d = delta.principal_dir();
+    const dir = d.ivec();
+
     switch (weapon.tag) {
         .Rifle => {
-            const p = globals.player().position;
-            const d = aim.minus(p).principal_dir();
             const glyph: u8 = switch (d.orientation()) {
                 .v => 0xB3, // │
                 .h => 0xC4, // ─
             };
-            var starts = p.minus(d.ivec().scaled(4)).scan(d, 8);
+            var starts = ppos.minus(dir.scaled(4)).scan(d, 8);
             while (starts.next()) |start| {
                 send_projectile(.{
                     .from = start.float(),
@@ -923,14 +926,11 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             }
         },
         .Gamma_Beam => {
-            const p = globals.player().position;
-            const delta = aim.minus(p);
-            const d = delta.principal_dir();
             const glyph: u8 = 'X';
-            var starts = p.scan(d, delta.max_norm() - 1);
+            var starts = ppos.scan(d, delta.max_norm() - 1);
             while (starts.next()) |start| {
                 const a = start.float();
-                const b = start.plus(d.ivec()).float();
+                const b = start.plus(dir).float();
                 send_projectile(.{
                     .from = a,
                     .to = b,
@@ -950,10 +950,9 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             }
         },
         .Rocket_Launcher => {
-            const p = globals.player().position;
             const base_speed: f32 = 10;
             send_projectile(.{
-                .from = p.float(),
+                .from = ppos.float(),
                 .to = aim.float(),
                 .glyph = 'O',
                 .speed = base_speed,
@@ -969,7 +968,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                 const j: f32 = @floatFromInt(i);
                 const n: f32 = 9;
                 send_projectile(.{
-                    .from = p.float(),
+                    .from = ppos.float(),
                     .to = aim.float(),
                     .glyph = '%',
                     .speed = n * base_speed / (n + j),
@@ -978,11 +977,27 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
                 });
             }
         },
+        .Psionic_Focus => {
+            const anchor = ppos.plus(dir.scaled(SHOT_RANGE));
+            const radius = weapon.attrs.effective_value(.psi_radius);
+            const base = IRect.singleton(anchor).expando(d.orientation().flip(), radius);
+            var it = base.iter();
+            while (it.next()) |to| {
+                send_projectile(.{
+                    .from = ppos.float(),
+                    .to = to.float(),
+                    .glyph = 0x0F,
+                    .color = .purple,
+                    .start_lock = lock,
+                    .speed = globals.rng.float(f32) * 0.2 + 6,
+                });
+            }
+        },
 
         else => {},
     }
 
-    if (whiff) {
+    if (whiff and weapon.tag != .Psionic_Focus) {
         combat_log.log("You fire off into the distance.", .{});
         globals.combo_count = 0;
         return true;
@@ -1029,12 +1044,12 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             const radius: u8 = @intCast(weapon.attrs.effective_value(.psi_radius));
             const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
             const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
-            const target_pos: IVec2 = aim;
-            handle_psychic_damage(target_pos, radius, idamage);
-            if (target) |_| {
-                combat_log.log("You concentrate a psychic blast at the beast.", .{});
+
+            const target_pos: IVec2 = ppos.plus(dir.scaled(SHOT_RANGE));
+            if (handle_psychic_damage(target_pos, radius, idamage)) {
+                combat_log.log("You unleash a psychic blast.", .{});
             } else {
-                combat_log.log("You concentrate a psychic blast at the {s}.", .{terrain.name()});
+                combat_log.log("You lash out with psychic energy, but feel no resonance.", .{});
             }
         },
         .Gamma_Beam => {
@@ -1058,10 +1073,11 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
     return true;
 }
 
-fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
+fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) bool {
     var cone = core.cone_iter(globals.player().position, target_pos, radius);
     var i: UnitId = 0;
     var candidate_kaiju: [100]UnitId = .{0} ** 100;
+    var resonance = false;
     while (cone.next()) |pos| {
         // std.log.info("cone pos {}", .{pos});
         map.set_terrain_at(pos, .money);
@@ -1077,6 +1093,7 @@ fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
         std.mem.sort(UnitId, &candidate_kaiju, {}, comptime std.sort.desc(UnitId));
         var previous: UnitId = 0;
         for (&candidate_kaiju) |k_id| {
+            resonance = true;
             if (k_id == previous) {
                 continue;
             }
@@ -1089,6 +1106,7 @@ fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
             globals.units[k_id].damage(total_damage);
         }
     }
+    return resonance;
 }
 
 pub fn handle_player_attack(dir: Dir4) bool {

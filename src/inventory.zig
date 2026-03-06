@@ -247,6 +247,7 @@ pub const ItemTag = enum {
             .Rifle => "gun ",
             .Gamma_Beam => "radiation ",
             .Rocket_Launcher => "explosion ",
+            .Psionic_Focus => "psi ",
             else => "",
         };
     }
