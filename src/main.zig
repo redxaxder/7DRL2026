@@ -489,10 +489,10 @@ pub const ux = struct {
     pub const Action = union(enum) { move: struct { Dir4, bool }, attack: Dir4, pass: void };
     pub fn resolve_input(key: keyboard.Code, rng: std.Random) ?Action {
         const dir: ?Dir4 = switch (key) {
-            .KeyW, .ArrowUp => .Up,
-            .KeyA, .ArrowLeft => .Left,
-            .KeyS, .ArrowDown => .Down,
-            .KeyD, .ArrowRight => .Right,
+            .KeyW, .ArrowUp, .KeyK => .Up,
+            .KeyA, .ArrowLeft, .KeyH => .Left,
+            .KeyS, .ArrowDown, .KeyJ => .Down,
+            .KeyD, .ArrowRight, .KeyL => .Right,
             else => null,
         };
         const number: ?usize = switch (key) {
@@ -513,7 +513,7 @@ pub const ux = struct {
                 globals.animation_queue.hurry(3);
                 return null;
             },
-            .Space, .Period => true,
+            .Space, .Period, .Escape, .NumpadDecimal => true,
             else => false,
         };
 
