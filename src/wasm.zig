@@ -456,8 +456,9 @@ pub fn render_debug(val: anytype) void {
 }
 
 pub fn draw_status() !void {
-    const r: IRect = ui.MAIN_VIEW.get("status");
-    const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
+    const r: Rect = ui.MAIN_VIEW.get("status").float().scaled(SPRITE_SCALE);
+    RenderBuffer.clear_rect(r.expand(-SPRITE_SCALE / 2), .dark_gray);
+    const interior = r.expand(-SPRITE_SCALE);
     const w = interior.w;
 
     const player = main.globals.player();
@@ -520,22 +521,22 @@ pub fn draw_status() !void {
 }
 
 fn draw_log() void {
-    const bounds = ui.MAIN_VIEW.get("log").float().scaled(SPRITE_SCALE);
-    screen_offset = bounds.pos();
-    defer screen_offset = .ZERO;
+    const r: Rect = ui.MAIN_VIEW.get("log").float().scaled(SPRITE_SCALE);
+    RenderBuffer.clear_rect(r.expand(-SPRITE_SCALE / 2), .dark_gray);
+    const interior = r.expand(-SPRITE_SCALE);
 
     var vshift: f32 = 0;
     var ix: i32 = @as(i32, @intCast(combat_log.storage.len())) - 1;
     while (ix >= 0) : (ix -= 1) {
         const entry = combat_log.storage.index(ix) orelse continue;
         const options: DrawOptions = .{
-            .origin = bounds.pos(),
+            .origin = interior.pos(),
             .color = if (entry.turn + 1 >= main.globals.turn) .white else .gray,
         };
-        const h = draw_text(.{ .y = vshift, .x = 0 }, entry.text, options, bounds.w);
+        const h = draw_text(.{ .y = vshift, .x = 0 }, entry.text, options, interior.w - SPRITE_SCALE);
         vshift += h;
         vshift += SPRITE_SCALE;
-        if (vshift >= bounds.h) break;
+        if (vshift >= interior.h) break;
     }
     render_buffer.flush();
 }
@@ -572,9 +573,9 @@ fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, opt
 }
 
 fn draw_inventory() void {
-    const r: IRect = ui.MAIN_VIEW.get("inventory");
-    const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
-    RenderBuffer.clear_rect(interior, .dark_gray);
+    const r: Rect = ui.MAIN_VIEW.get("inventory").float().scaled(SPRITE_SCALE);
+    RenderBuffer.clear_rect(r.expand(-SPRITE_SCALE / 2), .dark_gray);
+    const interior = r.expand(-SPRITE_SCALE);
     const w = interior.w;
 
     var cursor: Vec2 = .ZERO;
@@ -621,13 +622,15 @@ fn draw_inventory() void {
 }
 
 fn draw_target_info() void {
+    const r: Rect = ui.MAIN_VIEW.get("unitinfo").float().scaled(SPRITE_SCALE);
+    RenderBuffer.clear_rect(r.expand(-SPRITE_SCALE / 2), .dark_gray);
+    const interior = r.expand(-SPRITE_SCALE);
+
     const target_id = main.globals.focus;
     const target = main.globals.unit(target_id);
     if (target.tag == .Nil) return;
     if (!target.alive) return;
 
-    const r: IRect = ui.MAIN_VIEW.get("unitinfo");
-    const interior = r.expand(-1).float().scaled(SPRITE_SCALE);
     const w = interior.w;
     const opts = DrawOptions{ .origin = interior.pos() };
     var cursor: Vec2 = .ZERO;
@@ -770,15 +773,13 @@ pub export fn frame(t: f64) void {
 
     draw_target_info();
 
-    draw_log();
-
     // render_debug(.{ .lorem = "Impedit est impedit animi nulla. Neque expedita aut sit sunt quas amet fuga voluptas. Mollitia sunt sed consequatur vel occaecati delectus. Labore vel laudantium neque aperiam quasi dolores. Laudantium quia error dolores enim enim alias." });
     var weap: ?inventory.ItemTag = null;
     if (inventory.active_weapon()) |w| {
         weap = w.tag;
     }
 
-    // render_debug(.{ .active = weap });
+    draw_log();
 
     render_buffer.flush();
 }

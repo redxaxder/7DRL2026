@@ -669,7 +669,7 @@ fn try_place_moto(rect: IRect, rng: std.Random) bool {
                 pos,
                 face,
                 model,
-                rng.intRangeAtMost(i64, 20, 200),
+                @intCast(inventory.roll_low(3, 10, 200)),
             ),
         ) catch {
             std.log.err("cant seed initial motorcycle", .{});
