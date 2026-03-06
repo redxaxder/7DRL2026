@@ -6,7 +6,6 @@ const IVec2 = core.IVec2;
 const IRect = core.IRect;
 
 const max_template_side = 16;
-const max_output_side = 128;
 const scratch_size = 8192;
 
 fn assert(ok: bool, comptime msg: []const u8, args: anytype) void {
@@ -20,10 +19,11 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
     std.log.err("stamp_floorplan: x={} y={} w={} h={}", .{ rect.x, rect.y, rect.w, rect.h });
     assert(rect.w >= 0, "rect.w={} negative", .{rect.w});
     assert(rect.h >= 0, "rect.h={} negative", .{rect.h});
-    assert(rect.w <= max_output_side, "rect.w={} > max_output_side", .{rect.w});
-    assert(rect.h <= max_output_side, "rect.h={} > max_output_side", .{rect.h});
-    const target_w: u8 = @intCast(rect.w);
-    const target_h: u8 = @intCast(rect.h);
+    const target_w: usize = @intCast(rect.w);
+    const target_h: usize = @intCast(rect.h);
+
+    const total = target_w * target_h;
+    if (total > scratch_size) return false;
 
     const template = pick_template(target_w, target_h, rng) orelse return false;
     assert(template.w >= 2, "template.w={} < 2", .{template.w});
@@ -34,14 +34,14 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
     var scratch: [scratch_size]Terrain = undefined;
 
     const extra_cols = target_w - template.w;
-    var col_map: [max_output_side]u8 = undefined;
+    var col_map: [scratch_size]u8 = undefined;
     for (0..template.w) |i| {
         col_map[i] = @intCast(i);
     }
-    var col_is_dup: [max_output_side]bool = .{false} ** max_output_side;
-    var current_w: u8 = template.w;
+    var col_is_dup: [scratch_size]bool = .{false} ** scratch_size;
+    var current_w: usize = template.w;
     for (0..extra_cols) |_| {
-        const gap = rng.intRangeLessThan(u8, 0, current_w - 1);
+        const gap = rng.intRangeLessThan(usize, 0, current_w - 1);
         const c0 = col_map[gap];
         const c1 = col_map[gap + 1];
         const v0 = template.is_valid_col_seam(c0);
@@ -52,7 +52,7 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
             c0
         else
             c1;
-        var j: u8 = current_w;
+        var j: usize = current_w;
         while (j > gap + 1) : (j -= 1) {
             col_map[j] = col_map[j - 1];
             col_is_dup[j] = col_is_dup[j - 1];
@@ -63,14 +63,14 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
     }
 
     const extra_rows = target_h - template.h;
-    var row_map: [max_output_side]u8 = undefined;
+    var row_map: [scratch_size]u8 = undefined;
     for (0..template.h) |i| {
         row_map[i] = @intCast(i);
     }
-    var row_is_dup: [max_output_side]bool = .{false} ** max_output_side;
-    var current_h: u8 = template.h;
+    var row_is_dup: [scratch_size]bool = .{false} ** scratch_size;
+    var current_h: usize = template.h;
     for (0..extra_rows) |_| {
-        const gap = rng.intRangeLessThan(u8, 0, current_h - 1);
+        const gap = rng.intRangeLessThan(usize, 0, current_h - 1);
         const r0 = row_map[gap];
         const r1 = row_map[gap + 1];
         const v0 = template.is_valid_row_seam(r0);
@@ -81,7 +81,7 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
             r0
         else
             r1;
-        var j: u8 = current_h;
+        var j: usize = current_h;
         while (j > gap + 1) : (j -= 1) {
             row_map[j] = row_map[j - 1];
             row_is_dup[j] = row_is_dup[j - 1];
@@ -90,9 +90,6 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
         row_is_dup[gap + 1] = true;
         current_h += 1;
     }
-
-    const total = @as(usize, target_w) * target_h;
-    if (total > scratch_size) return false;
 
     for (0..target_h) |y| {
         for (0..target_w) |x| {
@@ -117,8 +114,7 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
     return true;
 }
 
-fn pick_template(target_w: u8, target_h: u8, rng: std.Random) ?Template {
-    // Try a few random templates with random transforms
+fn pick_template(target_w: usize, target_h: usize, rng: std.Random) ?Template {
     const max_attempts = all_templates.len * 8;
     for (0..max_attempts) |_| {
         const base = all_templates[rng.intRangeLessThan(usize, 0, all_templates.len)];
@@ -219,15 +215,12 @@ const Dihedral = struct {
     }
 
     // Maps output (x,y) to source (sx,sy).
-    // Output dimensions are (new_w, new_h) where swapped axes use (src_h, src_w).
     fn apply(self: Dihedral, x: u8, y: u8, src_w: u8, src_h: u8) [2]u8 {
         var sx: u8 = x;
         var sy: u8 = y;
         switch (self.rotation) {
             0 => {},
             1 => {
-                // 90° CW: source(sx,sy) -> output(src_h-1-sy, sx)
-                // inverse: output(x,y) -> source(y, src_h-1-x)
                 sx = y;
                 sy = src_h - 1 - x;
             },
@@ -236,8 +229,6 @@ const Dihedral = struct {
                 sy = src_h - 1 - y;
             },
             3 => {
-                // 270° CW: source(sx,sy) -> output(sy, src_w-1-sx)
-                // inverse: output(x,y) -> source(src_w-1-y, x)
                 sx = src_w - 1 - y;
                 sy = x;
             },

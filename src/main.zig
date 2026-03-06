@@ -32,9 +32,7 @@ pub const MOTHER_KAIJU_SIZE = 10;
 pub const MIN_KAIJU_SIZE = 3;
 
 pub const FOV_RANGE = 40;
-const DANGER_GROWTH = 90;
-// const DANGER_GROWTH = 0;
-const SPAWN_ROLL = 200000;
+const SPAWN_ROLL = 600000;
 
 const ANIMATION_QUEUE_LEN = 256;
 
@@ -1232,7 +1230,12 @@ fn units_cleanup(rng: std.Random) void {
 
 fn roll_new_enemy(rng: std.Random) ?IRect {
     const player = globals.player();
-    const roll = rng.int(u64) % SPAWN_ROLL;
+    const roll = {
+        const z = std.math.maxInt(u64);
+        for (0..3) |_| {
+            z = @min(z, rng.int(u64) % SPAWN_ROLL);
+        }
+    };
     if (roll > globals.danger) {
         return null;
     }

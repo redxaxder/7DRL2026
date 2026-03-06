@@ -180,6 +180,7 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
 
 pub fn gen_small_building(rect: IRect, rng: std.Random) void {
     if (stamp_floorplan(rect, rng)) {
+        roll_interesting_terrain(rect, .Residential, rng);
         return;
     }
     // fill with floor
