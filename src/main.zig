@@ -1021,13 +1021,16 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             combat_log.log("You fire a rocket.", .{});
         },
         .Psionic_Focus => {
-            // const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.psionic_damage));
-            // const radius: u8 = @intCast(weapon.attrs.effective_value(.explosion_radius));
-            // const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
+            const base_damage: f64 = @floatFromInt(weapon.attrs.effective_value(.psi_damage));
+            const radius: u8 = @intCast(weapon.attrs.effective_value(.psi_radius));
+            const damage: f64 = (base_damage + combo_linear) * combo_mul * crit;
+            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
+            const target_pos: IVec2 = aim;
+            handle_psychic_damage(target_pos, radius, idamage);
             if (target) |_| {
-                combat_log.log("You concentrate a psycic blast at the beast.", .{});
+                combat_log.log("You concentrate a psychic blast at the beast.", .{});
             } else {
-                combat_log.log("You concentrate a psycic blast at the {s}.", .{terrain.name()});
+                combat_log.log("You concentrate a psychic blast at the {s}.", .{terrain.name()});
             }
         },
         .Gamma_Beam => {
@@ -1049,6 +1052,39 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
         },
     }
     return true;
+}
+
+fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
+    var cone = core.cone_iter(globals.player().position, target_pos, radius);
+    var i: UnitId = 0;
+    var candidate_kaiju: [100]UnitId = .{0} ** 100;
+    while (cone.next()) |pos| {
+        // std.log.info("cone pos {}", .{pos});
+        map.set_terrain_at(pos, .money);
+        var occupants = get_occupants(pos);
+        while (occupants.next()) |id| {
+            const unit = globals.unit(id);
+            if (unit.tag == .Kaiju) {
+                candidate_kaiju[i] = id;
+                i += 1;
+            }
+        }
+        // dedup and do_damage
+        std.mem.sort(UnitId, &candidate_kaiju, {}, comptime std.sort.desc(UnitId));
+        var previous: UnitId = 0;
+        for (&candidate_kaiju) |k_id| {
+            if (k_id == previous) {
+                continue;
+            }
+            if (k_id == 0) {
+                break;
+            }
+            previous = k_id;
+            const total_damage: i64 = damage + globals.psi;
+            combat_log.log("It takes {} psychic damage.", .{total_damage});
+            globals.units[k_id].damage(total_damage);
+        }
+    }
 }
 
 pub fn handle_player_attack(dir: Dir4) bool {

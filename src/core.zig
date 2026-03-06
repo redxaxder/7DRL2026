@@ -259,6 +259,18 @@ pub const Vec2 = extern struct {
     pub fn manhattan_distance(self: Vec2, other: Vec2) f32 {
         return self.minus(other).manhattan_norm();
     }
+
+    pub fn euclidean_norm(self: Vec2) f32 {
+        return @sqrt(self.x * self.x + self.y + self.y);
+    }
+
+    pub fn euclidian_distance(self: Vec2, other: Vec2) f32 {
+        return euclidean_norm(self.minus(other));
+    }
+
+    pub fn perp(self: Vec2) Vec2 {
+        return .{ .x = -1 * self.y, .y = self.x };
+    }
 };
 
 pub const Orientation =
@@ -634,7 +646,68 @@ pub const IRect = struct {
     }
 };
 
-// pub fn cone_iter(point: IVec2, base_center: IVec2, )
+pub fn cone_iter(apex: IVec2, base: IVec2, base_radius: i16) ConeIter {
+    // approach
+    // have a big ol' rect centered at the player and going past the base_center by base_radius.
+    // better too big than too small, iterating is fast.
+    // iterate over that rect, continuing for any space not in the cone
+    const a: Vec2 = apex.float();
+    const b: Vec2 = base.float();
+    const r: f32 = @floatFromInt(base_radius);
+    const v: Vec2 = b.minus(a);
+    const l: f32 = v.euclidean_norm();
+    const v_perp: Vec2 = v.perp();
+    const p1_: Vec2 = v_perp.scaled(r / l);
+    const p2_: Vec2 = p1_.scaled(-1);
+    const p1: Vec2 = p1_.plus(a).plus(v);
+    const p2: Vec2 = p2_.plus(a).plus(v);
+    std.log.info("a {}, b {}, r {}, v {}, l {}, v_perp {}, p1 {}, p2 {}", .{ a, b, r, v, l, v_perp, p1, p2 });
+
+    const rect_l: i16 = @as(i16, @intFromFloat(@min((p1.x), (@min(p2.x, a.x)))));
+    const rect_t: i16 = @as(i16, @intFromFloat(@min((p1.y), (@min(p2.y, a.y)))));
+    const rect_r: i16 = @as(i16, @intFromFloat(@max((p1.x), (@max(p2.x, a.x)))));
+    const rect_b: i16 = @as(i16, @intFromFloat(@max((p1.y), (@max(p2.y, a.y)))));
+    const rect: IRect = IRect.from_sides(rect_l, rect_t, rect_r, rect_b);
+    return .{ .p1 = p1, .p2 = p2, .p3 = a, .rect_iter = rect.iter() };
+}
+
+pub const ConeIter = struct {
+    p1: Vec2,
+    p2: Vec2,
+    p3: Vec2,
+    rect_iter: IRect.LocationIterator,
+
+    pub fn next(self: *ConeIter) ?IVec2 {
+        while (self.rect_iter.next()) |pos| {
+            if (is_in_triangle(pos.float(), self.p1, self.p2, self.p3)) {
+                return pos;
+            }
+        }
+        return null;
+    }
+};
+
+fn sign(p1: Vec2, p2: Vec2, p3: Vec2) f32 {
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+}
+
+fn is_in_triangle(p: Vec2, a: Vec2, b: Vec2, c: Vec2) bool {
+    var d1: f32 = undefined;
+    var d2: f32 = undefined;
+    var d3: f32 = undefined;
+
+    var has_neg: bool = undefined;
+    var has_pos: bool = undefined;
+
+    d1 = sign(p, a, b);
+    d2 = sign(p, b, c);
+    d3 = sign(p, c, a);
+
+    has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0);
+    has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0);
+
+    return !(has_neg and has_pos);
+}
 
 pub const Rect = struct {
     x: f32 = 0,

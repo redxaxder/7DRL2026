@@ -56,13 +56,13 @@ const EXAMPLE_ROCKET: Item = blk: {
 const EXAMPLE_FOCUS: Item = blk: {
     var it: Item = .tagged(ItemTag.Psionic_Focus);
     it.attrs.field(.psi_damage).* = 1;
-    it.attrs.field(.psi_rasius).* = 10;
+    it.attrs.field(.psi_radius).* = 10;
     break :blk it;
 };
 
 pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
-    inventory[1] = EXAMPLE_ROCKET;
+    inventory[1] = EXAMPLE_FOCUS;
     // inventory[2] = EXAMPLE_ROCKET;
     roll_next_item(rng);
 }
