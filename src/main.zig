@@ -848,7 +848,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                         switch (u.tag) {
                             .Kaiju => {
                                 const base_damage = motostats.effective_value(.impact_damage);
-                                const dmg = base_damage * motomove.speed * motomove.speed;
+                                const dmg = base_damage * motomove.speed * motomove.speed * crit_bonus();
                                 combat_log.log("It plows into the beast, dealing {} damage.", .{dmg});
                                 u.damage(dmg);
                             },
