@@ -1205,7 +1205,6 @@ pub fn handle_player_attack(dir: Dir4) bool {
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     var player_acted = false;
     const player_start = globals.player().position;
-    check_gameover(rng);
 
     if (ux.resolve_input(key, rng)) |action| {
         globals.animation_queue.hurry(1.5);
@@ -1251,6 +1250,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
         fov.refresh_fov(globals.player().position, FOV_RANGE);
         inventory.handle_pending_pickups(rng);
+        check_gameover(rng);
     }
     if (globals.focus == 0) {
         const r = globals.player().get_rect().expand(40);
