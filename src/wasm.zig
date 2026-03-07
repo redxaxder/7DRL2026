@@ -632,6 +632,7 @@ fn draw_inventory() void {
             opts,
             w - indent,
         );
+        cursor.y += fmt_draw_text(cursor, "[SPACE to discard]", opts, w, .{});
         cursor.y += SPRITE_SCALE;
     }
 
