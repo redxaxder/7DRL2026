@@ -1,9 +1,10 @@
 const std = @import("std");
+const main = @import("main.zig");
 const core = @import("core.zig");
 const IVec2 = core.IVec2;
 const IRect = core.IRect;
 const Interval = core.Interval;
-const UnitType = @import("main.zig").UnitType;
+const UnitType = main.UnitType;
 const Color = @import("render.zig").Color;
 const floorplan = @import("floorplan.zig");
 const stamp_floorplan = floorplan.stamp_floorplan;
@@ -110,7 +111,7 @@ fn gen_industrial(rect: IRect, rng: std.Random) void {
     // approach: gen 2-3 disjoint intervals in the interior
     // of the zone in each direction. Those are rects that we can use
     const interior: IRect = rect.expand(-1);
-    std.log.info("interior {}", .{interior});
+    // std.log.info("interior {}", .{interior});
     var subrects: [6]?IRect = .{null} ** 6;
     const tries: usize = 6;
     var i: usize = 0;
@@ -180,9 +181,18 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
     }
 }
 
-const NUM_SMALLS: usize = 2000;
-var smalls: [NUM_SMALLS]?IRect = .{null} ** NUM_SMALLS;
-var small_cursor: usize = 0;
+var best_small: ?IRect = null;
+var best_small_dist: i16 = std.math.maxInt(i16);
+
+fn record_small(rect: IRect) void {
+    if (rect.w >= 9 and rect.h >= 9) {
+        const d = rect.point_distance(main.PLAYER_START).manhattan_norm();
+        if (d < best_small_dist) {
+            best_small_dist = d;
+            best_small = rect;
+        }
+    }
+}
 
 pub fn gen_small_building(rect: IRect, rng: std.Random, starting_room: bool) void {
     if (starting_room) {
@@ -224,13 +234,6 @@ pub fn gen_small_building(rect: IRect, rng: std.Random, starting_room: bool) voi
     record_small(rect);
 }
 
-fn record_small(rect: IRect) void {
-    if (small_cursor < NUM_SMALLS) {
-        smalls[small_cursor] = rect;
-        small_cursor += 1;
-    }
-}
-
 fn is_residential_size(rect: IRect) bool {
     return rect.w <= 12 and rect.h <= 12;
 }
@@ -263,7 +266,7 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
     const max_flat = interval.len - 2 - MIN_LEFTOVER;
     const min_origin = interval.origin + @max(@divFloor(interval.len - 2, 3), min_flat);
     const max_origin = interval.origin + @min(@divFloor(2 * (interval.len - 2), 3), max_flat);
-    std.log.err("rect {}", .{rect});
+    // std.log.err("rect {}", .{rect});
     assert("no slicey", min_origin < max_origin);
 
     const origin = rng.intRangeAtMost(i16, min_origin, max_origin);
@@ -381,7 +384,8 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
 
     // blocks
     const zone_is_fixed = @max(rect.w, rect.h) < 300;
-    const new_zone: Zone = if (zone_is_fixed) zone else rng.enumValue(Zone);
+    const near_start = rect.contains(main.PLAYER_START);
+    const new_zone: Zone = if (zone_is_fixed) zone else if (near_start) .Residential else rng.enumValue(Zone);
     const block_threshold: i16 = switch (zone) {
         .Residential => 24,
         .Commercial => 48,
@@ -434,32 +438,27 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     _ = new_mapgen(lr, new_zone, rng, depth + 1, max_road, false);
 
     if (top_level) {
-        const tries: usize = 2000;
-        std.log.info("small_cursor {}", .{small_cursor});
-        // try to place the starting room
-        for (0..tries) |_| {
-            const rix: usize = rng.intRangeAtMost(usize, 0, small_cursor - 1);
-            if (smalls[rix]) |small_rect| {
-                if (stamp_floorplan(small_rect, rng, floorplan.starting_lines, floorplan.starting_templates)) {
-                    var rect_iter = small_rect.iter();
-                    while (rect_iter.next()) |pos| {
-                        const t: Terrain = get_terrain_at(pos);
-                        if (t == .player_start) {
-                            set_terrain_at(pos, .floor);
-                            result[0] = pos;
-                        }
-                        if (t == .door) {
-                            const dirs = std.enums.values(core.Dir4);
-                            for (dirs) |dir| {
-                                // motorcycle spawns on the sidewalk outside the door, guaranteed to be unique
-                                const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
-                                if (t2 == .sidewalk or t2 == .grass) {
-                                    if (dir == .Left) {
-                                        // so the handlebars don't spawn in the door
-                                        result[1] = pos.plus(dir.ivec().scaled(2));
-                                    } else {
-                                        result[1] = pos.plus(dir.ivec());
-                                    }
+        if (best_small) |small_rect| {
+            std.log.err("CLOSEST {}", .{best_small_dist});
+            if (stamp_floorplan(small_rect, rng, floorplan.starting_lines, floorplan.starting_templates)) {
+                var rect_iter = small_rect.iter();
+                while (rect_iter.next()) |pos| {
+                    const t: Terrain = get_terrain_at(pos);
+                    if (t == .player_start) {
+                        set_terrain_at(pos, .floor);
+                        result[0] = pos;
+                    }
+                    if (t == .door) {
+                        const dirs = std.enums.values(core.Dir4);
+                        for (dirs) |dir| {
+                            // motorcycle spawns on the sidewalk outside the door, guaranteed to be unique
+                            const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
+                            if (t2 == .sidewalk or t2 == .grass) {
+                                if (dir == .Left) {
+                                    // so the handlebars don't spawn in the door
+                                    result[1] = pos.plus(dir.ivec().scaled(2));
+                                } else {
+                                    result[1] = pos.plus(dir.ivec());
                                 }
                             }
                         }

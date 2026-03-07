@@ -16,7 +16,7 @@ fn assert(ok: bool, comptime msg: []const u8, args: anytype) void {
 }
 
 pub fn stamp_floorplan(rect: IRect, rng: std.Random, comptime lines: []const []const u8, templates: [count_templates(lines)]Template) bool {
-    std.log.info("stamp floorplan for {}", .{rect});
+    // std.log.info("stamp floorplan for {}", .{rect});
     assert(rect.w >= 0, "rect.w={} negative", .{rect.w});
     assert(rect.h >= 0, "rect.h={} negative", .{rect.h});
     const target_w: usize = @intCast(rect.w);
@@ -110,7 +110,7 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random, comptime lines: []const []c
             map.set_terrain_at(pos, scratch[y * target_w + x]);
         }
     }
-    std.log.err("stamp_floorplan: done", .{});
+    // std.log.err("stamp_floorplan: done", .{});
     return true;
 }
 
