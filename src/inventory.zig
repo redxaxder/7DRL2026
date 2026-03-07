@@ -293,8 +293,8 @@ pub const Attribute = enum {
     pub fn config(self: Attribute) Config {
         return switch (self) {
             .radiation_damage => .{
-                .low = 2,
-                .high = 10,
+                .low = 1,
+                .high = 6,
                 .n = 4,
             },
             .explosion_radius => .{
