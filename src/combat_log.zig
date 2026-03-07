@@ -24,6 +24,5 @@ pub fn log(comptime message: []const u8, args: anytype) void {
     }
     _ = storage.try_push_back(.{ .text = slice, .turn = main.globals.turn }) catch {
         std.log.err("out of storage", .{});
-        unreachable;
     };
 }

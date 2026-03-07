@@ -868,6 +868,7 @@ pub export fn frame(t: f64) void {
         .TitleScreen => {
             if (keyboard.firstJustPressed()) |_| {
                 main.globals.gamestate = .MainGame;
+                combat_log.log("You awaken to the sound of a distant roar.", .{});
             }
             draw_title_screen(t);
         },
