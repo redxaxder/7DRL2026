@@ -592,7 +592,7 @@ pub fn rendered_glyph(pos: IVec2) DrawInfo {
 fn is_wall_at(pos: IVec2) bool {
     const t = get_render_terrain_at(pos);
     return switch (t) {
-        .wall, .window, .door => true,
+        .wall, .window, .door, .open_door => true,
         else => false,
     };
 }
@@ -627,6 +627,7 @@ pub const Terrain = enum(u5) {
     asphalt,
     wall,
     door,
+    open_door,
     rubble,
     debris,
     trinket,
@@ -684,6 +685,7 @@ pub const Terrain = enum(u5) {
             .floor => return '.',
             .wall => return '#',
             .door => return '+',
+            .open_door => return '.',
             .window => return 0xCE, // ╬
             .rubble => return '&',
             .viscera => return 0x9C,
@@ -736,16 +738,17 @@ pub const Terrain = enum(u5) {
         };
     }
 
-    pub fn halting(self: Terrain) bool {
+    pub fn halting(self: Terrain) ?Terrain {
         return switch (self) {
-            .door, .viscera => true,
-            else => false,
+            .door => .open_door,
+            .viscera => .grass,
+            else => null,
         };
     }
 
     pub fn smash(self: Terrain) ?Terrain {
         return switch (self) {
-            .rubble, .viscera, .window, .door, .trinket, .vending_machine => .debris,
+            .rubble, .viscera, .window, .trinket, .vending_machine, .door => .debris,
             .wall => .rubble,
             else => null,
         };

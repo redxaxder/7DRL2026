@@ -332,12 +332,12 @@ pub const Unit = struct {
             var positions = edge.iter();
             while (positions.next()) |p| {
                 const tt = map.get_terrain_at(p);
-                if (tt.halting()) {
+                if (tt.halting()) |result| {
                     halt = true;
                     if (self.tag == .Player and globals.player().mounted()) {
                         combat_log.log("You drive through the {s}.", .{tt.name()});
                     }
-                    _ = animate_terrain_to(p, .floor).chain();
+                    _ = animate_terrain_to(p, result).chain();
                 }
                 if (self.tag == .Player) {
                     const r = IRect.singleton(p);
@@ -400,9 +400,9 @@ pub const Unit = struct {
         else
             self.get_rect().iter();
         while (landed.next()) |p| {
-            if (map.get_terrain_at(p).halting()) {
+            if (map.get_terrain_at(p).halting()) |result| {
                 halt = true;
-                _ = animate_terrain_to(p, .floor).chain();
+                _ = animate_terrain_to(p, result).chain();
             }
         }
         if (halt) {
@@ -842,7 +842,10 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                     },
                     .terrain => |where| {
                         const terrain = map.get_terrain_at(where);
-                        combat_log.log("The motorcycle hits a {s}.", .{terrain.name()});
+                        switch (terrain) {
+                            .rubble => combat_log.log("The motorcycle crashes into some rubble.", .{}),
+                            else => combat_log.log("The motorcycle hits a {s}.", .{terrain.name()}),
+                        }
                         if (terrain.smash()) |to| {
                             if (motomove.speed > 4) {
                                 _ = animate_terrain_to(
