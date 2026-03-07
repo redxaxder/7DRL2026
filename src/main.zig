@@ -752,7 +752,7 @@ fn handle_vending(rng: std.Random) bool {
     if (globals.money < 100) {
         combat_log.log("You don't have money for a drink.", .{});
     } else {
-        if (rng.float(f32) < 0.05) {
+        if (rng.float(f32) < 0.20) {
             combat_log.log("The vending machine has run dry.", .{});
             return false;
         }
@@ -1291,17 +1291,19 @@ fn resolve_pending(rng: std.Random) void {
                 const terrain: Terrain = if (rng.float(f32) < 0.9) .debris else .rubble;
                 const pos = u.position;
                 unspawn(u);
-                _ = animate_terrain_to(pos, terrain).chain();
 
-                var player: *Unit = globals.player();
-                const moto: ?*Unit = if (player.mounted()) player.mount() else null;
                 send_projectile(.{
                     .color = .white,
                     .glyph = '0',
                     .from = pos.plus(Dir4.Up.ivec().scaled(2)).float(),
                     .to = pos.float(),
-                    .speed = 0.2 + rng.float(f32) * 0.25,
+                    .speed = 0.35 + rng.float(f32) * 0.45,
                 });
+
+                _ = animate_terrain_to(pos, terrain).chain();
+
+                var player: *Unit = globals.player();
+                const moto: ?*Unit = if (player.mounted()) player.mount() else null;
                 if (pos.eq(player.position)) {
                     const dmg = rng.intRangeAtMost(i64, 1, 6);
                     combat_log.log("You take {} damage from falling debris", .{dmg});
@@ -1318,8 +1320,9 @@ fn resolve_pending(rng: std.Random) void {
                     u.alive = false;
                 } else {
                     const radius: i16 = @intCast(u.size);
-                    var iter = sector.get_occupants_rect(u.get_rect());
-                    while (iter.next()) |tid| {
+                    var targets: [256]UnitId = undefined;
+                    const n = sector.get_occupants_rect_dedup(u.get_rect(), &targets);
+                    for (targets[0..n]) |tid| {
                         const target = globals.unit(tid);
                         const impact = target.get_rect().count_overlap(u.position, radius);
                         if (impact == 0) {

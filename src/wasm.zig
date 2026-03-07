@@ -844,10 +844,8 @@ pub export fn frame(t: f64) void {
             draw_title_screen(t);
         },
         .Help => {
-            if (keyboard.firstJustPressed()) |key| {
-                if (key == .Space) {
-                    main.globals.gamestate = .MainGame;
-                }
+            if (keyboard.firstJustPressed()) |_| {
+                main.globals.gamestate = .MainGame;
             }
             new_draw_help_screen(t);
         },
@@ -902,10 +900,10 @@ pub fn new_draw_help_screen(t: f64) void {
 
     r = help_layout.get("shoot_desc").float().scaled(SPRITE_SCALE);
     cursor = r.y;
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF"), dt, w);
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xB3Tip: You can shoot while coasting.\xB3"), dt, w);
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(128, "\xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9"), dt, w);
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "      Weapon Mode Controls"), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "     \xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "     \xB3Tip: You can shoot while moving.\xB3"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(128, "     \xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "      Aiming Controls"), dl, w);
 
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(l, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
@@ -927,12 +925,12 @@ pub fn new_draw_help_screen(t: f64) void {
 
     r = help_layout.get("escape_key").float().scaled(SPRITE_SCALE);
     cursor = r.y;
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " SPACE"), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " SPACE/PERIOD"), dl, w);
 
     r = help_layout.get("escape_desc").float().scaled(SPRITE_SCALE);
     cursor = r.y;
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "< Exit Weapon Mode"), d, w);
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "< Drop pending item"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "< Cancel Aiming weapon"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "< Cancel pickup item"), d, w);
 
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(l, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
@@ -973,69 +971,6 @@ pub fn new_draw_help_screen(t: f64) void {
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xB3Tip: Select items with the number keys.\xB3"), dt, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(128, "\xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9"), dt, w);
 
-    r = help_layout.get("quit").float().scaled(SPRITE_SCALE);
-    cursor = r.y;
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "PRESS SPACE TO DISMISS"), di, w);
-
-    render_buffer.flush();
-}
-
-pub fn draw_help_screen(t: f64) void {
-    _ = t;
-    const w: f32 = 3000;
-    var cursor: f32 = 0;
-    const d: DrawOptions = .{ .color = .white, .size = 1.2 };
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                             \xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF             ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ Movement      Motorcycle Movement           \xB3You can shoot while coasting.\xB3             ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                             \xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9             ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                  Weapon Mode Controls                   ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~               Shift + Forward                      > Maintain speed                     ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~               Shift + Left, Shift + Right          > Strafe                             ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~               Shift + Back                         > Slow Down                          ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~               Strafe or Slow Down while stopped > Dismount                              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                      Advanced Motorcycle Movement                                       ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ 0  1  2  3  4  5  6  7  8  9  < Select an item                                          ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                 Select a weapon to go into Weapon Mode.                 ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ ESC                           < Exit Weapon Mode                                        ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                 Drop pending item                                       ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~                ~                           ~              ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~     Status     ~                           ~ Kaiju Status ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~                ~                           ~              ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~                ~                           ~~~~~~~~~~~~~~~~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~~~~~~~~~~~~~~~~~~                           ~              ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~                ~     Main Game Screen      ~              ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~   Inventory    ~                           ~     Log      ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~                ~                           ~              ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~                ~                           ~              ~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~              ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~  @ < You             o% < A Motorcycle           @% < You on a Motorcycle               ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ \xDA\xC4\xBF                                                                                     ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ \xB3A\xB3  < Kaiju       There's a Kaiju Radar on the edge of the main screen, looks          ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ \xC0\xC4\xD9                like it's picking up something big...                                ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~  _ < Vending Machines, which cost money $ to use      + < Doors     ( < Windows         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                      Some of the city is still standing ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~  * < Items, might be a trinket or a weapon            & < Rubble    ; < Debris          ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                      Some of the city is not...         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                               PRESS ESCAPE TO DISMISS                                   ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
     render_buffer.flush();
 }
 

@@ -128,3 +128,25 @@ pub fn get_occupants_rect(rect: core.IRect) OccupantIterator {
         .cur = sector_head(first).*,
     };
 }
+
+pub fn get_occupants_rect_dedup(rect: core.IRect, out: []UnitId) usize {
+    var it = get_occupants_rect(rect);
+    var i: usize = 0;
+    while (it.next()) |uid| {
+        out[i] = uid;
+        i += 1;
+    }
+    std.mem.sort(UnitId, out[0..i], {}, comptime std.sort.asc(UnitId));
+    var insert: usize = 0;
+    var prev: UnitId = 0;
+    for (0..i) |at| {
+        if (out[at] == prev) {
+            continue;
+        } else {
+            out[insert] = out[at];
+            prev = out[at];
+            insert += 1;
+        }
+    }
+    return insert;
+}
