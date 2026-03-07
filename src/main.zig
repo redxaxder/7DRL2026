@@ -2037,7 +2037,8 @@ pub fn resolve_motorcycle_movement(
 
 var reticle_pos: [5]IVec2 = .{IVec2.ZERO} ** 5;
 pub fn get_reticle_positions() []IVec2 {
-    const mount = globals.player().mount();
+    const player = globals.player();
+    const mount = player.mount();
     if (mount.tag == .Nil) {
         return reticle_pos[0..0];
     }
@@ -2052,6 +2053,17 @@ pub fn get_reticle_positions() []IVec2 {
             const handlepos = ppos.plus(projection.orientation.ivec());
             reticle_pos[i] = handlepos;
         }
+
+        if (keyboard.isShiftDown() and mount.speed == 0) {
+            for (std.enums.values(Dir4), 0..) |d, i| {
+                if (d == mount.orientation) {
+                    continue;
+                }
+                const dismountpos = player.position.plus(d.ivec());
+                reticle_pos[i] = dismountpos;
+            }
+        }
+
         return reticle_pos[0..5];
     } else {
         return reticle_pos[4..5];
