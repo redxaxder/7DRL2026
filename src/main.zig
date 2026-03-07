@@ -1252,8 +1252,13 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
         inventory.handle_pending_pickups(rng);
         check_gameover(rng);
     }
+    const focus_unit = globals.unit(globals.focus);
+    if (focus_unit.get_rect().point_distance(globals.player().position).max_norm() > 60) {
+        globals.focus = 0;
+    }
+
     if (globals.focus == 0) {
-        const r = globals.player().get_rect().expand(40);
+        const r = globals.player().get_rect().expand(45);
         var it = sector.get_occupants_rect(r);
         while (it.next()) |uid| {
             const u = globals.unit(uid);

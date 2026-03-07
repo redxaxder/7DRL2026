@@ -814,6 +814,15 @@ pub fn draw_main_screen(t: f64) void {
 
     indicate_unit(main.globals.kmom());
 
+    {
+        const r = main.globals.player().get_rect().expand(50);
+        var it = sector.get_occupants_rect(r);
+        while (it.next()) |uid| {
+            const u = main.globals.unit(uid);
+            indicate_unit(u);
+        }
+    }
+
     draw_inventory();
 
     draw_target_info();
