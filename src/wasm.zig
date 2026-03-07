@@ -845,13 +845,139 @@ pub export fn frame(t: f64) void {
         },
         .Help => {
             if (keyboard.firstJustPressed()) |key| {
-                if (key == .Escape) {
+                if (key == .Space) {
                     main.globals.gamestate = .MainGame;
                 }
             }
-            draw_help_screen(t);
+            new_draw_help_screen(t);
         },
     }
+}
+
+const help_layout: ui.Layout = ui.parse(@embedFile("help_view.txt"));
+pub fn new_draw_help_screen(t: f64) void {
+    _ = t;
+    const w: f32 = 3000;
+    var cursor: f32 = 0;
+    const d: DrawOptions = .{ .color = .white, .size = 1.2 };
+    const dl: DrawOptions = .{ .color = .orange, .size = 1.2 };
+    const dt: DrawOptions = .{ .color = .blue, .size = 1.2 };
+    const dk: DrawOptions = .{ .color = .red, .size = 1.2 };
+    const dv: DrawOptions = .{ .color = .teal, .size = 1.2 };
+    const dm: DrawOptions = .{ .color = .green, .size = 1.2 };
+    const di: DrawOptions = .{ .color = .yellow, .size = 1.2 };
+    const l: usize = 128;
+
+    var r = help_layout.get("controls").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   ^    W "), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  <\x19>  ASD"), d, w);
+
+    r = help_layout.get("moto_movement_controls").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "    Forward > Accelerate"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "Left, Right > Turn     "), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "       Back > Break           "), d, w);
+
+    r = help_layout.get("shoot_controls").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   ^"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  < >    Shoot in a direction"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   \x19"), d, w);
+
+    r = help_layout.get("move_desc").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " Movement"), dl, w);
+    render_buffer.flush();
+
+    r = help_layout.get("moto_move_desc").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " Motorcycle Movement"), dl, w);
+
+    r = help_layout.get("shoot_desc").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xB3Tip: You can shoot while coasting.\xB3"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(128, "\xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "      Weapon Mode Controls"), dl, w);
+
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(l, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+
+    r = help_layout.get("advanced_controls").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Forward       > Maintain speed"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Left or Right > Strafe"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Back          > Slow down, Dismount"), d, w);
+
+    r = help_layout.get("advanced_lable").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " Advanced Motorcycle Movement"), dl, w);
+
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(l, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+
+    r = help_layout.get("escape_key").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " SPACE"), dl, w);
+
+    r = help_layout.get("escape_desc").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "< Exit Weapon Mode"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "< Drop pending item"), d, w);
+
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(l, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+
+    r = help_layout.get("you_legend").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " @ < You      o% < A motorcycle      @% < You on a motorcycle"), d, w);
+
+    r = help_layout.get("kaiju_legend").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " \xDA\xC4\xBF"), dk, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " \xB3A\xB3  < Kaiju       There's a Kaiju Radar on the edge of the main screen, looks"), dk, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " \xC0\xC4\xD9                like it's picking up something big..."), dk, w);
+
+    r = help_layout.get("vending_legend").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "     _ < Vending Machine"), dv, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " Dispenses items for money $"), dm, w);
+
+    r = help_layout.get("landscape_legend").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "+ < Door      ( < Window"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "Some of the city is still standing"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "& < Rubble      ; < Debris"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "Some of the city is not..."), d, w);
+
+    r = help_layout.get("item_legend").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "         * < Item"), di, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, " Weapons or useful trinkets"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, ""), dl, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "\xB3Tip: Select items with the number keys.\xB3"), dt, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(128, "\xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9"), dt, w);
+
+    r = help_layout.get("quit").float().scaled(SPRITE_SCALE);
+    cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "PRESS SPACE TO DISMISS"), di, w);
+
+    render_buffer.flush();
 }
 
 pub fn draw_help_screen(t: f64) void {
@@ -860,10 +986,6 @@ pub fn draw_help_screen(t: f64) void {
     var cursor: f32 = 0;
     const d: DrawOptions = .{ .color = .white, .size = 1.2 };
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~   W   ^        Forward     > Accelerate      ^W                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~  ASD <\x19>       Left, Right > Turn           <A >D   Shoot in a direction                ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                Back        > Break           \x19S                                         ~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                             \xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF             ~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ Movement      Motorcycle Movement           \xB3You can shoot while coasting.\xB3             ~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                             \xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9             ~"), d, w);

@@ -550,7 +550,7 @@ pub const ux = struct {
         } else if (number) |weapon_id| {
             inventory.toggle_weapon(weapon_id);
         } else if (inventory.active_weapon()) |_| {
-            if (key == .Escape) {
+            if (key == .Space) {
                 inventory.active_index = null;
             }
         } else if (key == .Slash) {
