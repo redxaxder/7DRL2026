@@ -876,12 +876,15 @@ pub fn new_draw_help_screen(t: f64) void {
 
     r = help_layout.get("moto_movement_controls").float().scaled(SPRITE_SCALE);
     cursor = r.y;
+    cursor += SPRITE_SCALE;
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "    Forward > Accelerate"), d, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "Left, Right > Turn     "), d, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "       Back > Break           "), d, w);
 
     r = help_layout.get("shoot_controls").float().scaled(SPRITE_SCALE);
     cursor = r.y;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   Number key: start aiming a weapon"), d, w);
+    cursor += SPRITE_SCALE;
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   ^"), d, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  < >    Shoot in a direction"), d, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   \x19"), d, w);
