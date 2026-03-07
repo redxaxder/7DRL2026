@@ -1,1 +1,3 @@
 fswatch -o -m poll_monitor src | while read -r x; do zig build wasm; done
+
+cp zig-out/bin/_7DRL2026.wasm out/game.wasm; butler push out redxaxder/the-stomping-grounds:html5
