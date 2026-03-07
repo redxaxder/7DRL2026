@@ -870,6 +870,9 @@ pub fn new_draw_help_screen(t: f64) void {
     cursor = r.y;
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "   ^    W "), d, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  <\x19>  ASD"), d, w);
+    cursor += 2 * SPRITE_SCALE;
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "        K "), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "       HJL"), d, w);
 
     r = help_layout.get("moto_movement_controls").float().scaled(SPRITE_SCALE);
     cursor = r.y;
@@ -911,9 +914,10 @@ pub fn new_draw_help_screen(t: f64) void {
 
     r = help_layout.get("advanced_controls").float().scaled(SPRITE_SCALE);
     cursor = r.y;
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Forward       > Maintain speed"), d, w);
-    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Left or Right > Strafe"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Forward       > Move without gaining momentum"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Left or Right > Strafe, Dismount"), d, w);
     cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shift + Back          > Slow down, Dismount"), d, w);
+    cursor += draw_text(.{ .x = r.x, .y = cursor }, &ascii_replace(l, "  Shoot / Space         > Coast at current speed"), d, w);
 
     r = help_layout.get("advanced_lable").float().scaled(SPRITE_SCALE);
     cursor = r.y;
