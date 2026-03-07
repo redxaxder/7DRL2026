@@ -499,6 +499,7 @@ pub fn draw_status(t: f64) !void {
             "",
             opts,
             w,
+            true,
         );
 
         cursor.y += SPRITE_SCALE;
@@ -570,17 +571,29 @@ fn draw_item_desc(pos: Vec2, item: *const inventory.Item, opts: DrawOptions, w: 
         return 0;
     }
     cursor.y += fmt_draw_text(cursor, "{s}", opts, w, .{item.tag.name()});
-    cursor.y += draw_attrs(cursor, item.tag.is_trinket(), &item.attrs, item.tag.prefix(), opts, w);
+    cursor.y += draw_attrs(cursor, item.tag.is_trinket(), &item.attrs, item.tag.prefix(), opts, w, false);
     return cursor.y - pos.y;
 }
 
-fn draw_attrs(pos: Vec2, is_bonus: bool, attrs: *const inventory.Attributes, strip_prefix: []const u8, opts: DrawOptions, w: f32) f32 {
+fn draw_attrs(
+    pos: Vec2,
+    is_bonus: bool,
+    attrs: *const inventory.Attributes,
+    strip_prefix: []const u8,
+    opts: DrawOptions,
+    w: f32,
+    moto: bool,
+) f32 {
     var cursor: Vec2 = pos;
     const bonuses = inventory.bonuses();
     for (std.enums.values(inventory.Attribute)) |attr| {
         const val = attrs.readfield(attr);
         const extra = bonuses.readfield(attr);
-        if (val != 0) {
+        const drawmoto = moto and switch (attr) {
+            .impact_damage, .acceleration, .top_speed, .armor => true,
+            else => false,
+        };
+        if (val != 0 or drawmoto) {
             const full_name = attr.name();
             const display_name = if (strip_prefix.len > 0 and std.mem.startsWith(u8, full_name, strip_prefix))
                 full_name[strip_prefix.len..]
