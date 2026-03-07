@@ -1150,10 +1150,11 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
 fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
     var cone = core.cone_iter(globals.player().position, target_pos, radius);
     var i: usize = 0;
-    var candidate_kaiju: [4096]UnitId = .{0} ** 4096;
+    const BUFFERLEN = 4096;
+    var candidate_kaiju: [BUFFERLEN]UnitId = .{0} ** 4096;
     var resonance = false;
 
-    while (cone.next()) |pos| {
+    out: while (cone.next()) |pos| {
         var occupants = get_occupants(pos);
         while (occupants.next()) |id| {
             const unit = globals.unit(id);
@@ -1161,6 +1162,9 @@ fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
                 candidate_kaiju[i] = id;
                 i += 1;
             }
+        }
+        if (i >= BUFFERLEN) {
+            break :out;
         }
     }
 
