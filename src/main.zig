@@ -654,7 +654,7 @@ pub fn spawn(u: Unit) !UnitId {
 }
 
 pub fn unspawn(u: *Unit) void {
-    if (globals.focus == u.id) {
+    if (globals.focus == u.get_id()) {
         globals.focus = 0;
     }
     const anim = u.deferred_set(.tag, .Nil);
@@ -1250,6 +1250,16 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 
         fov.refresh_fov(globals.player().position, FOV_RANGE);
         inventory.handle_pending_pickups(rng);
+    }
+    if (globals.focus == 0) {
+        const r = globals.player().get_rect().expand(40);
+        var it = sector.get_occupants_rect(r);
+        while (it.next()) |uid| {
+            const u = globals.unit(uid);
+            if (u.tag == .Kaiju) {
+                globals.focus = uid;
+            }
+        }
     }
 }
 
