@@ -1400,7 +1400,10 @@ fn units_cleanup(rng: std.Random) void {
                         trigger_victory();
                     }
                     if (u.hp < 0 and inventory.has_psi()) {
-                        globals.psi -= u.hp;
+                        const psi_gain = -u.hp;
+                        const max_gain = std.math.pow(i64, 10, @intCast(u.size - 1));
+
+                        globals.psi += @min(psi_gain, max_gain);
                     }
 
                     const leveled_up = inventory.extend_item_capacity(u.size);
