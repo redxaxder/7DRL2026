@@ -22,7 +22,7 @@ pub fn reset() void {
     inventory = .{Item.DEFAULT} ** INVENTORY_SIZE;
     active_index = null;
     item_count = 0;
-    item_capacity = 3;
+    item_capacity = 4;
     cash = 0;
 }
 
@@ -64,6 +64,9 @@ pub fn init(rng: std.Random) void {
     inventory[0] = BASE_WEAPON;
     // inventory[1] = EXAMPLE_FOCUS;
     // inventory[2] = EXAMPLE_TRINKET;
+    // inventory[1] = EXAMPLE_FOCUS;
+    // inventory[2] = EXAMPLE_GAMMA;
+    // inventory[3] = EXAMPLE_ROCKET;
     roll_next_item(rng);
 }
 

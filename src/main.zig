@@ -774,6 +774,10 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 .shift = shift,
             },
         );
+        if (motomove.slide) {
+            queue_sound(.tirescreech);
+        }
+
         if (motomove.dismount) {
             player.move_to(motomove.position);
             player.*.mounted_on = 0;
@@ -879,6 +883,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 switch (occupant.tag) {
                     .Motorcycle => { // Mount it
                         player.move_to(occupant.position);
+                        queue_sound(.start_moto);
                         player.*.mounted_on = occupant_id;
                         combat_log.log("You start the {s}.", .{occupant.model.name()});
                         return true;
@@ -893,6 +898,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                     },
                 }
             }
+            queue_sound(.footstep);
             player.move_to(target);
         }
     }
@@ -900,6 +906,17 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
 }
 
 const SHOT_RANGE: usize = 64;
+
+pub fn queue_sound(soundid: audio.SoundId) void {
+    const lock: animation.AnimationLock = .{ .exclusive = globals.player().lock() };
+    const anim = globals.animation_queue.force_add_empty(.{
+        .on_wake = .lambda(
+            audio.play_,
+            .{audio.SoundConfig{ .id = soundid }},
+        ),
+    });
+    anim.lock_until_start = lock;
+}
 
 pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
     const weapon = inventory.active_weapon() orelse return false;
@@ -912,6 +929,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
 
     switch (weapon.tag) {
         .Rifle => {
+            queue_sound(.rifle);
             const glyph: u8 = switch (d.orientation()) {
                 .v => 0xB3, // │
                 .h => 0xC4, // ─
@@ -929,6 +947,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             }
         },
         .Gamma_Beam => {
+            queue_sound(.gamma);
             const glyph: u8 = 'X';
             var starts = ppos.scan(d, delta.max_norm() - 1);
             while (starts.next()) |start| {
@@ -954,6 +973,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
         },
         .Rocket_Launcher => {
             const base_speed: f32 = 10;
+            queue_sound(.fire_rocket);
             send_projectile(.{
                 .from = ppos.float(),
                 .to = aim.float(),
@@ -981,6 +1001,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             }
         },
         .Psionic_Focus => {
+            queue_sound(.psychic);
             const anchor = ppos.plus(dir.scaled(SHOT_RANGE));
             const radius = weapon.attrs.effective_value(.psi_radius);
             const base = IRect.singleton(anchor).expando(d.orientation().flip(), radius);
@@ -1405,7 +1426,7 @@ fn units_cleanup(rng: std.Random) void {
 
                         globals.psi += @min(psi_gain, max_gain);
                     }
-
+                    queue_sound(.roar);
                     const leveled_up = inventory.extend_item_capacity(u.size);
                     if (leveled_up) {
                         combat_log.log("You feel stronger after felling a powerful foe.", .{});
@@ -1563,6 +1584,7 @@ fn destroy(pos: IVec2, rng: std.Random) bool {
 fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
     const fling_distance: i16 = 10;
     var player = globals.player();
+    queue_sound(.smacked);
     const moto: ?*Unit = if (player.mounted()) player.mount() else null;
     if (globals.player().hp <= 1) {
         globals.player().hp = 0;

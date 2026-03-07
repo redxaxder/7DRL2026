@@ -126,19 +126,47 @@ pub const DSL = struct {
 };
 
 pub const defns = struct {
-    pub const move = blk: {
+    pub const start_moto = blk: {
         var b = DSL.Builder{};
-        const osc = b.oscillator(.triangle);
+        const osc = b.oscillator(.sawtooth);
+        const filt = b.biquadFilter(2); // bandpass
         const env = b.gain();
-        osc.envelope(.frequency, &.{ 300, 500 }, &.{0.05});
-        env.envelope(.gain, &.{ 0.15, 0.0 }, &.{0.08});
-        osc.connect(env);
+        osc.envelope(.frequency, &.{ 80, 120, 90 }, &.{ 0.1, 0.15 });
+        filt.envelope(.frequency, &.{ 400, 800, 300 }, &.{ 0.08, 0.17 });
+        filt.envelope(.Q, &.{ 5.0, 3.0 }, &.{0.2});
+        env.envelope(.gain, &.{ 0.15, 0.2, 0.0 }, &.{ 0.05, 0.25 });
+        osc.connect(filt);
+        filt.connect(env);
         env.toOutput();
-        osc.play(0.0, 0.1);
+        osc.play(0.0, 0.35);
         break :blk b.done();
     };
 
-    pub const collide = blk: {
+    pub const rifle = blk: {
+        var b = DSL.Builder{};
+        // Low sine rumble
+        const bass = b.oscillator(.sine);
+        const bass_env = b.gain();
+        bass.envelope(.frequency, &.{ 80, 30, 18 }, &.{ 0.05, 0.4 });
+        bass_env.envelope(.gain, &.{ 0.5, 0.35, 0.0 }, &.{ 0.08, 0.5 });
+        bass.connect(bass_env);
+        bass_env.toOutput();
+        bass.play(0.0, 0.6);
+        // Mid crunch layer
+        const mid = b.oscillator(.sawtooth);
+        const mid_filt = b.biquadFilter(0); // lowpass
+        const mid_env = b.gain();
+        mid.envelope(.frequency, &.{ 120, 45 }, &.{0.1});
+        mid_filt.envelope(.frequency, &.{ 800, 200 }, &.{0.15});
+        mid_filt.envelope(.Q, &.{ 1.0, 0.5 }, &.{0.2});
+        mid_env.envelope(.gain, &.{ 0.3, 0.0 }, &.{0.4});
+        mid.connect(mid_filt);
+        mid_filt.connect(mid_env);
+        mid_env.toOutput();
+        mid.play(0.0, 0.5);
+        break :blk b.done();
+    };
+    pub const fire_rocket = blk: {
         var b = DSL.Builder{};
         const osc = b.oscillator(.square);
         const env = b.gain();
@@ -150,15 +178,146 @@ pub const defns = struct {
         break :blk b.done();
     };
 
-    pub const click = blk: {
+    pub const whiff = blk: {
         var b = DSL.Builder{};
-        const osc = b.oscillator(.square);
+        const osc = b.oscillator(.sine);
         const env = b.gain();
-        osc.envelope(.frequency, &.{1000}, &.{});
-        env.envelope(.gain, &.{ 0.1, 0.0 }, &.{0.03});
+        osc.envelope(.frequency, &.{ 200, 40 }, &.{0.03});
+        env.envelope(.gain, &.{ 0.5, 0.0 }, &.{0.2});
         osc.connect(env);
         env.toOutput();
-        osc.play(0.0, 0.05);
+        osc.play(0.0, 0.25);
+        break :blk b.done();
+    };
+    pub const footstep = blk: {
+        var b = DSL.Builder{};
+        const osc = b.oscillator(.sine);
+        const filt = b.biquadFilter(0); // lowpass
+        const env = b.gain();
+        osc.envelope(.frequency, &.{ 100, 50 }, &.{0.02});
+        filt.envelope(.frequency, &.{ 600, 150 }, &.{0.03});
+        env.envelope(.gain, &.{ 0.3, 0.0 }, &.{0.08});
+        osc.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc.play(0.0, 0.1);
+        break :blk b.done();
+    };
+
+    pub const gamma = blk: {
+        var b = DSL.Builder{};
+        const osc = b.oscillator(.sawtooth);
+        const filt = b.biquadFilter(1); // highpass
+        const env = b.gain();
+        osc.envelope(.frequency, &.{ 2000, 400, 1500, 200 }, &.{ 0.02, 0.02, 0.04 });
+        filt.envelope(.frequency, &.{ 500, 200 }, &.{0.08});
+        env.envelope(.gain, &.{ 0.3, 0.10, 0.15, 0.0 }, &.{ 0.02, 0.02, 0.06 });
+        osc.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc.play(0.0, 0.12);
+        break :blk b.done();
+    };
+
+    pub const crash = blk: {
+        var b = DSL.Builder{};
+        const osc = b.oscillator(.triangle);
+        const filt = b.biquadFilter(0); // lowpass
+        const env = b.gain();
+        osc.envelope(.frequency, &.{ 300, 150, 250, 80, 180, 50 }, &.{ 0.04, 0.04, 0.06, 0.06, 0.08 });
+        filt.envelope(.frequency, &.{ 2000, 500 }, &.{0.25});
+        env.envelope(.gain, &.{ 0.25, 0.1, 0.2, 0.05, 0.15, 0.0 }, &.{ 0.04, 0.04, 0.06, 0.06, 0.08 });
+        osc.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc.play(0.0, 0.35);
+        break :blk b.done();
+    };
+
+    pub const roar = blk: {
+        var b = DSL.Builder{};
+        const osc1 = b.oscillator(.sawtooth);
+        const osc2 = b.oscillator(.sine);
+        const filt = b.biquadFilter(0); // lowpass
+        const env = b.gain();
+        osc1.envelope(.frequency, &.{ 60, 90, 50, 70 }, &.{ 0.15, 0.25, 0.2 });
+        osc2.envelope(.frequency, &.{ 45, 65, 38 }, &.{ 0.2, 0.4 });
+        filt.envelope(.frequency, &.{ 300, 600, 200 }, &.{ 0.15, 0.45 });
+        filt.envelope(.Q, &.{ 3.0, 1.5 }, &.{0.5});
+        env.envelope(.gain, &.{ 0.0, 0.4, 0.35, 0.0 }, &.{ 0.08, 0.4, 0.2 });
+        osc1.connect(filt);
+        osc2.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc1.play(0.0, 0.75);
+        osc2.play(0.0, 0.75);
+        break :blk b.done();
+    };
+
+    pub const brake = blk: {
+        var b = DSL.Builder{};
+        const osc1 = b.oscillator(.sine);
+        const osc2 = b.oscillator(.sine);
+        const env = b.gain();
+        osc1.envelope(.frequency, &.{ 35, 28, 35 }, &.{ 0.3, 0.3 });
+        osc2.envelope(.frequency, &.{ 42, 36, 42 }, &.{ 0.25, 0.35 });
+        env.envelope(.gain, &.{ 0.0, 0.3, 0.3, 0.0 }, &.{ 0.1, 0.4, 0.2 });
+        osc1.connect(env);
+        osc2.connect(env);
+        env.toOutput();
+        osc1.play(0.0, 0.8);
+        osc2.play(0.0, 0.8);
+        break :blk b.done();
+    };
+
+    pub const psychic = blk: {
+        var b = DSL.Builder{};
+        const osc = b.oscillator(.sawtooth);
+        const filt = b.biquadFilter(2); // bandpass
+        const env = b.gain();
+        osc.envelope(.frequency, &.{ 110, 115, 108, 112 }, &.{ 0.1, 0.1, 0.1 });
+        filt.envelope(.frequency, &.{ 500, 700, 400 }, &.{ 0.15, 0.15 });
+        filt.envelope(.Q, &.{ 6.0, 4.0 }, &.{0.25});
+        env.envelope(.gain, &.{ 0.0, 0.2, 0.18, 0.0 }, &.{ 0.03, 0.2, 0.07 });
+        osc.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc.play(0.0, 0.35);
+        break :blk b.done();
+    };
+
+    pub const tirescreech = blk: {
+        var b = DSL.Builder{};
+        const osc = b.oscillator(.sawtooth);
+        const filt = b.biquadFilter(2); // bandpass
+        const env = b.gain();
+        osc.envelope(.frequency, &.{ 1800, 2200, 1600 }, &.{ 0.08, 0.12 });
+        filt.envelope(.frequency, &.{ 2000, 2500, 1800 }, &.{ 0.08, 0.12 });
+        filt.envelope(.Q, &.{ 10.0, 6.0 }, &.{0.15});
+        env.envelope(.gain, &.{ 0.0, 0.2, 0.15, 0.0 }, &.{ 0.01, 0.12, 0.07 });
+        osc.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc.play(0.0, 0.25);
+        break :blk b.done();
+    };
+
+    pub const smacked = blk: {
+        var b = DSL.Builder{};
+        const osc = b.oscillator(.sawtooth);
+        const osc2 = b.oscillator(.sine);
+        const filt = b.biquadFilter(0); // lowpass
+        const env = b.gain();
+        osc.envelope(.frequency, &.{ 500, 150, 80 }, &.{ 0.02, 0.08 });
+        osc2.envelope(.frequency, &.{ 100, 40 }, &.{0.06});
+        filt.envelope(.frequency, &.{ 2000, 400, 150 }, &.{ 0.03, 0.1 });
+        env.envelope(.gain, &.{ 0.0, 0.45, 0.2, 0.0 }, &.{ 0.005, 0.05, 0.15 });
+        osc.connect(filt);
+        osc2.connect(filt);
+        filt.connect(env);
+        env.toOutput();
+        osc.play(0.0, 0.25);
+        osc2.play(0.0, 0.25);
         break :blk b.done();
     };
 };
@@ -219,13 +378,16 @@ pub const SoundConfig = struct {
 pub fn play(sound: SoundConfig) bool {
     const i = @intFromEnum(sound.id);
     if (globals.cooldowns[i] > 0) return false;
-    if (globals.active_counts[i] >= MAX_ACTIVE) return false;
-    const played = js.playSound(@intFromEnum(sound.id), sound.pan, sound.pitch_shift, sound.gain_scale) == 1;
+    const attenuation = if (globals.active_counts[i] >= MAX_ACTIVE)
+        MAX_ACTIVE / (globals.active_counts[i] + 1)
+    else
+        @as(f32, 1);
+    const played = js.playSound(@intFromEnum(sound.id), sound.pan, sound.pitch_shift, sound.gain_scale * attenuation) == 1;
     if (!played) {
         return false;
     }
     globals.cooldowns[i] = COOLDOWN_MS;
-    globals.active_counts[i] += 1;
+    globals.active_counts[i] += attenuation;
     return true;
 }
 
