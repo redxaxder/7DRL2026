@@ -1664,8 +1664,8 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
                 break :outer;
             }
 
-            destroyed = destroyed or destroy(pos, rng);
-            destroyed = destroyed or destroy(pos, rng);
+            destroyed = destroy(pos, rng) or destroyed;
+            destroyed = destroy(pos, rng) or destroyed;
         }
         flung += 1;
     }
