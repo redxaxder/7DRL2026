@@ -1,0 +1,55 @@
+-------------------------------------------------------------------------------------------
+-                                                                                         -
+-   W   ^        Forward     > Accelerate        Up                                       -
+-  ASD <v>       Left, Right > Turn        Left      Right     Shoot in a direction       -
+-                Back        > Break            Down                                      -
+-                                                                                         -
+- Movement      Motorcycle Movement          You can shoot while coasting.                -
+-                                                  Weapon Mode Controls                   -
+-                                                                                         -
+- Shift + Forward                      > Maintain speed                                   -
+- Shift + Left, Shift + Right          > Strafe                                           -
+- Shift + Back                         > Slow Down                                        -
+- Strafe or Slow Down at minimum speed > Dismount                                         -
+-                                                                                         -
+-        Advanced Motorcycle Movement                                                     -
+-                                                                                         -
+-                                                                                         -
+- 0  1  2  3  4  5  6  7  8  9  - Select an item                                          -
+-                                 Select a weapon to go into Weapon Mode.                 -
+-                                                                                         -
+- ESC                           - Exit Weapon Mode                                        -
+-                                 Drop pending item                                       -
+-                                                                                         -
+- -------------------------------------------------------------                           -
+- -                -                           -              -                           -
+- -                -                           - Kaiju Status -                           -
+- -    Status      -                           -              -                           -
+- -                -                           ----------------                           -
+- ------------------                           -              -                           -
+- -                -     Main Game Screen      -              -                           -
+- -   Inventory    -                           -     Log      -                           -
+- -                -                           -              -                           -
+- -                -                           -              -                           -
+- -------------------------------------------------------------                           -
+-                                                                                         -
+-                                                                                         -
+-   @ < You             o% < A Motorcycle           @% < You on a Motorcycle              -
+-                                                                                         -
+-  ---                                                                                    -
+-  |A|  < Kaiju       There's a Kaiju Radar on the edge of the main screen, looks         -
+-  ---                 like it's picking up something big...                              -
+-                                                                                         -
+-                                                                                         -
+-  _ < Vending Machines, which cost money $ to use      + < Doors     () < Windows        -
+-                                                                                         -
+-                                                      Some of the city is still standing -
+-                                                                                         -
+-  * < Items, might be a trinket or a weapon            & < Rubble    ; < Debris          -
+-                                                                                         -
+-                                                      Some of the city is not...         -
+-  _ < Vending Machines, which cost money $ to use                                        -
+-                                                                                         -
+-                               PRESS ESCAPE TO DISMISS                                   -
+-                                                                                         -
+-------------------------------------------------------------------------------------------
