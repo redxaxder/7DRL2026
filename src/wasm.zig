@@ -1001,10 +1001,18 @@ pub fn ascii_replace(comptime len: usize, s: []const u8) [len]u8 {
 
 pub fn draw_title_screen(t: f64) void {
     _ = t;
-    const w: f32 = 1000;
-    var cursor: f32 = 20;
-    cursor += draw_text(.{ .x = 0, .y = cursor }, "THE STOMPING GROUNDS", .{ .color = .red }, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, "press the any key", .{ .color = .white }, w);
+    const screen_width: f32 = 128 * SPRITE_SCALE;
+    const screen_height: f32 = 72 * SPRITE_SCALE;
+    const title = "THE STOMPING GROUNDS";
+    const subtitle = "press any key";
+    const title_x = (screen_width - @as(f32, @floatFromInt(title.len)) * SPRITE_SCALE) / 2;
+    const subtitle_x = (screen_width - @as(f32, @floatFromInt(subtitle.len)) * SPRITE_SCALE) / 2;
+    const total_height = 2 * SPRITE_SCALE;
+    const start_y = (screen_height - total_height) / 2;
+    var cursor: f32 = start_y - 4 * SPRITE_SCALE;
+    cursor += draw_text(.{ .x = title_x, .y = cursor }, title, .{ .color = .red }, screen_width);
+    cursor += SPRITE_SCALE;
+    cursor += draw_text(.{ .x = subtitle_x, .y = cursor }, subtitle, .{ .color = .white }, screen_width);
     render_buffer.flush();
 }
 
