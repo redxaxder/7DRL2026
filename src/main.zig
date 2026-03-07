@@ -782,6 +782,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             player.move_to(motomove.position);
             player.*.mounted_on = 0;
         } else if (crash_check(pmount, motomove)) |crashed| {
+            queue_sound(.crash);
             if (crashed.fling) {
                 const delta = motomove.midpoint.minus(player.position);
                 var landed_at = motomove.midpoint;
