@@ -2005,11 +2005,11 @@ pub fn resolve_motorcycle_movement(
                     const drift = moto.orientation.ivec()
                         .scaled(@max(amount, 2))
                         .plus(change.ivec());
-                    it.position = it.position.plus(drift);
+                    it.position = it.position.plus(drift)
+                        .plus(it.orientation.ivec());
                 } else {
                     // dismount
                     it.dismount = true;
-                    combat_log.log("You dismount the motorcycle.", .{});
                     it.position = it.position.plus(change.ivec());
                 }
             } else { // full brake
@@ -2036,26 +2036,27 @@ pub fn resolve_motorcycle_movement(
     return it;
 }
 
-pub fn get_reticle_positions() ?[5]IVec2 {
+var reticle_pos: [5]IVec2 = .{IVec2.ZERO} ** 5;
+pub fn get_reticle_positions() []IVec2 {
     const mount = globals.player().mount();
     if (mount.tag == .Nil) {
-        return null;
+        return reticle_pos[0..0];
     }
-
-    const prj = resolve_motorcycle_movement(mount, .{});
-    const hpos = prj.position.plus(prj.orientation.ivec());
-    var result: [5]IVec2 = .{hpos} ** 5;
 
     if (inventory.active_weapon() == null) {
         for (std.enums.values(Dir4), 0..) |d, i| {
-            const projection = resolve_motorcycle_movement(mount, .{ .dir = d });
+            const projection = resolve_motorcycle_movement(mount, .{ .dir = d, .shift = keyboard.isShiftDown() });
             const ppos = projection.position;
             const handlepos = ppos.plus(projection.orientation.ivec());
-            result[i] = handlepos;
+            reticle_pos[i] = handlepos;
         }
     }
 
-    return result;
+    const prj = resolve_motorcycle_movement(mount, .{});
+    reticle_pos[4] = prj.position.plus(prj.orientation.ivec());
+
+    // const n: usize = if (keyboard.isShiftDown()) 4 else 5;
+    return reticle_pos[0..5];
 }
 
 pub const Particle = struct {

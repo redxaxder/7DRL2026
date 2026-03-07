@@ -783,25 +783,23 @@ fn draw_gamefield(t: f64) void {
     }
 
     // Draw movement preview reticles
-    const reticles: ?[5]IVec2 = main.get_reticle_positions();
+    const reticles: []IVec2 = main.get_reticle_positions();
     const reticle_blink = @mod(t, 1000) < 500;
     if (reticle_blink) {
-        if (reticles) |highlight| {
+        for (reticles) |pos| {
             const mount = main.globals.player().mount();
             const p0 = mount.position;
             const p1 = mount.position.plus(mount.orientation.ivec());
-            for (highlight) |pos| {
-                if (pos.eq(p0)) {
-                    continue;
-                }
-                if (pos.eq(p1)) {
-                    continue;
-                }
-                draw_world_glyph(pos.float(), 0x09, .{
-                    .color = .cyan,
-                    .origin = origin,
-                });
+            if (pos.eq(p0)) {
+                continue;
             }
+            if (pos.eq(p1)) {
+                continue;
+            }
+            draw_world_glyph(pos.float(), 0x09, .{
+                .color = .cyan,
+                .origin = origin,
+            });
         }
     }
     render_buffer.flush();
