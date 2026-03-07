@@ -731,6 +731,8 @@ pub fn init(rng: std.Random) !void {
             }
         }
     }
+
+    combat_log.log("You awaken to the sound of a distant roar.", .{});
 }
 
 fn try_place_moto(rect: IRect, rng: std.Random) bool {
