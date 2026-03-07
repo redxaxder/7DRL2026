@@ -808,8 +808,12 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
         }
 
         if (motomove.dismount) {
-            player.move_to(motomove.position);
-            player.*.mounted_on = 0;
+            if (unmounted_move(dir, rng)) {
+                if (!player.mount().get_rect().contains(player.position)) {
+                    combat_log.log("You dismount the motorcycle.", .{});
+                    player.*.mounted_on = 0;
+                }
+            }
         } else if (crash_check(pmount, motomove)) |crashed| {
             if (crashed.fling) {
                 const delta = motomove.midpoint.minus(player.position);
@@ -889,52 +893,57 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             player.move_to(motomove.position);
         }
     } else {
-        if (dir) |d| { // unmounted movement
-            const dv = d.ivec();
-            const target = player.position.plus(dv);
-            const terrain = map.get_terrain_at(target);
-            if (!terrain.unit_passable(.Player)) {
-                switch (terrain) {
-                    .wall => combat_log.log("The wall rejects your advances.", .{}),
-                    .void_ => combat_log.log("You're not done yet.", .{}),
-                    .window => combat_log.log("The window is cold.", .{}),
-                    .vending_machine => {
-                        const remaining = handle_vending(rng);
-                        if (!remaining) {
-                            // TODO: empty vending machine
-                            _ = animate_terrain_to(target, .rubble);
-                        }
-                    },
-                    else => combat_log.log("You can't go there", .{}),
-                }
-                return false;
-            }
+        return unmounted_move(dir, rng);
+    }
+    return true;
+}
 
-            var occupants = get_occupants(target);
-            while (occupants.next()) |occupant_id| {
-                const occupant = globals.unit(occupant_id);
-                switch (occupant.tag) {
-                    .Motorcycle => { // Mount it
-                        player.move_to(occupant.position);
-                        queue_sound(.start_moto);
-                        player.*.mounted_on = occupant_id;
-                        combat_log.log("You start the {s}.", .{occupant.model.name()});
-                        return true;
-                    },
-                    .Kaiju => {
-                        // move into kaiju?
-                        combat_log.log("You don't like your prospects.", .{});
-                        return false;
-                    },
-                    else => {
-                        continue;
-                    },
+pub fn unmounted_move(dir: ?Dir4, rng: std.Random) bool {
+    const d = dir orelse return false;
+    const player = globals.player();
+    const dv = d.ivec();
+    const target = player.position.plus(dv);
+    const terrain = map.get_terrain_at(target);
+    if (!terrain.unit_passable(.Player)) {
+        switch (terrain) {
+            .wall => combat_log.log("The wall rejects your advances.", .{}),
+            .void_ => combat_log.log("You're not done yet.", .{}),
+            .window => combat_log.log("The window is cold.", .{}),
+            .vending_machine => {
+                const remaining = handle_vending(rng);
+                if (!remaining) {
+                    // TODO: empty vending machine
+                    _ = animate_terrain_to(target, .rubble);
                 }
-            }
-            queue_sound(.footstep);
-            player.move_to(target);
+            },
+            else => combat_log.log("You can't go there", .{}),
+        }
+        return false;
+    }
+
+    var occupants = get_occupants(target);
+    while (occupants.next()) |occupant_id| {
+        const occupant = globals.unit(occupant_id);
+        switch (occupant.tag) {
+            .Motorcycle => { // Mount it
+                player.move_to(occupant.position);
+                queue_sound(.start_moto);
+                player.*.mounted_on = occupant_id;
+                combat_log.log("You start the {s}.", .{occupant.model.name()});
+                return true;
+            },
+            .Kaiju => {
+                // move into kaiju?
+                combat_log.log("You don't like your prospects.", .{});
+                return false;
+            },
+            else => {
+                continue;
+            },
         }
     }
+    queue_sound(.footstep);
+    player.move_to(target);
     return true;
 }
 
@@ -1968,7 +1977,6 @@ pub fn resolve_motorcycle_movement(
                 it.position = it.position.plus(drift);
                 if (moto.speed == 0) {
                     it.dismount = true;
-                    combat_log.log("You dismount the motorcycle.", .{});
                 }
             } else { // turn!
                 const turned_speed = blk: {
