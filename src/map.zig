@@ -453,7 +453,7 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
                         for (dirs) |dir| {
                             // motorcycle spawns on the sidewalk outside the door, guaranteed to be unique
                             const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
-                            if (t2 == .sidewalk or t2 == .grass) {
+                            if (t2 == .sidewalk or t2 == .grass or t2 == .vending_machine) {
                                 if (dir == .Left) {
                                     // so the handlebars don't spawn in the door
                                     result[1] = pos.plus(dir.ivec().scaled(2));
