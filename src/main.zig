@@ -782,7 +782,6 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             player.move_to(motomove.position);
             player.*.mounted_on = 0;
         } else if (crash_check(pmount, motomove)) |crashed| {
-            queue_sound(.crash);
             if (crashed.fling) {
                 const delta = motomove.midpoint.minus(player.position);
                 var landed_at = motomove.midpoint;
@@ -800,6 +799,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             pmount.move_to(motomove.midpoint);
             pmount.set_orientation(crashed.orientation);
             pmount.move_to(crashed.position);
+            queue_sound_mount(.crash);
             pmount.*.speed = 0;
             if (motomove.brake) {
                 player.*.move_to(pmount.position);
@@ -910,6 +910,17 @@ const SHOT_RANGE: usize = 64;
 
 pub fn queue_sound(soundid: audio.SoundId) void {
     const lock: animation.AnimationLock = .{ .exclusive = globals.player().lock() };
+    const anim = globals.animation_queue.force_add_empty(.{
+        .on_wake = .lambda(
+            audio.play_,
+            .{audio.SoundConfig{ .id = soundid }},
+        ),
+    });
+    anim.lock_until_start = lock;
+}
+
+pub fn queue_sound_mount(soundid: audio.SoundId) void {
+    const lock: animation.AnimationLock = .{ .exclusive = globals.player().mount().lock() };
     const anim = globals.animation_queue.force_add_empty(.{
         .on_wake = .lambda(
             audio.play_,
