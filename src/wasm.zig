@@ -805,6 +805,7 @@ pub fn draw_main_screen(t: f64) void {
     }
 
     draw_log();
+    draw_help();
 
     render_buffer.flush();
 }
@@ -857,12 +858,12 @@ pub fn draw_help_screen(t: f64) void {
     _ = t;
     const w: f32 = 3000;
     var cursor: f32 = 0;
-    const d: DrawOptions = .{ .color = .white, .size = 1.0 };
+    const d: DrawOptions = .{ .color = .white, .size = 1.2 };
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                                                                         ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~   W   ^        Forward     > Accelerate      ^                                          ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~  ASD <\x19>       Left, Right > Turn           < >     Shoot in a direction                ~"), d, w);
-    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                Back        > Break           \x19                                          ~"), d, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~   W   ^        Forward     > Accelerate      ^W                                         ~"), d, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~  ASD <\x19>       Left, Right > Turn           <A >D   Shoot in a direction                ~"), d, w);
+    cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                Back        > Break           \x19S                                         ~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                             \xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF             ~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~ Movement      Motorcycle Movement           \xB3You can shoot while coasting.\xB3             ~"), d, w);
     cursor += draw_text(.{ .x = 0, .y = cursor }, &ascii_replace(128, "~                                             \xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9             ~"), d, w);
@@ -964,6 +965,12 @@ pub fn draw_indicator(v: Vec2, glyph: u8) void {
     const center = edge_point(r.expand(-SPRITE_SCALE * 2), v);
     const corner = center.minus(Vec2.ONE.scaled(SPRITE_SCALE / 2));
     draw_glyph(corner, glyph, .{ .color = .red });
+}
+
+pub fn draw_help() void {
+    const r = ui.MAIN_VIEW.get("help").float().scaled(SPRITE_SCALE);
+    _ = draw_text(.{ .x = r.x, .y = r.y }, "Press ? for help!", .{ .color = .white }, 500);
+    render_buffer.flush();
 }
 
 // Casts a ray from the center of `rect` in the given `dir`ection,
