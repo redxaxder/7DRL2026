@@ -1126,7 +1126,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
             const decay = 1 - std.math.pow(f64, 0.99, multiplied);
             const hp: f64 = @floatFromInt(u.hp);
             const damage = decay * hp;
-            const idamage: i64 = @as(i64, @intFromFloat(@trunc(damage)));
+            const idamage: i64 = @as(i64, @intFromFloat(@ceil(damage)));
             u.damage(idamage);
             combat_log.log("The gamma ray deals {} damage.", .{idamage});
         },
