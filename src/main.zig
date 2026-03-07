@@ -767,7 +767,7 @@ fn handle_vending(rng: std.Random) bool {
         combat_log.log("You don't have money for a drink.", .{});
     } else {
         if (rng.float(f32) < 0.20) {
-            combat_log.log("The vending machine has run dry.", .{});
+            combat_log.log("The vending machine is empty.", .{});
             return false;
         }
 
@@ -779,6 +779,7 @@ fn handle_vending(rng: std.Random) bool {
             1 => combat_log.log("Executive Coffee! You heal {} HP.", .{healing}),
             2 => combat_log.log("Cowbliss! You heal {} HP.", .{healing}),
             3 => combat_log.log("D.D. Lime! You heal {} HP.", .{healing}),
+            4 => combat_log.log("Shuwashuwa Sweat! You heal {} HP.", .{healing}),
             else => unreachable,
         }
         globals.player().hp += healing;
