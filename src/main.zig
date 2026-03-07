@@ -654,6 +654,9 @@ pub fn spawn(u: Unit) !UnitId {
 }
 
 pub fn unspawn(u: *Unit) void {
+    if (globals.focus == u.id) {
+        globals.focus = 0;
+    }
     const anim = u.deferred_set(.tag, .Nil);
     _ = anim.lock_exclusive(u.lock())
         .lock_exclusive(animlib.lock_rect(u.get_rect()));
