@@ -350,8 +350,14 @@ pub const Unit = struct {
 
                         if (map.get_terrain_at(q) == .money) {
                             _ = animate_terrain_to(q, .floor).chain();
-                            combat_log.log("You pick up 100 yen", .{});
+                            combat_log.log("You pick up 100 yen.", .{});
                             globals.money += 100;
+                        }
+
+                        if (map.get_terrain_at(q) == .starting_gun) {
+                            _ = animate_terrain_to(q, .floor).chain();
+                            combat_log.log("It's kaiju season.", .{});
+                            inventory.inventory[0] = inventory.BASE_WEAPON;
                         }
                     }
                 }
@@ -577,7 +583,7 @@ pub const globals = struct {
     pub var combo_target: ?UnitId = 0;
     pub var combo_count: i64 = 0;
     pub var turn: i64 = 0;
-    pub var money: i64 = 1000;
+    pub var money: i64 = 0;
     pub var focus: UnitId = 0;
 
     pub var danger: u64 = 0;
@@ -614,7 +620,7 @@ pub const globals = struct {
         combo_target = 0;
         combo_count = 0;
         turn = 0;
-        money = 1000;
+        money = 0;
         focus = 0;
 
         danger = 0;
@@ -652,20 +658,25 @@ pub fn init(rng: std.Random) !void {
     globals.rng = rng;
 
     const map_rect: IRect = .{ .x = 0, .y = 0, .w = 2500, .h = 2500 };
-    map.new_mapgen(map_rect, .Residential, rng, 0, 25);
+    const starting_pos, const moto_pos = map.new_mapgen(map_rect, .Residential, rng, 0, 25, true);
 
-    // start within a hundred units or so of PLAYER_START but only if on a road
-    const start_radius = 50;
-    const num_tries: usize = 1000;
-    var start: IVec2 = PLAYER_START;
-    for (0..num_tries) |_| {
-        const player_x = PLAYER_START.x + rng.intRangeAtMost(i16, -1 * start_radius, start_radius);
-        const player_y = PLAYER_START.y + rng.intRangeAtMost(i16, -1 * start_radius, start_radius);
-        const pos: IVec2 = .{ .x = player_x, .y = player_y };
-        const t: Terrain = map.get_terrain_at(pos);
-        if (t == .asphalt or t == .road_paint or t == .road_paint_2) {
-            start = pos;
-            break;
+    var start: IVec2 = undefined;
+    if (starting_pos) |s| {
+        start = s;
+    } else {
+        // start within a hundred units or so of PLAYER_START but only if on a road
+        const start_radius = 50;
+        const num_tries: usize = 1000;
+        start = PLAYER_START;
+        for (0..num_tries) |_| {
+            const player_x = PLAYER_START.x + rng.intRangeAtMost(i16, -1 * start_radius, start_radius);
+            const player_y = PLAYER_START.y + rng.intRangeAtMost(i16, -1 * start_radius, start_radius);
+            const pos: IVec2 = .{ .x = player_x, .y = player_y };
+            const t: Terrain = map.get_terrain_at(pos);
+            if (t == .asphalt or t == .road_paint or t == .road_paint_2) {
+                start = pos;
+                break;
+            }
         }
     }
     globals.units[PLAYER_ID] = .init_player(start);
@@ -674,8 +685,11 @@ pub fn init(rng: std.Random) !void {
     sector.add(KMOM_ID, globals.kmom());
     _ = destroy_area(globals.kmom().get_rect().expand(3), rng);
 
-    const moto_id = try spawn(Unit.init_motorcycle(start, .Right, .Nova_Glide, 80));
-    globals.player().mounted_on = moto_id;
+    var moto_spawn: IVec2 = start;
+    if (moto_pos) |pos| {
+        moto_spawn = pos;
+    }
+    _ = try spawn(Unit.init_motorcycle(moto_spawn, .Right, .Nova_Glide, 80));
 
     inventory.init(rng);
     fov.refresh_fov(globals.player().position, FOV_RANGE);

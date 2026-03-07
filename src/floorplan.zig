@@ -15,8 +15,8 @@ fn assert(ok: bool, comptime msg: []const u8, args: anytype) void {
     }
 }
 
-pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
-    std.log.err("stamp_floorplan: x={} y={} w={} h={}", .{ rect.x, rect.y, rect.w, rect.h });
+pub fn stamp_floorplan(rect: IRect, rng: std.Random, comptime lines: []const []const u8, templates: [count_templates(lines)]Template) bool {
+    std.log.info("stamp floorplan for {}", .{rect});
     assert(rect.w >= 0, "rect.w={} negative", .{rect.w});
     assert(rect.h >= 0, "rect.h={} negative", .{rect.h});
     const target_w: usize = @intCast(rect.w);
@@ -25,7 +25,7 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
     const total = target_w * target_h;
     if (total > scratch_size) return false;
 
-    const template = pick_template(target_w, target_h, rng) orelse return false;
+    const template = pick_template(target_w, target_h, rng, lines, templates) orelse return false;
     assert(template.w >= 2, "template.w={} < 2", .{template.w});
     assert(template.h >= 2, "template.h={} < 2", .{template.h});
     assert(template.w <= target_w, "template.w={} > target_w={}", .{ template.w, target_w });
@@ -114,10 +114,10 @@ pub fn stamp_floorplan(rect: IRect, rng: std.Random) bool {
     return true;
 }
 
-fn pick_template(target_w: usize, target_h: usize, rng: std.Random) ?Template {
-    const max_attempts = all_templates.len * 8;
+fn pick_template(target_w: usize, target_h: usize, rng: std.Random, comptime lines: []const []const u8, templates: [count_templates(lines)]Template) ?Template {
+    const max_attempts = templates.len * 8;
     for (0..max_attempts) |_| {
-        const base = all_templates[rng.intRangeLessThan(usize, 0, all_templates.len)];
+        const base = templates[rng.intRangeLessThan(usize, 0, templates.len)];
         const transformed = base.transform(Dihedral.random(rng));
         if (transformed.w <= target_w and transformed.h <= target_h) {
             return transformed;
@@ -190,10 +190,14 @@ const Template = struct {
 
     fn char_to_terrain(c: u8) Terrain {
         return switch (c) {
+            '~' => .sidewalk,
             '#' => .wall,
             '=' => .window,
             '.' => .floor,
             '+' => .door,
+            '$' => .money,
+            '*' => .starting_gun,
+            '@' => .player_start,
             else => .floor,
         };
     }
@@ -241,7 +245,12 @@ const Dihedral = struct {
 };
 
 const floorplan_data = @embedFile("floorplans/plans.txt");
-const all_templates = parse_all(all_lines);
+pub const all_lines = split_lines(floorplan_data);
+pub const all_templates = parse_all(all_lines);
+
+const starting_data = @embedFile("floorplans/starting_room.txt");
+pub const starting_lines = split_lines(starting_data);
+pub const starting_templates = parse_all(starting_lines);
 
 fn split_lines(comptime data: []const u8) []const []const u8 {
     @setEvalBranchQuota(10000);
@@ -271,8 +280,6 @@ fn count_templates(comptime lines: []const []const u8) usize {
     if (has_rows) count += 1;
     return count;
 }
-
-const all_lines = split_lines(floorplan_data);
 
 fn parse_all(comptime lines: []const []const u8) [count_templates(lines)]Template {
     const count = count_templates(lines);

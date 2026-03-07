@@ -5,7 +5,8 @@ const IRect = core.IRect;
 const Interval = core.Interval;
 const UnitType = @import("main.zig").UnitType;
 const Color = @import("render.zig").Color;
-const stamp_floorplan = @import("floorplan.zig").stamp_floorplan;
+const floorplan = @import("floorplan.zig");
+const stamp_floorplan = floorplan.stamp_floorplan;
 
 const Zone = enum {
     Residential,
@@ -127,10 +128,11 @@ fn gen_industrial(rect: IRect, rng: std.Random) void {
             if (sr) |s| {
                 if (candidate.intersects(s)) {
                     break;
+                } else {
+                    gen_small_building(candidate, rng, false);
                 }
             }
         }
-        gen_small_building(candidate, rng);
         subrects[i] = candidate;
         i += 1;
     }
@@ -178,10 +180,26 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
     }
 }
 
-pub fn gen_small_building(rect: IRect, rng: std.Random) void {
-    if (stamp_floorplan(rect, rng)) {
-        roll_interesting_terrain(rect, .Residential, rng);
-        return;
+const NUM_SMALLS: usize = 2000;
+var smalls: [NUM_SMALLS]?IRect = .{null} ** NUM_SMALLS;
+var small_cursor: usize = 0;
+
+pub fn gen_small_building(rect: IRect, rng: std.Random, starting_room: bool) void {
+    if (starting_room) {
+        const lines = floorplan.starting_lines;
+        const templates = floorplan.starting_templates;
+        fill_terrain(rect, .sidewalk);
+        if (stamp_floorplan(rect, rng, lines, templates)) {
+            return;
+        }
+    } else {
+        const lines = floorplan.all_lines;
+        const templates = floorplan.all_templates;
+        if (stamp_floorplan(rect, rng, lines, templates)) {
+            record_small(rect);
+            roll_interesting_terrain(rect, .Residential, rng);
+            return;
+        }
     }
     // fill with floor
     fill_terrain(rect, .floor);
@@ -203,6 +221,14 @@ pub fn gen_small_building(rect: IRect, rng: std.Random) void {
             set_terrain_at(pos, .wall);
         }
     }
+    record_small(rect);
+}
+
+fn record_small(rect: IRect) void {
+    if (small_cursor < NUM_SMALLS) {
+        smalls[small_cursor] = rect;
+        small_cursor += 1;
+    }
 }
 
 fn is_residential_size(rect: IRect) bool {
@@ -221,7 +247,7 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
     fill_terrain(rect, .sidewalk);
 
     if (is_residential_size(rect)) {
-        gen_small_building(rect, rng);
+        gen_small_building(rect, rng, false);
         return;
     }
 
@@ -330,7 +356,8 @@ pub fn roll_interesting_terrain(rect: IRect, zone: Zone, rng: std.Random) void {
     }
 }
 
-pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_width: i16) void {
+pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_width: i16, top_level: bool) [2]?IVec2 {
+    // returns player starting position
     // scheme:
     // recursively -
     //   draw some number of roads, which divide up the given rect
@@ -349,6 +376,8 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
     // if (depth > 1) {
     //     return;
     // }
+
+    var result: [2]?IVec2 = .{null} ** 2;
 
     // blocks
     const zone_is_fixed = @max(rect.w, rect.h) < 300;
@@ -371,7 +400,7 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
                 gen_residential(rect, rng);
             },
         }
-        return;
+        return result;
     }
 
     const road_v = pick_road_interval(rect, rng, .v, zone, zone_is_fixed, max_road_width);
@@ -399,10 +428,47 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
         set_terrain_at(p, .sidewalk);
     }
 
-    new_mapgen(ul, new_zone, rng, depth + 1, max_road);
-    new_mapgen(ur, new_zone, rng, depth + 1, max_road);
-    new_mapgen(ll, new_zone, rng, depth + 1, max_road);
-    new_mapgen(lr, new_zone, rng, depth + 1, max_road);
+    _ = new_mapgen(ul, new_zone, rng, depth + 1, max_road, false);
+    _ = new_mapgen(ur, new_zone, rng, depth + 1, max_road, false);
+    _ = new_mapgen(ll, new_zone, rng, depth + 1, max_road, false);
+    _ = new_mapgen(lr, new_zone, rng, depth + 1, max_road, false);
+
+    if (top_level) {
+        const tries: usize = 2000;
+        std.log.info("small_cursor {}", .{small_cursor});
+        // try to place the starting room
+        for (0..tries) |_| {
+            const rix: usize = rng.intRangeAtMost(usize, 0, small_cursor - 1);
+            if (smalls[rix]) |small_rect| {
+                if (stamp_floorplan(small_rect, rng, floorplan.starting_lines, floorplan.starting_templates)) {
+                    var rect_iter = small_rect.iter();
+                    while (rect_iter.next()) |pos| {
+                        const t: Terrain = get_terrain_at(pos);
+                        if (t == .player_start) {
+                            set_terrain_at(pos, .floor);
+                            result[0] = pos;
+                        }
+                        if (t == .door) {
+                            const dirs = std.enums.values(core.Dir4);
+                            for (dirs) |dir| {
+                                // motorcycle spawns on the sidewalk outside the door, guaranteed to be unique
+                                const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
+                                if (t2 == .sidewalk or t2 == .grass) {
+                                    if (dir == .Left) {
+                                        // so the handlebars don't spawn in the door
+                                        result[1] = pos.plus(dir.ivec().scaled(2));
+                                    } else {
+                                        result[1] = pos.plus(dir.ivec());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return result;
 }
 
 pub fn pave_road(rect: IRect, orientation: core.Orientation, rng: std.Random) void {
@@ -572,6 +638,8 @@ pub const Terrain = enum(u5) {
     grass,
     vending_machine,
     window,
+    starting_gun,
+    player_start,
     void_,
 
     pub fn name(self: Terrain) []const u8 {
@@ -604,6 +672,7 @@ pub const Terrain = enum(u5) {
             .money => .dark_green,
             .door => .brown,
             .void_ => .dark_blue,
+            .starting_gun => .yellow,
             else => .white,
         };
     }
@@ -624,8 +693,10 @@ pub const Terrain = enum(u5) {
             .sidewalk => return 0xB0,
             .road_paint => return 0xB0,
             .road_paint_2 => return 0xB1,
+            .starting_gun => return 0x0F,
             .grass => return ',',
             .vending_machine => return 0xF0,
+            .player_start => return ';',
             else => return '/',
         }
     }
@@ -689,7 +760,7 @@ pub const Terrain = enum(u5) {
 
     pub fn restricted(self: Terrain) bool {
         return switch (self) {
-            .wall, .door, .window, .vending_machine => true,
+            .wall, .door, .window, .vending_machine, .starting_gun, .player_start => true,
             else => false,
         };
     }

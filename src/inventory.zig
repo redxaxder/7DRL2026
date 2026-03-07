@@ -26,7 +26,7 @@ pub fn reset() void {
     cash = 0;
 }
 
-const BASE_WEAPON: Item = blk: {
+pub const BASE_WEAPON: Item = blk: {
     var it: Item = .tagged(ItemTag.Rifle);
     it.attrs.field(.gun_damage).* = 1;
     it.attrs.field(.accuracy).* = 1;
@@ -61,7 +61,7 @@ const EXAMPLE_FOCUS: Item = blk: {
 };
 
 pub fn init(rng: std.Random) void {
-    inventory[0] = BASE_WEAPON;
+    // inventory[0] = BASE_WEAPON;
     // inventory[1] = EXAMPLE_FOCUS;
     // inventory[2] = EXAMPLE_TRINKET;
     // inventory[1] = EXAMPLE_FOCUS;
