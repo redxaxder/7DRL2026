@@ -655,6 +655,8 @@ pub fn init(rng: std.Random) !void {
     globals.reset();
     inventory.reset();
     sector.init();
+    map.reset();
+
     globals.animation_queue = try animation.Queue.init(std.heap.wasm_allocator, ANIMATION_QUEUE_LEN);
     globals.rng = rng;
 

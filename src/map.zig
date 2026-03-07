@@ -941,6 +941,13 @@ fn get_mask(pos: IVec2) *TerrainMask {
 
 pub var terrain_masks: [256]TerrainMask = .{TerrainMask{}} ** 256;
 
+pub fn reset() void {
+    for (&mapdata) |*t| t.* = FullTerrain.from(.grass);
+    for (&terrain_masks) |*t| t.* = TerrainMask{};
+    best_small = null;
+    best_small_dist = std.math.maxInt(i16);
+}
+
 fn rubblum(radius: IVec2, at: IVec2, terrain: Terrain, density: f32, rng: std.Random) !void {
     var buffer: [2 << 16]u8 = undefined;
     var fba: std.heap.FixedBufferAllocator = .init(&buffer);
