@@ -1201,9 +1201,7 @@ pub fn handle_player_attack(dir: Dir4) bool {
 pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
     var player_acted = false;
     const player_start = globals.player().position;
-    if (globals.player().hp <= 0) {
-        return;
-    }
+    check_gameover(rng);
 
     if (ux.resolve_input(key, rng)) |action| {
         globals.animation_queue.hurry(1.5);
@@ -1631,11 +1629,7 @@ fn destroy(pos: IVec2, rng: std.Random) bool {
     return any;
 }
 
-fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
-    const fling_distance: i16 = 10;
-    var player = globals.player();
-    queue_sound(.smacked);
-    const moto: ?*Unit = if (player.mounted()) player.mount() else null;
+fn check_gameover(rng: std.Random) void {
     if (globals.player().hp <= 1) {
         globals.player().hp = 0;
         const splatter_zone = globals.player().get_rect().expand(1);
@@ -1646,37 +1640,43 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
         combat_log.log("You have been killed.", .{});
         combat_log.log("Press R to restart.", .{});
         globals.gamestate = .Death;
-    } else {
-        harm(damage);
+    }
+}
 
-        // fling player
-        combat_log.log("You are sent flying!", .{});
-        const fling_rect: IRect = if (moto) |m| m.get_rect() else player.get_rect();
-        var fling_iter = fling_rect.slide(dir, fling_distance);
-        var flung: i16 = 0;
-        var destroyed = false;
-        outer: while (fling_iter.next()) |fling_slice| {
-            var iter = fling_slice.iter();
-            while (iter.next()) |pos| {
-                const terrain = map.get_terrain_at(pos);
-                if (terrain == .void_) {
-                    break :outer;
-                }
+fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
+    const fling_distance: i16 = 10;
+    var player = globals.player();
+    queue_sound(.smacked);
+    const moto: ?*Unit = if (player.mounted()) player.mount() else null;
+    harm(damage);
 
-                destroyed = destroyed or destroy(pos, rng);
-                destroyed = destroyed or destroy(pos, rng);
+    // fling player
+    combat_log.log("You are sent flying!", .{});
+    const fling_rect: IRect = if (moto) |m| m.get_rect() else player.get_rect();
+    var fling_iter = fling_rect.slide(dir, fling_distance);
+    var flung: i16 = 0;
+    var destroyed = false;
+    outer: while (fling_iter.next()) |fling_slice| {
+        var iter = fling_slice.iter();
+        while (iter.next()) |pos| {
+            const terrain = map.get_terrain_at(pos);
+            if (terrain == .void_) {
+                break :outer;
             }
-            flung += 1;
+
+            destroyed = destroyed or destroy(pos, rng);
+            destroyed = destroyed or destroy(pos, rng);
         }
-        if (destroyed) {
-            combat_log.log("Smash!!", .{});
-        }
-        const target: IVec2 = player.position.plus(dir.ivec().scaled(flung));
-        globals.player().move_to(target);
-        if (moto) |m| {
-            m.move_to(target);
-            m.speed = 0;
-        }
+        flung += 1;
+    }
+    if (destroyed) {
+        combat_log.log("Smash!!", .{});
+    }
+    const target: IVec2 = player.position.plus(dir.ivec().scaled(flung));
+    globals.player().move_to(target);
+    if (moto) |m| {
+        m.move_to(target);
+        m.speed = 0;
     }
 }
 
