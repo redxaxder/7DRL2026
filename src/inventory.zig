@@ -22,7 +22,7 @@ pub fn reset() void {
     inventory = .{Item.DEFAULT} ** INVENTORY_SIZE;
     active_index = null;
     item_count = 0;
-    item_capacity = 4;
+    item_capacity = 3;
     cash = 0;
 }
 
