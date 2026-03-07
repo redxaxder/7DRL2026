@@ -458,7 +458,7 @@ pub fn render_debug(val: anytype) void {
     }
 }
 
-pub fn draw_status() !void {
+pub fn draw_status(t: f64) !void {
     const r: Rect = ui.MAIN_VIEW.get("status").float().scaled(SPRITE_SCALE);
     RenderBuffer.clear_rect(r.expand(-SPRITE_SCALE / 2), .dark_gray);
     const interior = r.expand(-SPRITE_SCALE);
@@ -471,13 +471,20 @@ pub fn draw_status() !void {
     var cursor: Vec2 = .ZERO;
 
     cursor.y += fmt_draw_text(cursor, "You", opts, w, .{});
-    cursor.y += fmt_draw_text(cursor, "Hp: {}", opts, w, .{player.hp});
+    {
+        var c = opts;
+        const blink = @mod(t, 750) < 100;
+        if (player.hp == 1 and blink) {
+            c.color = .red;
+        }
+        cursor.y += fmt_draw_text(cursor, "Hp: {}", c, w, .{player.hp});
+    }
     cursor.y += fmt_draw_text(cursor, "\x9D: {}", opts, w, .{main.globals.money});
     cursor.y += SPRITE_SCALE;
 
     if (player.mounted()) {
         const mount = player.mount();
-        cursor.y += fmt_draw_text(cursor, "{s}", opts, w, .{mount.model.name()});
+        cursor.y += fmt_draw_text(cursor, "Riding: {s}", opts, w, .{mount.model.name()});
         cursor.y += fmt_draw_text(
             cursor,
             "Hp: {}",
@@ -788,7 +795,7 @@ fn draw_gamefield(t: f64) void {
 
 pub fn draw_main_screen(t: f64) void {
     draw_gamefield(t);
-    draw_status() catch |e| {
+    draw_status(t) catch |e| {
         std.log.err("draw status err {}", .{e});
     };
 
