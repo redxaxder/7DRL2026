@@ -1281,7 +1281,7 @@ pub fn logic_tick(key: keyboard.Code, rng: std.Random) void {
 fn decay_psi() void {
     const psi: f64 = @floatFromInt(globals.psi);
     const reservoir: f64 = @floatFromInt(inventory.bonuses().readfield(.psi_reservoir));
-    const base_decay = 0.95;
+    const base_decay = 0.90;
     const effective_decay = std.math.pow(f64, base_decay, 1 / reservoir);
     const result = psi * effective_decay;
     globals.psi = @intFromFloat(@floor(result));
