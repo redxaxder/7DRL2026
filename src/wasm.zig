@@ -484,7 +484,7 @@ pub fn draw_status(t: f64) !void {
 
     if (player.mounted()) {
         const mount = player.mount();
-        cursor.y += fmt_draw_text(cursor, "Riding: {s}", opts, w, .{mount.model.name()});
+        cursor.y += fmt_draw_text(cursor, "Bike: {s}", opts, w, .{mount.model.name()});
         cursor.y += fmt_draw_text(
             cursor,
             "Hp: {}",
