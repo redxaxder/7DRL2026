@@ -1295,6 +1295,13 @@ fn resolve_pending(rng: std.Random) void {
 
                 var player: *Unit = globals.player();
                 const moto: ?*Unit = if (player.mounted()) player.mount() else null;
+                send_projectile(.{
+                    .color = .white,
+                    .glyph = '0',
+                    .from = pos.plus(Dir4.Up.ivec().scaled(2)).float(),
+                    .to = pos.float(),
+                    .speed = 0.2 + rng.float(f32) * 0.25,
+                });
                 if (pos.eq(player.position)) {
                     const dmg = rng.intRangeAtMost(i64, 1, 6);
                     combat_log.log("You take {} damage from falling debris", .{dmg});

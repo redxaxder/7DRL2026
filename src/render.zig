@@ -8,7 +8,7 @@ var xform_scale: f32 = 1.0;
 var xform_offset: Vec2 = .ZERO;
 
 pub fn setTransform(screen_w: f32, screen_h: f32, virtual_w: f32, virtual_h: f32) void {
-    xform_scale = @max(0.5, @floor(@min(screen_w / virtual_w, screen_h / virtual_h) * 2) / 2);
+    xform_scale = @max(0.25, @floor(@min(screen_w / virtual_w, screen_h / virtual_h) * 4) / 4);
     xform_offset = .{
         .x = @floor((screen_w - virtual_w * xform_scale) / 2),
         .y = @floor((screen_h - virtual_h * xform_scale) / 2),
