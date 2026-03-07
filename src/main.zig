@@ -1150,7 +1150,7 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
 fn handle_psychic_damage(target_pos: IVec2, radius: i16, damage: i64) void {
     var cone = core.cone_iter(globals.player().position, target_pos, radius);
     var i: usize = 0;
-    var candidate_kaiju: [100]UnitId = .{0} ** 100;
+    var candidate_kaiju: [4096]UnitId = .{0} ** 4096;
     var resonance = false;
 
     while (cone.next()) |pos| {
