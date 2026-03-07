@@ -34,7 +34,7 @@ pub const MIN_KAIJU_SIZE = 3;
 pub const FOV_RANGE = 40;
 const SPAWN_ROLL = 400000;
 
-const ANIMATION_QUEUE_LEN = 256;
+const ANIMATION_QUEUE_LEN = 512;
 
 pub fn danger_growth(pos: IVec2) u64 {
     const d: u64 = @intCast(KMOM_START.manhattan_distance(pos));
@@ -1360,7 +1360,7 @@ fn resolve_pending(rng: std.Random) void {
                     u.alive = false;
                 } else {
                     const radius: i16 = @intCast(u.size);
-                    var targets: [256]UnitId = undefined;
+                    var targets: [512]UnitId = undefined;
                     const n = sector.get_occupants_rect_dedup(u.get_rect(), &targets);
                     for (targets[0..n]) |tid| {
                         const target = globals.unit(tid);
@@ -2088,7 +2088,7 @@ pub const Particle = struct {
 };
 
 pub const Particles = struct {
-    data: [200]Particle = .{Particle{}} ** 200,
+    data: [2000]Particle = .{Particle{}} ** 2000,
 
     pub fn clear(self: *Particles) void {
         self.* = .{};
