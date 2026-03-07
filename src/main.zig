@@ -2042,6 +2042,9 @@ pub fn get_reticle_positions() []IVec2 {
         return reticle_pos[0..0];
     }
 
+    const prj = resolve_motorcycle_movement(mount, .{});
+    reticle_pos[4] = prj.position.plus(prj.orientation.ivec());
+
     if (inventory.active_weapon() == null) {
         for (std.enums.values(Dir4), 0..) |d, i| {
             const projection = resolve_motorcycle_movement(mount, .{ .dir = d, .shift = keyboard.isShiftDown() });
@@ -2049,13 +2052,10 @@ pub fn get_reticle_positions() []IVec2 {
             const handlepos = ppos.plus(projection.orientation.ivec());
             reticle_pos[i] = handlepos;
         }
+        return reticle_pos[0..5];
+    } else {
+        return reticle_pos[4..5];
     }
-
-    const prj = resolve_motorcycle_movement(mount, .{});
-    reticle_pos[4] = prj.position.plus(prj.orientation.ivec());
-
-    // const n: usize = if (keyboard.isShiftDown()) 4 else 5;
-    return reticle_pos[0..5];
 }
 
 pub const Particle = struct {
