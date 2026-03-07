@@ -2000,13 +2000,12 @@ pub fn resolve_motorcycle_movement(
             if (move.shift) {
                 if (it.speed > 0) {
                     // slight brake
-                    it.speed -= 1;
                     const amount: i16 = @intCast(it.speed);
+                    it.speed -= 1;
                     const drift = moto.orientation.ivec()
                         .scaled(@max(amount, 2))
                         .plus(change.ivec());
-                    it.position = it.position.plus(drift)
-                        .plus(it.orientation.ivec());
+                    it.position = it.position.plus(drift);
                 } else {
                     // dismount
                     it.dismount = true;
