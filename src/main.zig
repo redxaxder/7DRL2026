@@ -377,7 +377,7 @@ pub const Unit = struct {
                 while (occupants.next()) |uid| {
                     const occupant = globals.unit(uid);
                     if (occupant.tag == .Motorcycle) {
-                        occupant.hp -= 1;
+                        occupant.damage(1);
                     }
                 }
                 var posit = edge.iter();
@@ -1643,7 +1643,7 @@ fn destroy(pos: IVec2, rng: std.Random) bool {
 }
 
 fn check_gameover(rng: std.Random) void {
-    if (globals.player().hp <= 1) {
+    if (globals.player().hp <= 0) {
         globals.player().hp = 0;
         const splatter_zone = globals.player().get_rect().expand(1);
         const seed = rng.int(u16);
