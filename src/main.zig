@@ -356,6 +356,7 @@ pub const Unit = struct {
 
                         if (map.get_terrain_at(q) == .starting_gun) {
                             _ = animate_terrain_to(q, .floor).chain();
+                            combat_log.log("You pick up your old rifle.", .{});
                             combat_log.log("It's kaiju season.", .{});
                             inventory.inventory[0] = inventory.BASE_WEAPON;
                         }
