@@ -112,6 +112,10 @@ pub const Motorcycle = enum {
     Nova_Glide,
     Cinder_Wolf_Pro,
     Kawamura_ZX,
+    Redline_Phantom,
+    Ironfang_Classic,
+    Sato_Bruiser,
+    Talon_600,
 
     pub fn stats(self: Motorcycle) inventory.Attributes {
         var attrs: inventory.Attributes = .{};
@@ -123,9 +127,13 @@ pub const Motorcycle = enum {
         };
 
         const got: [4]i16 = switch (self) {
-            .Nova_Glide => .{ 10, 0, 8, 2 },
+            .Ironfang_Classic => .{ 5, 1, 8, 80 },
             .Cinder_Wolf_Pro => .{ 5, 8, 14, 12 },
             .Kawamura_ZX => .{ 7, 3, 6, 4 },
+            .Talon_600 => .{ 8, 2, 16, 3 },
+            .Nova_Glide => .{ 10, 0, 8, 2 },
+            .Sato_Bruiser => .{ 10, 0, 0, 40 },
+            .Redline_Phantom => .{ 12, 4, 0, 1 },
             .Nil => .{0} ** 4,
         };
         for (fields, 0..) |field, i| {
@@ -1303,7 +1311,7 @@ fn resolve_pending(rng: std.Random) void {
                     .glyph = '0',
                     .from = pos.plus(Dir4.Up.ivec().scaled(2)).float(),
                     .to = pos.float(),
-                    .speed = 0.35 + rng.float(f32) * 0.45,
+                    .speed = 0.45 + rng.float(f32) * 0.45,
                 });
 
                 _ = animate_terrain_to(pos, terrain).chain();
