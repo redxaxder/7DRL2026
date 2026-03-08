@@ -432,6 +432,15 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
         if (best_small) |small_rect| {
             std.log.err("CLOSEST {}", .{best_small_dist});
             if (stamp_floorplan(small_rect, rng, floorplan.starting_lines, floorplan.starting_templates)) {
+
+                // clear vending machines by the starting rect
+                var outer = small_rect.expand(1).iter();
+                while (outer.next()) |pos| {
+                    if (get_terrain_at(pos) == .vending_machine) {
+                        set_terrain_at(pos, .sidewalk);
+                    }
+                }
+
                 var rect_iter = small_rect.iter();
                 while (rect_iter.next()) |pos| {
                     const t: Terrain = get_terrain_at(pos);
@@ -444,10 +453,7 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
                         for (dirs) |dir| {
                             // motorcycle spawns on the sidewalk outside the door, guaranteed to be unique
                             const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
-                            if (t2 == .sidewalk or t2 == .grass or t2 == .vending_machine) {
-                                if (t2 == .vending_machine) {
-                                    set_terrain_at(pos.plus(dir.ivec()), .sidewalk);
-                                }
+                            if (t2 == .sidewalk or t2 == .grass) {
                                 if (dir == .Left) {
                                     // so the handlebars don't spawn in the door
                                     result[1] = pos.plus(dir.ivec().scaled(2));
