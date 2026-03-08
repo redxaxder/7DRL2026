@@ -342,7 +342,7 @@ pub const Unit = struct {
                 .duration = 50 * dist,
                 .lock_exclusive = self.lock(),
                 .lock_shared = animlib.lock_rect_sweep(self.get_rect(), facing, idist),
-                .on_finish = .lambda(draw_bloody_path, .{ self, self.bloody, self.position, pos }),
+                .on_finish = .lambda(draw_bloody_path, .{ self, self.position, pos }),
             },
             animlib.linear_slide,
             .{ from, to, &self.render_position },
@@ -1731,8 +1731,10 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
     }
     const target: IVec2 = player.position.plus(dir.ivec().scaled(flung));
     player.bloody = @floatFromInt(damage);
-    globals.player().move_to(target);
-    player.bloody = 0;
+    player.move_to(target);
+    _ = player.deferred_set(.bloody, 0)
+        .lock_exclusive(player.lock());
+    // player.bloody = 0;
     if (moto) |m| {
         m.move_to(target);
         m.speed = 0;
@@ -2164,14 +2166,14 @@ pub fn send_projectile(opts: struct {
     anim.lock_until_start = opts.start_lock;
 }
 
-pub fn try_mark_blood(blood: *f32, bloody: f32, pos: IVec2) void {
-    if (globals.rng.float(f32) * 100 < (bloody - 5)) {
+pub fn try_mark_blood(blood: *f32, pos: IVec2) void {
+    if (globals.rng.float(f32) * 100 < (blood.* - 5)) {
         blood.* *= 0.9;
         map.mark_bloody(pos);
     }
 }
 
-pub fn draw_bloody_path(unit: *Unit, bloody: f32, from: IVec2, to: IVec2) void {
+pub fn draw_bloody_path(unit: *Unit, from: IVec2, to: IVec2) void {
     const delta = to.minus(from);
     const n = delta.max_norm();
     const is_line = n == delta.manhattan_norm();
@@ -2179,12 +2181,12 @@ pub fn draw_bloody_path(unit: *Unit, bloody: f32, from: IVec2, to: IVec2) void {
     if (is_line) {
         var it = from.scan(dir, n);
         while (it.next()) |pos| {
-            try_mark_blood(&unit.bloody, bloody, pos);
+            try_mark_blood(&unit.bloody, pos);
         }
     } else {
-        try_mark_blood(&unit.bloody, bloody, to);
+        try_mark_blood(&unit.bloody, to);
         if (unit.tag == .Motorcycle) {
-            try_mark_blood(&unit.bloody, bloody, to.plus(unit.orientation.ivec()));
+            try_mark_blood(&unit.bloody, to.plus(unit.orientation.ivec()));
         }
     }
 }
