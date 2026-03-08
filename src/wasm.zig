@@ -331,11 +331,12 @@ fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
         .Motorcycle => {
             const p0 = unit.render_position;
             const p1 = p0.plus(unit.render_orientation.ivec().float());
+            const color: Color = if (unit.bloody > 5) .red else .orange;
             if (map.get_render_terrain_payload_at(unit.position).seen) {
-                draw_world_glyph(p0, 'o', .{ .bgcolor = .black, .origin = origin, .color = .orange });
+                draw_world_glyph(p0, 'o', .{ .bgcolor = .black, .origin = origin, .color = color });
             }
             if (map.get_render_terrain_payload_at(unit.handlepos()).seen) {
-                draw_world_glyph(p1, '%', .{ .bgcolor = .black, .origin = origin, .color = .orange });
+                draw_world_glyph(p1, '%', .{ .bgcolor = .black, .origin = origin, .color = color });
             }
         },
         .Kaiju => render_kaiju(unit, origin),

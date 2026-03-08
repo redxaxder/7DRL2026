@@ -179,6 +179,7 @@ pub const Unit = struct {
     render_orientation: Dir4 = .Right,
     speed: u8 = 0,
     model: Motorcycle = .Nil,
+    bloody: f32 = 0,
 
     mounted_on: UnitId = 0,
 
@@ -335,6 +336,18 @@ pub const Unit = struct {
         const idist = self.position.max_norm_distance(pos);
         var slide = self.get_rect().slide(facing, idist);
 
+        const dist = to.distance(from);
+        _ = globals.animation_queue.force_add(
+            animation.Queue.Options{
+                .duration = 50 * dist,
+                .lock_exclusive = self.lock(),
+                .lock_shared = animlib.lock_rect_sweep(self.get_rect(), facing, idist),
+                .on_finish = .lambda(draw_bloody_path, .{ self, self.position, pos }),
+            },
+            animlib.linear_slide,
+            .{ from, to, &self.render_position },
+        );
+
         var halt = false;
         while (slide.next()) |edge| {
             var positions = edge.iter();
@@ -391,17 +404,6 @@ pub const Unit = struct {
         sector.remove(id, self);
         self.position = pos;
         sector.add(id, self);
-
-        const dist = to.distance(from);
-        _ = globals.animation_queue.force_add(
-            .{
-                .duration = 50 * dist,
-                .lock_exclusive = self.lock(),
-                .lock_shared = animlib.lock_rect_sweep(self.get_rect(), facing, idist),
-            },
-            animlib.linear_slide,
-            .{ from, to, &self.render_position },
-        );
 
         var landed = if (self.mounted())
             self.mount().get_rect().iter()
@@ -794,6 +796,10 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
     const player = globals.player();
     const pmount = player.mount();
     const motostats = pmount.model.stats();
+
+    // when checking if a strafe causes a crash, populate intermediate positions in here
+    var switcheroo: ?[2]IVec2 = null;
+
     if (player.mounted()) {
         // mounted movement
         const motomove = resolve_motorcycle_movement(
@@ -814,7 +820,7 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                     player.*.mounted_on = 0;
                 }
             }
-        } else if (crash_check(pmount, motomove)) |crashed| {
+        } else if (crash_check(pmount, motomove, &switcheroo)) |crashed| {
             if (crashed.fling) {
                 const delta = motomove.midpoint.minus(player.position);
                 var landed_at = motomove.midpoint;
@@ -828,11 +834,17 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                 }
                 player.move_to(landed_at);
             }
-
-            pmount.move_to(motomove.midpoint);
-            pmount.set_orientation(crashed.orientation);
-            pmount.move_to(crashed.position);
-            queue_sound_mount(.crash);
+            if (switcheroo) |got_switcheroo| {
+                pmount.move_to(got_switcheroo[0]);
+                pmount.move_to(got_switcheroo[1]);
+                pmount.move_to(crashed.position);
+                queue_sound_mount(.crash);
+            } else {
+                pmount.move_to(motomove.midpoint);
+                pmount.set_orientation(crashed.orientation);
+                pmount.move_to(crashed.position);
+                queue_sound_mount(.crash);
+            }
             pmount.*.speed = 0;
             if (motomove.brake) {
                 player.*.move_to(pmount.position);
@@ -851,6 +863,9 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
                                 const dmg = base_damage * motomove.speed * motomove.speed * crit_bonus();
                                 combat_log.log("It plows into the beast, dealing {} damage.", .{dmg});
                                 u.damage(dmg);
+                                if (u.hp < 0) {
+                                    pmount.bloody += std.math.pow(f32, 10, @floatFromInt(u.size - 1));
+                                }
                             },
                             .Motorcycle => {
                                 // TODO: what happens when a motorcycle hits another?
@@ -886,11 +901,21 @@ pub fn handle_player_move(dir: ?Dir4, shift: bool, rng: std.Random) bool {
             }
         } else {
             pmount.*.speed = motomove.speed;
-            pmount.move_to(motomove.midpoint);
-            player.move_to(motomove.midpoint);
-            pmount.set_orientation(motomove.orientation);
-            pmount.move_to(motomove.position);
-            player.move_to(motomove.position);
+
+            if (switcheroo) |got_switcheroo| {
+                pmount.move_to(got_switcheroo[0]);
+                player.move_to(got_switcheroo[0]);
+                pmount.move_to(got_switcheroo[1]);
+                player.move_to(got_switcheroo[1]);
+                pmount.move_to(motomove.position);
+                player.move_to(motomove.position);
+            } else {
+                pmount.move_to(motomove.midpoint);
+                player.move_to(motomove.midpoint);
+                pmount.set_orientation(motomove.orientation);
+                pmount.move_to(motomove.position);
+                player.move_to(motomove.position);
+            }
         }
     } else {
         return unmounted_move(dir, rng);
@@ -1824,7 +1849,7 @@ pub const CrashInfo = struct {
     collided_with: ?Unit.Impassable = null,
 };
 
-pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
+pub fn crash_check(moto: *const Unit, move: MotoResult, switcheroo: *?[2]IVec2) ?CrashInfo {
     const delta = move.position.minus(moto.position);
     const n = delta.max_norm();
 
@@ -1877,10 +1902,12 @@ pub fn crash_check(moto: *const Unit, move: MotoResult) ?CrashInfo {
         };
 
         for (0..@intCast(n)) |_| {
+            (switcheroo.*) = .{cursor.position} ** 2;
             var next = cursor.position.plus(principal_vector);
             if (!shifted and !moto.check_passable(.{ .pos = next, .orientation = moto.orientation })) {
                 next = next.plus(secondary_vector);
                 shifted = true;
+                (switcheroo.*.?)[1] = next;
             }
             if (moto.check_passable_full(.{ .pos = next, .orientation = moto.orientation })) |impassable| {
                 cursor.collided_with = impassable;
@@ -2133,6 +2160,31 @@ pub fn send_projectile(opts: struct {
         return;
     };
     anim.lock_until_start = opts.start_lock;
+}
+
+pub fn try_mark_blood(blood: *f32, pos: IVec2) void {
+    if (globals.rng.float(f32) * 100 < (blood.* - 5)) {
+        blood.* *= 0.9;
+        map.mark_bloody(pos);
+    }
+}
+
+pub fn draw_bloody_path(unit: *Unit, from: IVec2, to: IVec2) void {
+    const delta = to.minus(from);
+    const n = delta.max_norm();
+    const is_line = n == delta.manhattan_norm();
+    const dir = delta.principal_dir();
+    if (is_line) {
+        var it = from.scan(dir, n);
+        while (it.next()) |pos| {
+            try_mark_blood(&unit.bloody, pos);
+        }
+    } else {
+        try_mark_blood(&unit.bloody, to);
+        if (unit.tag == .Motorcycle) {
+            try_mark_blood(&unit.bloody, to.plus(unit.orientation.ivec()));
+        }
+    }
 }
 
 test {
