@@ -194,8 +194,8 @@ pub const defns = struct {
         const osc = b.oscillator(.sine);
         const filt = b.biquadFilter(0); // lowpass
         const env = b.gain();
-        osc.envelope(.frequency, &.{ 100, 50 }, &.{0.02});
-        filt.envelope(.frequency, &.{ 600, 150 }, &.{0.03});
+        osc.envelope(.frequency, &.{ 300, 150 }, &.{0.02});
+        filt.envelope(.frequency, &.{ 800, 300 }, &.{0.03});
         env.envelope(.gain, &.{ 0.3, 0.0 }, &.{0.08});
         osc.connect(filt);
         filt.connect(env);
