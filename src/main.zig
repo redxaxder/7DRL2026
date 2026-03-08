@@ -193,6 +193,15 @@ pub const Unit = struct {
     // these are considered to have mutually exclusive ownership over locations,
     // except when the player is riding a motorcycle
 
+    pub fn get_render_pos(self: *const Unit) Vec2 {
+        const mnt = self.mounted_on;
+        const u = globals.unit(mnt);
+        if (mnt > 0 and u.tag == .Motorcycle) {
+            return u.render_position;
+        }
+        return self.render_position;
+    }
+
     pub fn init_player(pos: IVec2) Unit {
         return .{
             .tag = .Player,

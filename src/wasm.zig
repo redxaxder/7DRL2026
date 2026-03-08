@@ -320,7 +320,7 @@ fn render_unit(unit: *const main.Unit, origin: Vec2, t: f64) void {
     switch (unit.tag) {
         .Player => {
             draw_world_glyph(
-                unit.render_position,
+                unit.get_render_pos(),
                 '@',
                 .{
                     .bgcolor = .black,
