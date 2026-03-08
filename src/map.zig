@@ -184,8 +184,8 @@ fn gen_commercial(rect: IRect, rng: std.Random) void {
 var best_small: ?IRect = null;
 var best_small_dist: i16 = std.math.maxInt(i16);
 
-fn record_small(rect: IRect) void {
-    if (rect.w >= 9 and rect.h >= 9) {
+fn record_small(rect: IRect, actually_record: bool) void {
+    if (rect.w >= 9 and rect.h >= 9 and actually_record) {
         const d = rect.point_distance(main.PLAYER_START).manhattan_norm();
         if (d < best_small_dist) {
             best_small_dist = d;
@@ -194,22 +194,13 @@ fn record_small(rect: IRect) void {
     }
 }
 
-pub fn gen_small_building(rect: IRect, rng: std.Random, starting_room: bool) void {
-    if (starting_room) {
-        const lines = floorplan.starting_lines;
-        const templates = floorplan.starting_templates;
-        fill_terrain(rect, .sidewalk);
-        if (stamp_floorplan(rect, rng, lines, templates)) {
-            return;
-        }
-    } else {
-        const lines = floorplan.all_lines;
-        const templates = floorplan.all_templates;
-        if (stamp_floorplan(rect, rng, lines, templates)) {
-            record_small(rect);
-            roll_interesting_terrain(rect, .Residential, rng);
-            return;
-        }
+pub fn gen_small_building(rect: IRect, rng: std.Random, is_residential: bool) void {
+    const lines = floorplan.all_lines;
+    const templates = floorplan.all_templates;
+    if (stamp_floorplan(rect, rng, lines, templates)) {
+        record_small(rect, is_residential);
+        roll_interesting_terrain(rect, .Residential, rng);
+        return;
     }
     // fill with floor
     fill_terrain(rect, .floor);
@@ -231,7 +222,7 @@ pub fn gen_small_building(rect: IRect, rng: std.Random, starting_room: bool) voi
             set_terrain_at(pos, .wall);
         }
     }
-    record_small(rect);
+    record_small(rect, is_residential);
 }
 
 fn is_residential_size(rect: IRect) bool {
@@ -250,7 +241,7 @@ fn gen_residential(rect: IRect, rng: std.Random) void {
     fill_terrain(rect, .sidewalk);
 
     if (is_residential_size(rect)) {
-        gen_small_building(rect, rng, false);
+        gen_small_building(rect, rng, true);
         return;
     }
 
@@ -454,6 +445,9 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
                             // motorcycle spawns on the sidewalk outside the door, guaranteed to be unique
                             const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
                             if (t2 == .sidewalk or t2 == .grass or t2 == .vending_machine) {
+                                if (t2 == .vending_machine) {
+                                    set_terrain_at(pos, .sidewalk);
+                                }
                                 if (dir == .Left) {
                                     // so the handlebars don't spawn in the door
                                     result[1] = pos.plus(dir.ivec().scaled(2));
