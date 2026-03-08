@@ -446,7 +446,7 @@ pub fn new_mapgen(rect: IRect, zone: Zone, rng: std.Random, depth: u8, max_road_
                             const t2: Terrain = get_terrain_at(pos.plus(dir.ivec()));
                             if (t2 == .sidewalk or t2 == .grass or t2 == .vending_machine) {
                                 if (t2 == .vending_machine) {
-                                    set_terrain_at(pos, .sidewalk);
+                                    set_terrain_at(pos.plus(dir.ivec()), .sidewalk);
                                 }
                                 if (dir == .Left) {
                                     // so the handlebars don't spawn in the door
