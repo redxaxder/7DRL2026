@@ -342,7 +342,7 @@ pub const Unit = struct {
                 .duration = 50 * dist,
                 .lock_exclusive = self.lock(),
                 .lock_shared = animlib.lock_rect_sweep(self.get_rect(), facing, idist),
-                .on_finish = .lambda(draw_bloody_path, .{ self, self.position, pos }),
+                .on_wake = .lambda(draw_bloody_path, .{ self, self.position, pos, 50 }),
             },
             animlib.linear_slide,
             .{ from, to, &self.render_position },
@@ -1734,7 +1734,6 @@ fn smack_player(dir: Dir4, rng: std.Random, damage: i64) void {
     player.move_to(target);
     _ = player.deferred_set(.bloody, 0)
         .lock_exclusive(player.lock());
-    // player.bloody = 0;
     if (moto) |m| {
         m.move_to(target);
         m.speed = 0;
@@ -2173,15 +2172,28 @@ pub fn try_mark_blood(blood: *f32, pos: IVec2) void {
     }
 }
 
-pub fn draw_bloody_path(unit: *Unit, from: IVec2, to: IVec2) void {
+pub fn draw_bloody_path(unit: *Unit, from: IVec2, to: IVec2, incdelay: f32) void {
     const delta = to.minus(from);
     const n = delta.max_norm();
     const is_line = n == delta.manhattan_norm();
     const dir = delta.principal_dir();
+    var delay: f32 = 0;
     if (is_line) {
         var it = from.scan(dir, n);
         while (it.next()) |pos| {
-            try_mark_blood(&unit.bloody, pos);
+            delay += incdelay;
+            _ = globals.animation_queue.force_add(
+                .{
+                    .duration = delay,
+                    .on_finish = .lambda(try_mark_blood, .{ &unit.bloody, pos }),
+                },
+                struct {
+                    fn call(_: animation.Time) animation.Exit!void {
+                        return;
+                    }
+                }.call,
+                .{},
+            );
         }
     } else {
         try_mark_blood(&unit.bloody, to);
