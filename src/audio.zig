@@ -196,7 +196,7 @@ pub const defns = struct {
         const env = b.gain();
         osc.envelope(.frequency, &.{ 300, 150 }, &.{0.02});
         filt.envelope(.frequency, &.{ 800, 300 }, &.{0.03});
-        env.envelope(.gain, &.{ 0.3, 0.0 }, &.{0.08});
+        env.envelope(.gain, &.{ 0.05, 0.0 }, &.{0.08});
         osc.connect(filt);
         filt.connect(env);
         env.toOutput();
