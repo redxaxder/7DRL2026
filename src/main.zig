@@ -1081,6 +1081,8 @@ pub fn fire_weapon(aim: IVec2, target: ?*Unit, whiff: bool) bool {
         .Psionic_Focus => {
             queue_sound(.psychic);
             const anchor = ppos.plus(dir.scaled(SHOT_RANGE));
+            const cost = @divFloor(globals.psi, 5);
+            globals.psi -= cost;
             const radius = weapon.attrs.effective_value(.psi_radius);
             const base = IRect.singleton(anchor).expando(d.orientation().flip(), radius);
             var it = base.iter();
